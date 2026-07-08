@@ -16,7 +16,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
-  if (!body?.title?.trim()) return NextResponse.json({ error: 'title required' }, { status: 400 });
+  // typeof check first: a non-string title (number/object/array) has no
+  // .trim() and would otherwise throw an uncaught TypeError -> generic 500
+  // instead of a clean 400.
+  if (typeof body?.title !== 'string' || !body.title.trim()) {
+    return NextResponse.json({ error: 'title required' }, { status: 400 });
+  }
   const urgency = body.urgency ?? 'this_week';
   const db = serviceClient();
   const { data, error } = await db.from('tasks').insert({
