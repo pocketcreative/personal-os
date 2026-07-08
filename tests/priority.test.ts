@@ -22,4 +22,12 @@ describe('mergeRanks', () => {
     const updates = mergeRanks([t('a', 700), t('b', 700)], ['ghost', 'a']);
     expect(updates.map((u) => u.id)).toEqual(['a', 'b']);
   });
+  it('deduplicates a repeated id instead of shifting every later rank down', () => {
+    const updates = mergeRanks([t('a', 700), t('b', 700), t('c', 700)], ['a', 'a', 'b', 'c']);
+    expect(updates).toEqual([
+      { id: 'a', priority_score: 1000 },
+      { id: 'b', priority_score: 990 },
+      { id: 'c', priority_score: 980 },
+    ]);
+  });
 });

@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
 import { mergeRanks } from '@/lib/priority';
 import { localDateKey } from '@/lib/dates';
+import { requireEnv } from '@/lib/auth';
 
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  // requireEnv (not a bare process.env.CRON_SECRET) so a missing env var
+  // fails loudly instead of silently comparing against the literal string
+  // "undefined" — which any caller could match by sending "Bearer undefined".
+  if (req.headers.get('authorization') !== `Bearer ${requireEnv('CRON_SECRET')}`) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const db = serviceClient();
