@@ -25,7 +25,17 @@ export async function rollupTask(db: SupabaseClient, taskId: string): Promise<vo
   if (upErr) throw new Error(upErr.message);
 }
 
-/** Close any running session(s) and roll their tasks up. Enforces the one-timer-max rule. */
+/**
+ * Close any running session(s) and roll their tasks up. Enforces the
+ * one-timer-max rule.
+ *
+ * IMPORTANT: never insert into timer_sessions from anywhere except
+ * app/api/timers/start/route.ts, which always calls this first. Bypassing
+ * it (e.g. a future UI writing to the table directly) would silently break
+ * the one-timer-max guarantee. A DB-level partial unique index
+ * (migrations/0002) backstops the race between concurrent start requests,
+ * but does not protect against a caller skipping this function entirely.
+ */
 export async function closeOpenSessions(db: SupabaseClient): Promise<void> {
   const { data: open, error } = await db.from('timer_sessions')
     .select('id, task_id').eq('user_id', USER_ID).is('ended_at', null);
