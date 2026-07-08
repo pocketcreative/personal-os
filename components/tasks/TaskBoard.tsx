@@ -14,11 +14,16 @@ export default function TaskBoard() {
   const [view, setView] = useState<View>('list');
   const [selected, setSelected] = useState<Task | null>(null);
   const dirtyRef = useRef(false); // guard: a mount-time GET must never clobber a fresh edit (guide bug #4)
+  // Ids being optimistically completed/deleted right now — load() must not
+  // resurrect them if a concurrent capture:done/timer:changed event fires
+  // mid-request, before the server has actually processed the removal.
+  const pendingRemovalRef = useRef<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     const data = await fetchTasks('open');
-    if (!dirtyRef.current) setTasks(data);
-    else setTasks((cur) => data.map((d) => cur.find((c) => c.id === d.id && c.updated_at > d.updated_at) ?? d));
+    const withoutPendingRemovals = data.filter((d) => !pendingRemovalRef.current.has(d.id));
+    if (!dirtyRef.current) setTasks(withoutPendingRemovals);
+    else setTasks((cur) => withoutPendingRemovals.map((d) => cur.find((c) => c.id === d.id && c.updated_at > d.updated_at) ?? d));
   }, []);
 
   useEffect(() => {
@@ -36,7 +41,12 @@ export default function TaskBoard() {
 
   async function applyPatch(id: string, patch: Partial<Task>) {
     dirtyRef.current = true;
-    setTasks((cur) => cur.map((t) => (t.id === id ? { ...t, ...patch } as Task : t)));
+    // Stamp a local updated_at so the dirty-merge comparison in load() sees
+    // this optimistic edit as newer than whatever the server still has
+    // in-flight — without this, a concurrent load() during the round trip
+    // would see equal timestamps and let the server's stale pre-edit copy win.
+    const optimisticPatch = { ...patch, updated_at: new Date().toISOString() };
+    setTasks((cur) => cur.map((t) => (t.id === id ? { ...t, ...optimisticPatch } : t)));
     const saved = await patchTask(id, patch);
     if (saved) setTasks((cur) => cur.map((t) => (t.id === id ? saved : t)));
     else load(); // server rejected — resync rather than lie
@@ -44,16 +54,21 @@ export default function TaskBoard() {
 
   async function complete(task: Task) {
     dirtyRef.current = true;
+    pendingRemovalRef.current.add(task.id);
     setTasks((cur) => cur.filter((t) => t.id !== task.id));
     const saved = await patchTask(task.id, { completed_at: new Date().toISOString() });
+    pendingRemovalRef.current.delete(task.id);
     if (!saved) load();
   }
 
   async function remove(task: Task) {
     dirtyRef.current = true;
+    pendingRemovalRef.current.add(task.id);
     setSelected(null);
     setTasks((cur) => cur.filter((t) => t.id !== task.id));
-    if (!(await deleteTask(task.id))) load();
+    const ok = await deleteTask(task.id);
+    pendingRemovalRef.current.delete(task.id);
+    if (!ok) load();
   }
 
   const sorted = [...tasks].sort((a, b) => b.priority_score - a.priority_score);
@@ -90,6 +105,12 @@ export default function TaskBoard() {
 
       {selected && (
         <TaskDrawer
+          // key forces a remount when the user clicks a different row while
+          // the drawer is already open — without it, TaskDrawer's form state
+          // (initialized once via useState) would keep showing the PREVIOUS
+          // task's stale field values, and saving would apply them to the
+          // wrong task's id.
+          key={selected.id}
           task={selected}
           onClose={() => setSelected(null)}
           onDelete={() => remove(selected)}
