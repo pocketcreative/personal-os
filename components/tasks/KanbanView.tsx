@@ -3,6 +3,14 @@ import { useState } from 'react';
 import type { Task } from '@/lib/types';
 import { URGENCIES, URGENCY_LABELS } from '@/lib/types';
 
+/**
+ * Native HTML5 drag-and-drop — deliberate v1 tradeoff (no deps, upgradeable
+ * to dnd-kit later per the plan). No keyboard alternative and not
+ * screen-reader operable. Re-tiering (moving to a different urgency column)
+ * has a non-drag fallback via the drawer's urgency select, but fine-grained
+ * reordering WITHIN a column has none. Worth a tracked follow-up (e.g.
+ * move-up/move-down buttons per card) if this gap needs to close.
+ */
 export default function KanbanView({ tasks, onDrop, onOpen, onStartTimer }: {
   tasks: Task[];
   /** target urgency + new priority_score (drag = manual rank = pin, handled by PATCH) */
@@ -15,7 +23,13 @@ export default function KanbanView({ tasks, onDrop, onOpen, onStartTimer }: {
   const byTier = (u: Task['urgency']) =>
     tasks.filter((t) => t.urgency === u).sort((a, b) => b.priority_score - a.priority_score);
 
-  /** Score that lands the dragged card at `index` within the tier's current order. */
+  /**
+   * Score that lands the dragged card at `index` within the tier's current order.
+   * No rebalancing: repeatedly reordering into the exact same slot between the
+   * same two neighbors halves their gap each time. Fine at personal-task-list
+   * reorder volume (dozens, not thousands); revisit with a rebalance pass if
+   * scores in a tier ever collide.
+   */
   function scoreAt(tier: Task[], index: number): number {
     const above = tier[index - 1]?.priority_score;
     const below = tier[index]?.priority_score;
@@ -45,6 +59,12 @@ export default function KanbanView({ tasks, onDrop, onOpen, onStartTimer }: {
             {tier.map((t, i) => (
               <div key={t.id} draggable
                 onDragStart={() => setDragId(t.id)}
+                // dragend fires unconditionally after a drop OR a cancelled
+                // drag (Escape, dropped outside any column). Without this,
+                // a cancelled drag leaves dragId stuck, and the filter below
+                // (`t.id !== dragId`) would hide this card from its own
+                // column until the next successful drag-drop resets it.
+                onDragEnd={() => setDragId(null)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault(); e.stopPropagation();
