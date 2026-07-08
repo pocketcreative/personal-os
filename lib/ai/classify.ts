@@ -67,8 +67,21 @@ function userContent(text: string, overrides: string[]): string {
   return `Recent corrections (was → corrected):\n${overrides.join('\n') || '(none)'}\n\nNote:\n${text}`;
 }
 
+const PROVIDER_TIMEOUT_MS = 15_000;
+
+/**
+ * A provider that hangs (rather than erroring) must still degrade to the next
+ * link in the fallback chain — a bare fetch() with no timeout would block
+ * classifyCapture indefinitely and defeat the whole point of the chain.
+ */
+function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = PROVIDER_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 async function claudeClassify(text: string, overrides: string[]): Promise<Classification | null> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'x-api-key': requireEnv('ANTHROPIC_API_KEY'),
@@ -91,7 +104,7 @@ async function claudeClassify(text: string, overrides: string[]): Promise<Classi
 }
 
 async function openaiClassify(text: string, overrides: string[]): Promise<Classification | null> {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${requireEnv('OPENAI_API_KEY')}`,
