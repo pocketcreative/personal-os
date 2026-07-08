@@ -1,7 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { createSessionToken, verifySessionToken } from '@/lib/auth';
+import { createSessionToken, verifySessionToken, requireEnv } from '@/lib/auth';
 
 const SECRET = 'test-secret';
+
+describe('requireEnv', () => {
+  it('returns the value when set', () => {
+    process.env.TEST_REQUIRED_VAR = 'present';
+    expect(requireEnv('TEST_REQUIRED_VAR')).toBe('present');
+    delete process.env.TEST_REQUIRED_VAR;
+  });
+  it('throws when missing, rather than silently returning undefined/empty', () => {
+    delete process.env.TEST_REQUIRED_VAR;
+    expect(() => requireEnv('TEST_REQUIRED_VAR')).toThrow('Missing required env var: TEST_REQUIRED_VAR');
+  });
+});
 
 describe('session tokens', () => {
   it('round-trips a valid token', async () => {

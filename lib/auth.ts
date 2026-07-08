@@ -1,5 +1,16 @@
 const enc = new TextEncoder();
 
+/**
+ * Fail loudly if a required auth env var is missing, instead of letting
+ * `process.env.X!` silently become undefined -> "" and produce a predictable,
+ * publicly-guessable HMAC key (an empty secret is not a secret).
+ */
+export function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing required env var: ${name}`);
+  return value;
+}
+
 async function hmacHex(value: string, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
