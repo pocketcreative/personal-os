@@ -9,6 +9,12 @@ describe('localDateKey', () => {
     expect(localDateKey(new Date('2026-07-08T16:00:00Z'), 'Asia/Singapore')).toBe('2026-07-09');
   });
   it('formats as YYYY-MM-DD', () => {
-    expect(localDateKey(new Date('2026-01-05T00:00:00Z'), 'Asia/Singapore')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(localDateKey(new Date('2026-01-05T00:00:00Z'), 'Asia/Singapore')).toBe('2026-01-05');
+  });
+  it('defaults to Asia/Singapore when no timezone is passed', () => {
+    expect(localDateKey(new Date('2026-07-08T16:00:00Z'))).toBe('2026-07-09');
+  });
+  it('threads a different timezone through correctly (UTC has no offset)', () => {
+    expect(localDateKey(new Date('2026-07-08T16:00:00Z'), 'UTC')).toBe('2026-07-08');
   });
 });
