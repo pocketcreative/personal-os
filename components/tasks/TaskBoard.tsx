@@ -5,6 +5,7 @@ import { fetchTasks, patchTask, deleteTask, startTimer } from '@/lib/clientTasks
 import TaskRow from './TaskRow';
 import TaskDrawer from './TaskDrawer';
 import KanbanView from './KanbanView';
+import SmartView from './SmartView';
 import Panel from '@/components/ui/Panel';
 
 const VIEWS = ['list', 'kanban', 'smart'] as const;
@@ -110,7 +111,10 @@ export default function TaskBoard() {
             applyPatch(taskId, { urgency, priority_score: priorityScore })}
         />
       )}
-      {view === 'smart' && <p style={{ color: 'var(--ink-3)' }}>Smart search lands soon.</p>}
+      {view === 'smart' && (
+        <SmartView tasks={tasks} onComplete={complete} onOpen={setSelected}
+          onStartTimer={(t) => startTimer(t.id)} />
+      )}
 
       {selected && (
         <TaskDrawer
