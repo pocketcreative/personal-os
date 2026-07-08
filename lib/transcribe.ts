@@ -18,6 +18,13 @@ export async function transcribeOgg(buf: ArrayBuffer): Promise<string> {
       body: form,
       signal: controller.signal,
     });
+  } catch (e) {
+    // An aborted fetch rejects with a bare AbortError; rewrap so the caller
+    // sees a clear, actionable message instead of an opaque timeout error.
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error(`whisper transcription timed out after ${WHISPER_TIMEOUT_MS / 1000}s`);
+    }
+    throw e;
   } finally {
     clearTimeout(timer);
   }
