@@ -4,6 +4,7 @@ import type { Task } from '@/lib/types';
 import { fetchTasks, patchTask, deleteTask, startTimer } from '@/lib/clientTasks';
 import TaskRow from './TaskRow';
 import TaskDrawer from './TaskDrawer';
+import KanbanView from './KanbanView';
 import Panel from '@/components/ui/Panel';
 
 const VIEWS = ['list', 'kanban', 'smart'] as const;
@@ -100,7 +101,15 @@ export default function TaskBoard() {
           ))}
         </div>
       )}
-      {view === 'kanban' && <p style={{ color: 'var(--ink-3)' }}>Kanban lands in the next task.</p>}
+      {view === 'kanban' && (
+        <KanbanView
+          tasks={tasks}
+          onOpen={setSelected}
+          onStartTimer={(t) => startTimer(t.id)}
+          onDrop={(taskId, urgency, priorityScore) =>
+            applyPatch(taskId, { urgency, priority_score: priorityScore })}
+        />
+      )}
       {view === 'smart' && <p style={{ color: 'var(--ink-3)' }}>Smart search lands soon.</p>}
 
       {selected && (
