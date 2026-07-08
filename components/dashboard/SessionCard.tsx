@@ -31,7 +31,11 @@ export default function SessionCard() {
     const res = await fetch('/api/focus', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ focus }),
     }).catch((e) => { console.error(e); return null; });
-    if (!res?.ok) console.error('focus save failed', res && (await res.text()));
+    if (!res?.ok) { console.error('focus save failed', res && (await res.text())); return; }
+    // Local and server state are back in sync — clear the guard so a later
+    // load() (e.g. from another tab/device, or capture:done) can pick up
+    // subsequent server-side changes again instead of being blocked forever.
+    focusDirty.current = false;
   }
 
   return (
