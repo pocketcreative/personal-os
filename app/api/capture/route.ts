@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processCapture } from '@/lib/capture';
 
-export const maxDuration = 30;
+// Worst case, processCapture's classifier chain alone can spend ~30s
+// (15s Claude timeout + 15s OpenAI timeout) before even falling back to
+// regex — leave headroom for that plus the Supabase reads/writes on top.
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   const { text } = await req.json().catch(() => ({ text: '' }));
