@@ -46,6 +46,12 @@ export async function POST(req: NextRequest) {
   try {
     const parsed = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
     const valid = new Set(tasks.map((t) => t.id));
+    // Deliberate prompt-injection mitigation: task titles and the raw query
+    // both flow into the prompt unsanitized. A crafted title could try to
+    // manipulate the model's output, but this filter constrains the result
+    // to ids that are real, already-open, already-belong-to-USER_ID tasks
+    // regardless of what the model returns — worst case is a confusing note
+    // or ordering, never a leaked or unauthorized id.
     return NextResponse.json({
       ids: (parsed.ids ?? []).filter((id: string) => valid.has(id)),
       note: typeof parsed.note === 'string' ? parsed.note : '',
