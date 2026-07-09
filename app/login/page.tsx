@@ -1,21 +1,31 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Panel from '@/components/ui/Panel';
 
 export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const router = useRouter();
+  const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    setBusy(true);
     const res = await fetch('/api/auth/login', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ password }),
-    });
-    if (res.ok) router.push('/');
-    else setError('Wrong password.');
+    }).catch((err) => { console.error(err); return null; });
+    if (res?.ok) {
+      // A full navigation, not router.push(): App Router's client-side
+      // navigation can reuse a cached "redirect to /login" result from
+      // before the session cookie existed, bouncing straight back here
+      // even though login succeeded. window.location forces a real
+      // request that middleware re-evaluates with the fresh cookie.
+      window.location.href = '/';
+      return;
+    }
+    setBusy(false);
+    setError('Wrong password.');
   }
 
   return (
@@ -29,9 +39,9 @@ export default function Login() {
             style={{ borderColor: 'var(--ink-2)' }}
           />
           {error && <p className="text-sm" style={{ color: 'var(--danger)' }}>{error}</p>}
-          <button type="submit" className="rounded p-2 font-medium"
+          <button type="submit" disabled={busy} className="rounded p-2 font-medium"
             style={{ background: 'var(--accent)', color: 'var(--ink-0)' }}>
-            Enter
+            {busy ? '…' : 'Enter'}
           </button>
         </form>
       </Panel>
