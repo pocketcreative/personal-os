@@ -1,6 +1,11 @@
 import { requireEnv } from '@/lib/auth';
 
-const WHISPER_TIMEOUT_MS = 60_000;
+// Telegram voice notes are short (personal capture, not long recordings) —
+// Whisper transcription of a clip that size typically takes a few seconds.
+// Kept well under 60s so the Telegram webhook route's own maxDuration=60
+// has headroom left for the classifier chain (up to 30s) that runs after
+// this: 60s here would alone exceed the route's total budget.
+const WHISPER_TIMEOUT_MS = 20_000;
 
 /** Transcribe a Telegram voice note (OGG/Opus). Telegram serves OGG — the MIME type matters (guide Part 4 bug). */
 export async function transcribeOgg(buf: ArrayBuffer): Promise<string> {

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { processCapture } from '@/lib/capture';
 import { transcribeOgg } from '@/lib/transcribe';
@@ -6,9 +7,36 @@ import { serviceClient, USER_ID } from '@/lib/supabase';
 
 export const maxDuration = 60;
 
+/**
+ * Constant-time secret comparison. This route sits in middleware.ts's public
+ * prefix list (no cookie/x-api-secret layer) — the secret-token check below
+ * is the ONLY gate on a publicly-reachable URL, so a plain !== comparison's
+ * theoretical timing leak is worth closing here even though it wasn't for
+ * lower-stakes internal routes elsewhere in the app.
+ */
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
+
 const URGENCY_LABELS: Record<string, string> = {
   today: 'Today', this_week: 'This Week', this_month: 'This Month', someday: 'Someday',
 };
+
+interface TelegramMessage {
+  from?: { id: number };
+  chat: { id: number };
+  text?: string;
+  voice?: { file_id: string };
+}
+
+interface CallbackQuery {
+  id: string;
+  from?: { id: number };
+  data?: string;
+  message?: { chat: { id: number } };
+}
 
 // callback_data must stay <=64 bytes: "u|<uuid36>|this_month" = 50 bytes. OK.
 function urgencyKeyboard(taskId: string) {
@@ -28,29 +56,52 @@ function urgencyKeyboard(taskId: string) {
 }
 
 export async function POST(req: NextRequest) {
-  if (req.headers.get('x-telegram-bot-api-secret-token') !== process.env.TELEGRAM_WEBHOOK_SECRET) {
+  const secretHeader = req.headers.get('x-telegram-bot-api-secret-token');
+  const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!secretHeader || !expectedSecret || !safeEqual(secretHeader, expectedSecret)) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
-  const update = await req.json();
+
+  // req.json() sat outside the try/catch below, so a malformed body (or an
+  // attacker probing this publicly-reachable URL, since it has no other
+  // auth layer) would throw before reaching it — producing a non-200
+  // response and defeating the "always 200, avoid Telegram retry storms"
+  // goal the comment at the bottom of this function describes.
+  let update: {
+    message?: unknown;
+    callback_query?: unknown;
+  };
   try {
-    if (update.callback_query) await handleCallback(update.callback_query);
-    else if (update.message) await handleMessage(update.message);
+    update = await req.json();
+  } catch (err) {
+    console.error('webhook: malformed update body', err);
+    return NextResponse.json({ ok: true });
+  }
+
+  // Tracks whether processCapture already succeeded before a later step
+  // (e.g. the confirmation reply) fails, so the error message sent back
+  // doesn't falsely tell the user their capture was lost when it wasn't.
+  let captureSucceeded = false;
+  try {
+    if (update.callback_query) await handleCallback(update.callback_query as CallbackQuery);
+    else if (update.message) await handleMessage(update.message as TelegramMessage, () => { captureSucceeded = true; });
   } catch (err) {
     console.error('webhook error', err);
-    const chatId = update.message?.chat?.id ?? update.callback_query?.message?.chat?.id;
+    const message = update.message as TelegramMessage | undefined;
+    const callback = update.callback_query as CallbackQuery | undefined;
+    const chatId = message?.chat?.id ?? callback?.message?.chat?.id;
     if (chatId) {
-      await tgSendMessage(chatId, `⚠️ Capture failed: ${(err as Error).message}`)
-        .catch((e) => console.error('error-reply failed', e));
+      const text = captureSucceeded
+        ? `⚠️ Saved, but couldn't send the confirmation: ${(err as Error).message}`
+        : `⚠️ Capture failed: ${(err as Error).message}`;
+      await tgSendMessage(chatId, text).catch((e) => console.error('error-reply failed', e));
     }
   }
   // Always 200 — otherwise Telegram retry-storms the endpoint.
   return NextResponse.json({ ok: true });
 }
 
-async function handleMessage(message: {
-  from?: { id: number }; chat: { id: number };
-  text?: string; voice?: { file_id: string };
-}) {
+async function handleMessage(message: TelegramMessage, onCaptureSucceeded: () => void) {
   if (String(message.from?.id) !== process.env.TELEGRAM_USER_ID) return;
   const chatId = message.chat.id;
   let text = message.text ?? '';
@@ -68,6 +119,7 @@ async function handleMessage(message: {
   if (!text.trim()) return;
 
   const result = await processCapture({ text, source: 'telegram', audioUrl });
+  onCaptureSucceeded();
   const c = result.classification;
   const flag = c.low_confidence ? ' (low confidence — AI was down)' : '';
 
@@ -85,9 +137,7 @@ async function handleMessage(message: {
   }
 }
 
-async function handleCallback(cb: {
-  id: string; from?: { id: number }; data?: string;
-}) {
+async function handleCallback(cb: CallbackQuery) {
   if (String(cb.from?.id) !== process.env.TELEGRAM_USER_ID) return;
   const [op, taskId, value] = String(cb.data ?? '').split('|');
   if (!op || !taskId) return;
