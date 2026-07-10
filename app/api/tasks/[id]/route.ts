@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
+import { closeOpenSessionForTask } from '@/lib/timers';
 
 const PATCHABLE = new Set([
   'title', 'description', 'urgency', 'key', 'priority_score', 'rank_pinned',
@@ -23,6 +24,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   patch.updated_at = new Date().toISOString();
   const db = serviceClient();
+  // Completing a task auto-stops any running timer for it and rolls up
+  // actual_time_min from all closed sessions (spec: task-dashboard-redesign
+  // decision #3). Must run BEFORE the main update below — closeOpenSessionForTask
+  // does its own separate update of actual_time_min, and this route's own
+  // patch never touches actual_time_min, so ordering it first means the
+  // select('*') below returns the fresh rolled-up value instead of a stale one.
+  if (patch.status === 'completed') {
+    try {
+      await closeOpenSessionForTask(db, id);
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    }
+  }
   const { data, error } = await db.from('tasks').update(patch)
     .eq('id', id).eq('user_id', USER_ID).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
