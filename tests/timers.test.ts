@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sumSessionMinutes } from '@/lib/timers';
+import { sumSessionMinutes, closeOpenSessionForTask } from '@/lib/timers';
 
 describe('sumSessionMinutes', () => {
   it('sums closed sessions, rounded to minutes', () => {
@@ -14,5 +14,11 @@ describe('sumSessionMinutes', () => {
   });
   it('returns 0 for no sessions', () => {
     expect(sumSessionMinutes([])).toBe(0);
+  });
+});
+
+describe('closeOpenSessionForTask (integration shape check)', () => {
+  it('is exported as a function', () => {
+    expect(typeof closeOpenSessionForTask).toBe('function');
   });
 });

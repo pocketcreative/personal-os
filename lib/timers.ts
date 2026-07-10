@@ -26,24 +26,25 @@ export async function rollupTask(db: SupabaseClient, taskId: string): Promise<vo
 }
 
 /**
- * Close any running session(s) and roll their tasks up. Enforces the
- * one-timer-max rule.
+ * Close THIS task's open session (if any) and roll it up. Scoped per-task,
+ * not per-user — multiple different tasks can each have their own running
+ * timer simultaneously (the app-wide one-timer-max invariant was retired
+ * in the Task Dashboard redesign; a task still can't have two overlapping
+ * sessions with itself, enforced by migrations/0003's partial unique index).
  *
  * IMPORTANT: never insert into timer_sessions from anywhere except
- * app/api/timers/start/route.ts, which always calls this first. Bypassing
- * it (e.g. a future UI writing to the table directly) would silently break
- * the one-timer-max guarantee. A DB-level partial unique index
- * (migrations/0002) backstops the race between concurrent start requests,
- * but does not protect against a caller skipping this function entirely.
+ * app/api/timers/start/route.ts, which always calls this first for the
+ * SAME task_id. Bypassing it would let a task accumulate two open sessions
+ * at once and violate the DB constraint on the next start attempt.
  */
-export async function closeOpenSessions(db: SupabaseClient): Promise<void> {
+export async function closeOpenSessionForTask(db: SupabaseClient, taskId: string): Promise<void> {
   const { data: open, error } = await db.from('timer_sessions')
-    .select('id, task_id').eq('user_id', USER_ID).is('ended_at', null);
+    .select('id').eq('task_id', taskId).eq('user_id', USER_ID).is('ended_at', null);
   if (error) throw new Error(error.message);
   for (const s of open ?? []) {
     const { error: endErr } = await db.from('timer_sessions')
       .update({ ended_at: new Date().toISOString() }).eq('id', s.id);
     if (endErr) throw new Error(endErr.message);
-    await rollupTask(db, s.task_id);
   }
+  if (open && open.length > 0) await rollupTask(db, taskId);
 }
