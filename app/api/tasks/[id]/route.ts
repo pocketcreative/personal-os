@@ -3,7 +3,8 @@ import { serviceClient, USER_ID } from '@/lib/supabase';
 
 const PATCHABLE = new Set([
   'title', 'description', 'urgency', 'key', 'priority_score', 'rank_pinned',
-  'time_estimate_min', 'tags', 'due_date', 'completed_at',
+  'time_estimate_min', 'actual_time_min', 'tags', 'due_date', 'completed_at',
+  'category', 'status',
 ]);
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -14,6 +15,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
   // A manual priority change is a drag — pin it so the AI re-ranker works around it.
   if ('priority_score' in patch && !('rank_pinned' in patch)) patch.rank_pinned = true;
+  // Marking Completed via the status popover also completes the task, and
+  // moving off Completed un-marks it — unless the caller explicitly set
+  // completed_at itself, in which case we don't second-guess it.
+  if ('status' in patch && !('completed_at' in patch)) {
+    patch.completed_at = patch.status === 'completed' ? new Date().toISOString() : null;
+  }
   patch.updated_at = new Date().toISOString();
   const db = serviceClient();
   const { data, error } = await db.from('tasks').update(patch)
