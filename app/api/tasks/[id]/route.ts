@@ -27,14 +27,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Completing a task auto-stops any running timer for it and rolls up
   // actual_time_min from all closed sessions (spec: task-dashboard-redesign
   // decision #3). Must run BEFORE the main update below — closeOpenSessionForTask
-  // does its own separate update of actual_time_min, and this route's own
-  // patch never touches actual_time_min, so ordering it first means the
-  // select('*') below returns the fresh rolled-up value instead of a stale one.
+  // does its own separate update of actual_time_min, so ordering it first means
+  // the select('*') below returns the fresh rolled-up value instead of a stale
+  // one (unless overridden by the restore logic or the caller's own patch below).
   if (patch.status === 'completed') {
+    // rollupTask (inside closeOpenSessionForTask) unconditionally overwrites
+    // actual_time_min with the sum of closed sessions. That's correct for
+    // /api/timers/start and /api/timers/stop, but the spec only wants a
+    // *backfill* here: preserve a manually-set actual_time_min and only let
+    // the rollup's value stand when it was genuinely still zero. (If the
+    // caller's own PATCH body also sets actual_time_min explicitly, that
+    // still wins over both — it's applied last, in the update below.)
+    const { data: before, error: beforeErr } = await db.from('tasks')
+      .select('actual_time_min').eq('id', id).eq('user_id', USER_ID).single();
+    if (beforeErr) return NextResponse.json({ error: beforeErr.message }, { status: 500 });
     try {
       await closeOpenSessionForTask(db, id);
     } catch (err) {
+      console.error('auto-stop timer on completion failed', err);
       return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    }
+    if (before?.actual_time_min) {
+      const { error: restoreErr } = await db.from('tasks')
+        .update({ actual_time_min: before.actual_time_min })
+        .eq('id', id).eq('user_id', USER_ID);
+      if (restoreErr) return NextResponse.json({ error: restoreErr.message }, { status: 500 });
     }
   }
   const { data, error } = await db.from('tasks').update(patch)
