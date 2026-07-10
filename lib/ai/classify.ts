@@ -1,11 +1,13 @@
 import { requireEnv } from '@/lib/auth';
 
 export type CaptureKind = 'task' | 'journal' | 'goal';
-export type Urgency = 'today' | 'this_week' | 'this_month' | 'someday';
+export type Priority = 'today' | 'dash';
+export type Category = 'personal' | 'business';
 
 export interface Classification {
   kind: CaptureKind;
-  urgency: Urgency;
+  priority: Priority;
+  category: Category;
   tags: string[];
   summary: string;
   time_estimate_min: number | null;
@@ -13,12 +15,15 @@ export interface Classification {
 }
 
 const KINDS: CaptureKind[] = ['task', 'journal', 'goal'];
-const URGENCIES: Urgency[] = ['today', 'this_week', 'this_month', 'someday'];
+const PRIORITIES: Priority[] = ['today', 'dash'];
+const CATEGORIES: Category[] = ['personal', 'business'];
 
 const SYSTEM_PROMPT = `You classify one captured note from the user's phone into strict JSON.
 Return ONLY a JSON object:
-{"kind":"task"|"journal"|"goal","urgency":"today"|"this_week"|"this_month"|"someday","tags":string[] (1-3 lowercase words),"summary":string (imperative, <=80 chars),"time_estimate_min":number|null}
+{"kind":"task"|"journal"|"goal","priority":"today"|"dash","category":"personal"|"business","tags":string[] (1-3 lowercase words),"summary":string (imperative, <=80 chars),"time_estimate_min":number|null}
 - "task" = a single actionable item. "journal" = reflection/diary about the day. "goal" = an outcome for the week/month, not one action.
+- priority: "today" only if the note implies urgency/today, otherwise "dash".
+- category: "business" for work/client/professional items, "personal" for everything else.
 - time_estimate_min: honest working-time estimate for tasks (the user has ADHD and underestimates); null for journal/goal.
 - Recent corrections the user made to past classifications are provided — match their judgment.`;
 
@@ -28,11 +33,13 @@ export function parseClassification(raw: string): Classification | null {
     const end = raw.lastIndexOf('}');
     if (start === -1 || end <= start) return null;
     const obj = JSON.parse(raw.slice(start, end + 1));
-    if (!KINDS.includes(obj.kind) || !URGENCIES.includes(obj.urgency)) return null;
+    if (!KINDS.includes(obj.kind) || !PRIORITIES.includes(obj.priority)) return null;
+    if (obj.category !== undefined && !CATEGORIES.includes(obj.category)) return null;
     if (typeof obj.summary !== 'string' || !obj.summary.trim()) return null;
     return {
       kind: obj.kind,
-      urgency: obj.urgency,
+      priority: obj.priority,
+      category: CATEGORIES.includes(obj.category) ? obj.category : 'personal',
       tags: Array.isArray(obj.tags) ? obj.tags.filter((t: unknown): t is string => typeof t === 'string').slice(0, 3) : [],
       summary: obj.summary.trim().slice(0, 120),
       time_estimate_min: typeof obj.time_estimate_min === 'number' ? Math.round(obj.time_estimate_min) : null,
@@ -49,14 +56,12 @@ export function regexClassify(text: string): Classification {
     /\b(journal|diary|reflect(ing|ion)?|felt|grateful)\b/.test(lower) ? 'journal'
     : /\b(goal|this month i want|by end of)\b/.test(lower) ? 'goal'
     : 'task';
-  const urgency: Urgency =
-    /\b(today|tonight|asap|right now|urgent)\b/.test(lower) ? 'today'
-    : /\bthis week\b/.test(lower) ? 'this_week'
-    : /\bthis month\b/.test(lower) ? 'this_month'
-    : /\b(someday|one day|eventually)\b/.test(lower) ? 'someday'
-    : 'this_week';
+  const priority: Priority =
+    /\b(today|tonight|asap|right now|urgent)\b/.test(lower) ? 'today' : 'dash';
+  const category: Category =
+    /\b(invoice|deadline|colleague|boss|work)\b/.test(lower) ? 'business' : 'personal';
   return {
-    kind, urgency, tags: [],
+    kind, priority, category, tags: [],
     summary: text.trim().slice(0, 120),
     time_estimate_min: null,
     low_confidence: true,
