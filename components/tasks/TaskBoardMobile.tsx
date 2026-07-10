@@ -17,8 +17,14 @@ const STATUS_TEXT: Record<Task['status'], string> = {
 function MobileTimer({ task, onStart, onStop }: {
   task: Task; onStart: () => void; onStop: () => void;
 }) {
-  const liveMin = useLiveTimer(task.active_timer?.started_at ?? null);
-  const running = !!task.active_timer;
+  const isCompleted = task.status === 'completed';
+  // Completed tasks never count as "running" for display purposes, even if
+  // stale local state still has an active_timer (server already auto-closed
+  // it — see applyPatch in useTaskDashboard). Don't feed useLiveTimer a live
+  // startedAt in that case either, so the displayed time freezes instead of
+  // continuing to tick on a card that shows "Completed".
+  const liveMin = useLiveTimer(isCompleted ? null : task.active_timer?.started_at ?? null);
+  const running = !isCompleted && !!task.active_timer;
   const totalMin = running ? task.actual_time_min + liveMin : task.actual_time_min;
   const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
   const mm = String(Math.floor(totalMin % 60)).padStart(2, '0');
@@ -28,7 +34,7 @@ function MobileTimer({ task, onStart, onStop }: {
       <span style={{ fontSize: 17, lineHeight: 1 }}>{running ? '⏳' : '⌛'}</span>
       <span style={{
         fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, fontWeight: 600,
-        letterSpacing: '.02em', color: running ? '#9a7a2e' : '#111',
+        letterSpacing: '.02em', color: isCompleted ? 'rgba(17,17,17,.35)' : (running ? '#9a7a2e' : '#111'),
       }}>{hh}:{mm}:{ss}</span>
     </div>
   );
