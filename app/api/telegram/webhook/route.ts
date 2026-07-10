@@ -20,10 +20,6 @@ function safeEqual(a: string, b: string): boolean {
   return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
 }
 
-const URGENCY_LABELS: Record<string, string> = {
-  today: 'Today', this_week: 'This Week', this_month: 'This Month', someday: 'Someday',
-};
-
 interface TelegramMessage {
   from?: { id: number };
   chat: { id: number };
@@ -38,19 +34,19 @@ interface CallbackQuery {
   message?: { chat: { id: number } };
 }
 
-// callback_data must stay <=64 bytes: "u|<uuid36>|this_month" = 50 bytes. OK.
-function urgencyKeyboard(taskId: string) {
+// callback_data must stay <=64 bytes: "p|<uuid36>|today" = 43 bytes,
+// "c|<uuid36>|business" = 46 bytes. Both OK.
+function taskActionKeyboard(taskId: string) {
   return {
     inline_keyboard: [
       [
-        { text: 'Today', callback_data: `u|${taskId}|today` },
-        { text: 'This Week', callback_data: `u|${taskId}|this_week` },
+        { text: '⭐ Today', callback_data: `p|${taskId}|today` },
+        { text: 'Not today', callback_data: `p|${taskId}|dash` },
       ],
       [
-        { text: 'This Month', callback_data: `u|${taskId}|this_month` },
-        { text: 'Someday', callback_data: `u|${taskId}|someday` },
+        { text: 'Personal', callback_data: `c|${taskId}|personal` },
+        { text: 'Business', callback_data: `c|${taskId}|business` },
       ],
-      [{ text: '⭐ Mark Key', callback_data: `k|${taskId}|1` }],
     ],
   };
 }
@@ -125,10 +121,11 @@ async function handleMessage(message: TelegramMessage, onCaptureSucceeded: () =>
 
   if (c.kind === 'task' && result.routedId) {
     const est = c.time_estimate_min ? ` · est ${c.time_estimate_min}m` : '';
+    const priorityLabel = c.priority === 'today' ? 'Today' : '—';
     await tgSendMessage(
       chatId,
-      `✅ Task: ${c.summary}\n${URGENCY_LABELS[c.urgency]}${est}${flag}`,
-      urgencyKeyboard(result.routedId),
+      `✅ Task: ${c.summary}\n${priorityLabel} · ${c.category}${est}${flag}`,
+      taskActionKeyboard(result.routedId),
     );
   } else if (c.kind === 'journal') {
     await tgSendMessage(chatId, `📓 Journaled for today.${flag}`);
@@ -143,20 +140,20 @@ async function handleCallback(cb: CallbackQuery) {
   if (!op || !taskId) return;
   const db = serviceClient();
 
-  if (op === 'u') {
+  if (op === 'p') {
     const { error } = await db.from('tasks')
-      .update({ urgency: value, updated_at: new Date().toISOString() })
+      .update({ key: value === 'today', updated_at: new Date().toISOString() })
       .eq('id', taskId).eq('user_id', USER_ID);
     if (error) throw new Error(error.message);
-    await recordOverride(taskId, { urgency: value });
-    await tgAnswerCallback(cb.id, `Moved to ${URGENCY_LABELS[value] ?? value}`);
-  } else if (op === 'k') {
+    await recordOverride(taskId, { key: value === 'today' });
+    await tgAnswerCallback(cb.id, value === 'today' ? '⭐ Marked Today' : 'Unmarked');
+  } else if (op === 'c') {
     const { error } = await db.from('tasks')
-      .update({ key: true, updated_at: new Date().toISOString() })
+      .update({ category: value, updated_at: new Date().toISOString() })
       .eq('id', taskId).eq('user_id', USER_ID);
     if (error) throw new Error(error.message);
-    await recordOverride(taskId, { key: true });
-    await tgAnswerCallback(cb.id, '⭐ Marked key');
+    await recordOverride(taskId, { category: value });
+    await tgAnswerCallback(cb.id, `Set to ${value}`);
   }
 }
 
