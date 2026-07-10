@@ -2,11 +2,6 @@ import { serviceClient, USER_ID } from '@/lib/supabase';
 import { classifyCapture, Classification } from '@/lib/ai/classify';
 import { localDateKey } from '@/lib/dates';
 
-/** New tasks land at the top of their tier: base score per tier, above previously ranked items. */
-export const TIER_BASE: Record<string, number> = {
-  today: 900, this_week: 700, this_month: 500, someday: 300,
-};
-
 export interface CaptureResult {
   captureId: string;
   routedTo: string;
@@ -21,7 +16,6 @@ export async function processCapture(opts: {
 }): Promise<CaptureResult> {
   const db = serviceClient();
 
-  // Feed the classifier the user's recent corrections so it converges on their judgment.
   const { data: overrideRows, error: ovErr } = await db
     .from('raw_captures')
     .select('classification, override')
@@ -47,8 +41,9 @@ export async function processCapture(opts: {
       user_id: USER_ID,
       title: classification.summary,
       description: opts.text.trim() === classification.summary ? null : opts.text,
-      urgency: classification.urgency,
-      priority_score: TIER_BASE[classification.urgency],
+      key: classification.priority === 'today',
+      category: classification.category,
+      status: 'not_started',
       time_estimate_min: classification.time_estimate_min,
       tags: classification.tags,
     }).select('id').single();
@@ -73,7 +68,7 @@ export async function processCapture(opts: {
       routedId = data.id;
     }
   } else {
-    const scope = classification.urgency === 'today' || classification.urgency === 'this_week' ? 'week' : 'month';
+    const scope = classification.priority === 'today' ? 'week' : 'month';
     const { data, error } = await db.from('goals')
       .insert({ user_id: USER_ID, scope, title: classification.summary })
       .select('id').single();
@@ -81,12 +76,6 @@ export async function processCapture(opts: {
     routedId = data.id;
   }
 
-  // Not wrapped in a transaction with the routing insert above — Supabase's
-  // JS client has no multi-statement transaction support without a custom
-  // RPC. A crash between the two inserts could orphan a task/journal/goal
-  // row with no raw_captures audit trail. Acceptable risk for a single-user
-  // P0/P1 system on one low-latency region; revisit via a Postgres RPC if
-  // this ever needs hard atomicity guarantees.
   const { data: capture, error: capErr } = await db.from('raw_captures').insert({
     user_id: USER_ID,
     source: opts.source,
@@ -99,9 +88,6 @@ export async function processCapture(opts: {
   }).select('id').single();
   if (capErr) throw new Error(`capture insert: ${capErr.message}`);
 
-  // audit_log is a best-effort admin ledger, not the source of truth (that's
-  // raw_captures above) — a failure here shouldn't cost the user their
-  // capture, so this soft-fails intentionally rather than throwing.
   const { error: auditErr } = await db.from('audit_log').insert({
     user_id: USER_ID, action: 'capture', resource_type: routedTo, resource_id: routedId,
     metadata: { source: opts.source, llm_source },
