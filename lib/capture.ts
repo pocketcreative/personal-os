@@ -16,6 +16,7 @@ export async function processCapture(opts: {
 }): Promise<CaptureResult> {
   const db = serviceClient();
 
+  // Feed the classifier the user's recent corrections so it converges on their judgment.
   const { data: overrideRows, error: ovErr } = await db
     .from('raw_captures')
     .select('classification, override')
@@ -76,6 +77,12 @@ export async function processCapture(opts: {
     routedId = data.id;
   }
 
+  // Not wrapped in a transaction with the routing insert above — Supabase's
+  // JS client has no multi-statement transaction support without a custom
+  // RPC. A crash between the two inserts could orphan a task/journal/goal
+  // row with no raw_captures audit trail. Acceptable risk for a single-user
+  // P0/P1 system on one low-latency region; revisit via a Postgres RPC if
+  // this ever needs hard atomicity guarantees.
   const { data: capture, error: capErr } = await db.from('raw_captures').insert({
     user_id: USER_ID,
     source: opts.source,
@@ -88,6 +95,9 @@ export async function processCapture(opts: {
   }).select('id').single();
   if (capErr) throw new Error(`capture insert: ${capErr.message}`);
 
+  // audit_log is a best-effort admin ledger, not the source of truth (that's
+  // raw_captures above) — a failure here shouldn't cost the user their
+  // capture, so this soft-fails intentionally rather than throwing.
   const { error: auditErr } = await db.from('audit_log').insert({
     user_id: USER_ID, action: 'capture', resource_type: routedTo, resource_id: routedId,
     metadata: { source: opts.source, llm_source },
