@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import TopRail from "@/components/dashboard/TopRail";
-import TimerStrip from "@/components/dashboard/TimerStrip";
 import CaptureBox from "@/components/dashboard/CaptureBox";
 import "./globals.css";
 
@@ -32,7 +31,6 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col antialiased">
         <TopRail />
-        <TimerStrip />
         <main className="mx-auto max-w-6xl p-6">{children}</main>
         <CaptureBox />
       </body>
