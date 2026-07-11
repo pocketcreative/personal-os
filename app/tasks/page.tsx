@@ -21,7 +21,7 @@ function SmartTab() {
   return (
     <SmartView
       tasks={tasks}
-      onComplete={async (t) => { await patchTask(t.id, { completed_at: new Date().toISOString() } as Partial<Task>); setTasks((c) => c.filter((x) => x.id !== t.id)); }}
+      onComplete={async (t) => { await patchTask(t.id, { status: 'completed' } as Partial<Task>); setTasks((c) => c.filter((x) => x.id !== t.id)); }}
       onOpen={() => {}}
       onStartTimer={(t) => startTimerApi(t.id)}
     />
