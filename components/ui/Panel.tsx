@@ -10,7 +10,11 @@ export default function Panel({
     >
       {(title || right) && (
         <header className="mb-3 flex items-center justify-between">
-          {title && <h2 className="mono text-xs uppercase tracking-[0.2em]" style={{ color: 'var(--ink-3)' }}>{title}</h2>}
+          {title && (
+            <h2 style={{ font: "700 10.5px 'Archivo', sans-serif", color: 'var(--ink-3)', letterSpacing: '.06em', textTransform: 'uppercase' }}>
+              {title}
+            </h2>
+          )}
           {right}
         </header>
       )}
