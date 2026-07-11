@@ -63,6 +63,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = serviceClient();
+  // raw_captures.routed_id and audit_log.resource_id are polymorphic pointers
+  // (routed_to / resource_type says which table they actually point at —
+  // 'tasks', 'journal_entries', or 'goals', see lib/capture.ts) so neither
+  // column carries a real FK, unlike timer_sessions.task_id which cascades
+  // via its FK (migration 0001). Delete both explicitly, scoped to rows that
+  // point at THIS task, before deleting the task row itself — that way, if
+  // one of these fails partway through, the task row is still there for the
+  // caller to retry against (idempotent: re-running finds nothing left to
+  // delete on whichever table already succeeded) rather than the task
+  // vanishing while orphans are left behind.
+  const { error: captureErr } = await db.from('raw_captures')
+    .delete().eq('routed_to', 'tasks').eq('routed_id', id);
+  if (captureErr) return NextResponse.json({ error: captureErr.message }, { status: 500 });
+  const { error: auditErr } = await db.from('audit_log')
+    .delete().eq('resource_type', 'tasks').eq('resource_id', id);
+  if (auditErr) return NextResponse.json({ error: auditErr.message }, { status: 500 });
   const { error } = await db.from('tasks').delete().eq('id', id).eq('user_id', USER_ID);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
