@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --ink-0: oklch(0.12 0.012 250); /* page background */
-  --ink-1: oklch(0.17 0.012 250); /* card background */
-  --ink-2: oklch(0.26 0.012 250); /* borders */
-  --ink-3: oklch(0.58 0.01 250);  /* muted text */
-  --ink-4: oklch(0.88 0.005 250); /* primary text */
-  --accent: oklch(0.85 0.14 165);
-  --ok: oklch(0.75 0.15 155);
-  --warn: oklch(0.8 0.15 85);
-  --danger: oklch(0.65 0.2 25);
+  --ink-0: #f3f1ec; /* page background */
+  --ink-1: #fbfaf7; /* card background */
+  --ink-2: rgba(17, 17, 17, .12); /* borders */
+  --ink-3: rgba(17, 17, 17, .45); /* muted text */
+  --ink-4: #111111; /* primary text */
+  --accent: #9a7a2e;
+  --ok: #4b7a4f;
+  --warn: #9a7a2e;
+  --danger: #b3261e;
 
   --background: var(--ink-0);
   --foreground: var(--ink-4);
