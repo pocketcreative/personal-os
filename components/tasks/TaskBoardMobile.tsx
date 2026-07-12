@@ -174,6 +174,7 @@ export default function TaskBoardMobile() {
             if (patch.title !== undefined) d.updateName(d.activeTask!.id, patch.title);
             if (patch.description !== undefined) d.updateDescription(d.activeTask!.id, patch.description);
           }}
+          onDelete={() => { d.deleteTask(d.activeTask!.id); d.setActiveTaskId(null); }}
         />
       )}
     </div>

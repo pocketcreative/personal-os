@@ -2,10 +2,11 @@
 import { useState } from 'react';
 import type { Task } from '@/lib/types';
 
-export default function TaskDetailModal({ task, onClose, onSave }: {
+export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
   task: Task;
   onClose: () => void;
   onSave: (patch: { title?: string; description?: string }) => void;
+  onDelete: () => void;
 }) {
   const [name, setName] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
@@ -57,7 +58,16 @@ export default function TaskDetailModal({ task, onClose, onSave }: {
             }}
           />
         </div>
-        <div style={{ padding: '20px 32px', borderTop: '1px solid rgba(17,17,17,.08)', display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ padding: '20px 32px', borderTop: '1px solid rgba(17,17,17,.08)', display: 'flex', justifyContent: 'space-between' }}>
+          <button
+            onClick={() => { if (confirm(`Delete "${task.title}"? This can't be undone.`)) onDelete(); }}
+            style={{
+              font: "600 13px 'Inter Tight', sans-serif", color: '#c0392b', background: 'transparent',
+              border: '1px solid rgba(192,57,43,.3)', borderRadius: 7, padding: '10px 18px', cursor: 'pointer',
+            }}
+          >
+            Delete
+          </button>
           <button
             onClick={done}
             style={{

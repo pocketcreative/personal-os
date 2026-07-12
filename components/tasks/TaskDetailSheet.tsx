@@ -2,10 +2,11 @@
 import { useState } from 'react';
 import type { Task } from '@/lib/types';
 
-export default function TaskDetailSheet({ task, onClose, onSave }: {
+export default function TaskDetailSheet({ task, onClose, onSave, onDelete }: {
   task: Task;
   onClose: () => void;
   onSave: (patch: { title?: string; description?: string }) => void;
+  onDelete: () => void;
 }) {
   const [name, setName] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
@@ -58,6 +59,17 @@ export default function TaskDetailSheet({ task, onClose, onSave }: {
               fontFamily: "'Inter Tight', sans-serif", outline: 'none',
             }}
           />
+        </div>
+        <div style={{ padding: '4px 24px 24px' }}>
+          <button
+            onClick={() => { if (confirm(`Delete "${task.title}"? This can't be undone.`)) onDelete(); }}
+            style={{
+              width: '100%', font: "600 13px 'Inter Tight', sans-serif", color: '#c0392b', background: 'transparent',
+              border: '1px solid rgba(192,57,43,.3)', borderRadius: 8, padding: '11px 0', cursor: 'pointer',
+            }}
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
