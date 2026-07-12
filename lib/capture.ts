@@ -32,6 +32,11 @@ export async function processCapture(opts: {
   const { classifications, llm_source } = await classifyCapture(opts.text, overrides);
 
   const results: CaptureResult[] = [];
+  // Avoids duplicating opts.text if a single capture yields 2+ journal items:
+  // once this capture has appended/inserted its text into today's entry, later
+  // journal-kind items from the same loop just reuse that entry's id instead
+  // of appending the identical opts.text again.
+  let journalEntryIdThisCapture: string | null = null;
 
   // Sequential (not parallel) so that multiple journal items in one message
   // correctly append onto the same day's entry in order, rather than racing
@@ -57,22 +62,30 @@ export async function processCapture(opts: {
       if (error) throw new Error(`task insert: ${error.message}`);
       routedId = data.id;
     } else if (classification.kind === 'journal') {
-      const entryDate = localDateKey();
-      const { data: existing, error: exErr } = await db.from('journal_entries')
-        .select('id, raw_text').eq('user_id', USER_ID).eq('entry_date', entryDate).maybeSingle();
-      if (exErr) throw new Error(`journal lookup: ${exErr.message}`);
-      if (existing) {
-        const { error } = await db.from('journal_entries')
-          .update({ raw_text: `${existing.raw_text}\n\n${opts.text}`.trim() })
-          .eq('id', existing.id);
-        if (error) throw new Error(`journal update: ${error.message}`);
-        routedId = existing.id;
+      if (journalEntryIdThisCapture) {
+        // Already appended/inserted this capture's text into today's entry
+        // once (from an earlier journal-kind item in this same loop) — reuse
+        // that same entry id rather than appending the identical opts.text again.
+        routedId = journalEntryIdThisCapture;
       } else {
-        const { data, error } = await db.from('journal_entries')
-          .insert({ user_id: USER_ID, entry_date: entryDate, raw_text: opts.text })
-          .select('id').single();
-        if (error) throw new Error(`journal insert: ${error.message}`);
-        routedId = data.id;
+        const entryDate = localDateKey();
+        const { data: existing, error: exErr } = await db.from('journal_entries')
+          .select('id, raw_text').eq('user_id', USER_ID).eq('entry_date', entryDate).maybeSingle();
+        if (exErr) throw new Error(`journal lookup: ${exErr.message}`);
+        if (existing) {
+          const { error } = await db.from('journal_entries')
+            .update({ raw_text: `${existing.raw_text}\n\n${opts.text}`.trim() })
+            .eq('id', existing.id);
+          if (error) throw new Error(`journal update: ${error.message}`);
+          routedId = existing.id;
+        } else {
+          const { data, error } = await db.from('journal_entries')
+            .insert({ user_id: USER_ID, entry_date: entryDate, raw_text: opts.text })
+            .select('id').single();
+          if (error) throw new Error(`journal insert: ${error.message}`);
+          routedId = data.id;
+        }
+        journalEntryIdThisCapture = routedId;
       }
     } else {
       const scope = classification.priority === 'today' ? 'week' : 'month';
