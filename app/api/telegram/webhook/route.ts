@@ -124,18 +124,26 @@ async function handleMessage(message: TelegramMessage, onCaptureSucceeded: () =>
     const c = result.classification;
     const flag = c.low_confidence ? ' (low confidence — AI was down)' : '';
 
-    if (c.kind === 'task' && result.routedId) {
-      const est = c.time_estimate_min ? ` · est ${c.time_estimate_min}m` : '';
-      const priorityLabel = c.priority === 'today' ? 'Today' : '—';
-      await tgSendMessage(
-        chatId,
-        `✅ Task: ${c.summary}\n${priorityLabel} · ${c.category}${est}${flag}`,
-        taskActionKeyboard(result.routedId),
-      );
-    } else if (c.kind === 'journal') {
-      await tgSendMessage(chatId, `📓 Journaled for today.${flag}`);
-    } else {
-      await tgSendMessage(chatId, `🎯 Goal added: ${c.summary}${flag}`);
+    try {
+      if (c.kind === 'task' && result.routedId) {
+        const est = c.time_estimate_min ? ` · est ${c.time_estimate_min}m` : '';
+        const priorityLabel = c.priority === 'today' ? 'Today' : '—';
+        await tgSendMessage(
+          chatId,
+          `✅ Task: ${c.summary}\n${priorityLabel} · ${c.category}${est}${flag}`,
+          taskActionKeyboard(result.routedId),
+        );
+      } else if (c.kind === 'journal') {
+        await tgSendMessage(chatId, `📓 Journaled for today.${flag}`);
+      } else {
+        await tgSendMessage(chatId, `🎯 Goal added: ${c.summary}${flag}`);
+      }
+    } catch (err) {
+      // Don't let one failed reply abort the rest — the underlying task was
+      // already created successfully; only the notification for THIS item
+      // failed, and the remaining items' replies (and their action
+      // keyboards) should still be attempted.
+      console.error('telegram reply failed for one capture item', result.routedId, err);
     }
   }
 }
