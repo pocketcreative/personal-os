@@ -114,23 +114,29 @@ async function handleMessage(message: TelegramMessage, onCaptureSucceeded: () =>
   }
   if (!text.trim()) return;
 
-  const result = await processCapture({ text, source: 'telegram', audioUrl });
+  const results = await processCapture({ text, source: 'telegram', audioUrl });
   onCaptureSucceeded();
-  const c = result.classification;
-  const flag = c.low_confidence ? ' (low confidence — AI was down)' : '';
 
-  if (c.kind === 'task' && result.routedId) {
-    const est = c.time_estimate_min ? ` · est ${c.time_estimate_min}m` : '';
-    const priorityLabel = c.priority === 'today' ? 'Today' : '—';
-    await tgSendMessage(
-      chatId,
-      `✅ Task: ${c.summary}\n${priorityLabel} · ${c.category}${est}${flag}`,
-      taskActionKeyboard(result.routedId),
-    );
-  } else if (c.kind === 'journal') {
-    await tgSendMessage(chatId, `📓 Journaled for today.${flag}`);
-  } else {
-    await tgSendMessage(chatId, `🎯 Goal added: ${c.summary}${flag}`);
+  // One reply per extracted item, so multiple tasks pulled from a single
+  // message each get their own independently-actionable message (and their
+  // own inline keyboard for tasks) instead of being crammed into one.
+  for (const result of results) {
+    const c = result.classification;
+    const flag = c.low_confidence ? ' (low confidence — AI was down)' : '';
+
+    if (c.kind === 'task' && result.routedId) {
+      const est = c.time_estimate_min ? ` · est ${c.time_estimate_min}m` : '';
+      const priorityLabel = c.priority === 'today' ? 'Today' : '—';
+      await tgSendMessage(
+        chatId,
+        `✅ Task: ${c.summary}\n${priorityLabel} · ${c.category}${est}${flag}`,
+        taskActionKeyboard(result.routedId),
+      );
+    } else if (c.kind === 'journal') {
+      await tgSendMessage(chatId, `📓 Journaled for today.${flag}`);
+    } else {
+      await tgSendMessage(chatId, `🎯 Goal added: ${c.summary}${flag}`);
+    }
   }
 }
 
