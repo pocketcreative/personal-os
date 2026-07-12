@@ -18,8 +18,8 @@ export default function TopRail() {
       setDateStr(new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Singapore', weekday: 'short', month: 'short', day: 'numeric',
       }).format(new Date()));
-      setTime(new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'Asia/Singapore', hour: '2-digit', minute: '2-digit', hour12: false,
+      setTime(new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Singapore', hour: 'numeric', minute: '2-digit', hour12: true,
       }).format(new Date()));
     };
     tick();
