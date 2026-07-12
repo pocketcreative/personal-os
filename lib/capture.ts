@@ -146,7 +146,9 @@ export async function processCapture(opts: {
       const { data, error } = await db.from('tasks').insert({
         user_id: USER_ID,
         title: classification.summary,
-        description: opts.text.trim() === classification.summary ? null : opts.text,
+        description: classification.description_points.length > 0
+          ? classification.description_points.map((p) => `• ${p}`).join('\n')
+          : null,
         key: classification.priority === 'today',
         category: classification.category,
         status: 'not_started',

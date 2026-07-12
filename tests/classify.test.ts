@@ -76,6 +76,43 @@ describe('parseClassifications', () => {
     expect(items[0].tags).toHaveLength(3);
     expect(items[0].summary).toHaveLength(120);
   });
+
+  it('parses description_points from a valid LLM response', () => {
+    const raw = JSON.stringify({
+      items: [{
+        kind: 'task', priority: 'today', category: 'business', summary: 'Redesign intake form',
+        description_points: ['Collect business name', 'Collect main goal', 'Add confirmation email'],
+      }],
+    });
+    const items = parseClassifications(raw)!;
+    expect(items[0].description_points).toEqual(['Collect business name', 'Collect main goal', 'Add confirmation email']);
+  });
+
+  it('defaults description_points to [] when absent or malformed', () => {
+    const noField = parseClassifications('{"items":[{"kind":"task","priority":"today","category":"personal","summary":"x"}]}')!;
+    expect(noField[0].description_points).toEqual([]);
+
+    const notArray = parseClassifications(JSON.stringify({
+      items: [{ kind: 'task', priority: 'today', category: 'personal', summary: 'x', description_points: 'not an array' }],
+    }))!;
+    expect(notArray[0].description_points).toEqual([]);
+  });
+
+  it('caps description_points at 6 items, filters non-strings, trims, and caps item length at 200 chars', () => {
+    const longPoint = 'y'.repeat(300);
+    const raw = JSON.stringify({
+      items: [{
+        kind: 'task', priority: 'today', category: 'personal', summary: 'x',
+        description_points: ['  a  ', 'b', 3, 'c', 'd', 'e', 'f', 'g', longPoint],
+      }],
+    });
+    const items = parseClassifications(raw)!;
+    const points = items[0].description_points;
+    expect(points.length).toBeLessThanOrEqual(6);
+    expect(points).toContain('a');
+    expect(points.every((p) => typeof p === 'string')).toBe(true);
+    expect(points.every((p) => p.length <= 200)).toBe(true);
+  });
 });
 
 describe('regexClassify', () => {
@@ -90,5 +127,8 @@ describe('regexClassify', () => {
     expect(regexClassify('need to do this today asap').priority).toBe('today');
     expect(regexClassify('journal: today went well, felt focused').kind).toBe('journal');
     expect(regexClassify('email the client about the invoice').category).toBe('business');
+  });
+  it('returns empty description_points (no summarization capability in the fallback)', () => {
+    expect(regexClassify('send the proposal to the client').description_points).toEqual([]);
   });
 });
