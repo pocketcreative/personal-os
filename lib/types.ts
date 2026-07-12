@@ -32,11 +32,3 @@ export const STATUSES = ['not_started', 'in_progress', 'completed'] as const;
 export const STATUS_LABELS: Record<Task['status'], string> = {
   not_started: 'Not started', in_progress: 'In progress', completed: 'Completed',
 };
-
-// Legacy — kept only because components/tasks/TaskRow.tsx (used by the
-// unchanged SmartView, per this redesign's decision to leave Smart search
-// as-is) still references these. Not used by anything in the new Board UI.
-export const URGENCIES = ['today', 'this_week', 'this_month', 'someday'] as const;
-export const URGENCY_LABELS: Record<Task['urgency'], string> = {
-  today: 'Today', this_week: 'This Week', this_month: 'This Month', someday: 'Someday',
-};
