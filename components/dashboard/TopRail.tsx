@@ -4,9 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 const TABS = [
-  { href: '/', label: 'Home' },
   { href: '/tasks', label: 'Tasks' },
-  { href: '/review', label: 'Review' },
 ];
 
 export default function TopRail() {
