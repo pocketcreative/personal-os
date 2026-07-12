@@ -10,7 +10,7 @@ export interface Task {
   urgency: 'today' | 'this_week' | 'this_month' | 'someday'; // legacy, unused by the new UI
   key: boolean; // reused as the new binary priority: true = "TODAY"
   category: 'personal' | 'business';
-  status: 'not_started' | 'in_progress' | 'completed';
+  status: 'not_started' | 'in_progress' | 'completed' | 'archived';
   priority_score: number; // legacy, unused by the new UI
   rank_pinned: boolean; // legacy, unused by the new UI
   time_estimate_min: number | null;
@@ -28,7 +28,7 @@ export const CATEGORY_LABELS: Record<Task['category'], string> = {
   personal: 'Personal', business: 'Business',
 };
 
-export const STATUSES = ['not_started', 'in_progress', 'completed'] as const;
+export const STATUSES = ['not_started', 'in_progress', 'completed', 'archived'] as const;
 export const STATUS_LABELS: Record<Task['status'], string> = {
-  not_started: 'Not started', in_progress: 'In progress', completed: 'Completed',
+  not_started: 'Not started', in_progress: 'In progress', completed: 'Completed', archived: 'Archived',
 };

@@ -92,9 +92,14 @@ export function useTaskDashboard() {
   const toggleFilter = <T,>(arr: T[], val: T): T[] =>
     arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
 
-  const filtered = tasks.filter((t) =>
-    (statusFilters.length === 0 || statusFilters.includes(t.status)) &&
-    (priorityFilters.length === 0 || priorityFilters.includes(t.key ? 'today' : 'dash')));
+  const filtered = tasks.filter((t) => {
+    // No active status filter: show everything except archived tasks (the
+    // default view). An active filter behaves exactly as before — show only
+    // tasks matching the selected filter(s), which lets the user opt into
+    // seeing archived tasks by toggling "Archived" on in the Status popover.
+    const passesStatus = statusFilters.length === 0 ? t.status !== 'archived' : statusFilters.includes(t.status);
+    return passesStatus && (priorityFilters.length === 0 || priorityFilters.includes(t.key ? 'today' : 'dash'));
+  });
   const sorted = sortTasks(filtered);
 
   return {

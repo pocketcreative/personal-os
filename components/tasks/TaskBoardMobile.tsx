@@ -8,10 +8,10 @@ import type { Task } from '@/lib/types';
 import { CATEGORY_LABELS, STATUS_LABELS } from '@/lib/types';
 
 const STATUS_DOT: Record<Task['status'], string> = {
-  not_started: 'rgba(17,17,17,.3)', in_progress: '#eab308', completed: '#2f9e44',
+  not_started: 'rgba(17,17,17,.3)', in_progress: '#eab308', completed: '#2f9e44', archived: 'rgba(154,122,46,.4)',
 };
 const STATUS_TEXT: Record<Task['status'], string> = {
-  not_started: 'rgba(17,17,17,.45)', in_progress: '#a16207', completed: '#227a37',
+  not_started: 'rgba(17,17,17,.45)', in_progress: '#a16207', completed: '#227a37', archived: 'rgba(154,122,46,.65)',
 };
 
 function MobileTimer({ task, onStart, onStop }: {
@@ -64,7 +64,7 @@ export default function TaskBoardMobile() {
                 font: "600 12.5px 'Inter Tight', sans-serif", color: sfActive ? '#9a7a2e' : '#111',
               }}>Status <span style={{ fontSize: 8 }}>▾</span></span>
             }
-            options={(['not_started', 'in_progress', 'completed'] as const).map((s) => ({
+            options={(['not_started', 'in_progress', 'completed', 'archived'] as const).map((s) => ({
               label: `${d.statusFilters.includes(s) ? '✓ ' : ''}${STATUS_LABELS[s]}`,
               onSelect: () => d.toggleStatusFilter(s),
             }))}
@@ -134,6 +134,7 @@ export default function TaskBoardMobile() {
                     { label: 'Not started', onSelect: () => d.updateStatus(task.id, 'not_started') },
                     { label: 'In progress', onSelect: () => d.updateStatus(task.id, 'in_progress') },
                     { label: 'Completed', onSelect: () => d.updateStatus(task.id, 'completed') },
+                    { label: 'Archived', onSelect: () => d.updateStatus(task.id, 'archived') },
                   ]}
                 />
                 <FieldPopover
