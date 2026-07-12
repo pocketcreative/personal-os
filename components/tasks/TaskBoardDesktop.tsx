@@ -113,7 +113,7 @@ export default function TaskBoardDesktop() {
                   style={{
                     font: "500 15px 'Inter Tight', sans-serif",
                     color: isCompleted ? 'rgba(17,17,17,.4)' : '#111',
-                    padding: '18px 0', textDecoration: isCompleted ? 'line-through' : 'none',
+                    padding: '18px 0', textDecorationLine: isCompleted ? 'line-through' : 'none',
                     textDecorationColor: 'rgba(17,17,17,.25)', cursor: 'pointer',
                     display: 'flex', alignItems: 'center',
                   }}

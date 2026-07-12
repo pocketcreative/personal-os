@@ -100,7 +100,7 @@ export default function TaskBoardMobile() {
                   style={{
                     font: "600 16px 'Inter Tight', sans-serif",
                     color: isCompleted ? 'rgba(17,17,17,.4)' : '#111',
-                    textDecoration: isCompleted ? 'line-through' : 'none',
+                    textDecorationLine: isCompleted ? 'line-through' : 'none',
                     textDecorationColor: 'rgba(17,17,17,.25)', flex: 1,
                   }}
                 >{task.title}</div>
