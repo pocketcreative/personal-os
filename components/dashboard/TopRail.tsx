@@ -12,13 +12,16 @@ const TABS = [
 export default function TopRail() {
   const pathname = usePathname();
   const [time, setTime] = useState('');
+  const [dateStr, setDateStr] = useState('');
   useEffect(() => {
-    const tick = () =>
-      setTime(new Intl.DateTimeFormat('en-US', {
+    const tick = () => {
+      setDateStr(new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Singapore', weekday: 'short', month: 'short', day: 'numeric',
-      }).format(new Date()) + ' · ' + new Intl.DateTimeFormat('en-GB', {
+      }).format(new Date()));
+      setTime(new Intl.DateTimeFormat('en-GB', {
         timeZone: 'Asia/Singapore', hour: '2-digit', minute: '2-digit', hour12: false,
       }).format(new Date()));
+    };
     tick();
     const id = setInterval(tick, 10_000);
     return () => clearInterval(id);
@@ -28,7 +31,7 @@ export default function TopRail() {
       className="flex items-center justify-between px-6 py-3"
       style={{ background: 'var(--ink-1)', borderBottom: '1px solid var(--ink-2)' }}
     >
-      <span style={{ font: "800 15px 'Archivo', sans-serif", color: 'var(--ink-4)', letterSpacing: '-0.01em' }}>
+      <span style={{ font: "800 15px 'Archivo', sans-serif", color: 'var(--ink-4)', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
         Brendan OS
       </span>
       <div className="flex gap-7">
@@ -45,6 +48,7 @@ export default function TopRail() {
                 color: active ? 'var(--ink-4)' : 'var(--ink-3)',
                 borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
                 paddingBottom: 2,
+                whiteSpace: 'nowrap',
               }}
             >
               {t.label}
@@ -52,7 +56,9 @@ export default function TopRail() {
           );
         })}
       </div>
-      <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>{time}</span>
+      <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+        <span className="hidden sm:inline">{dateStr} · </span>{time}
+      </span>
     </nav>
   );
 }
