@@ -18,33 +18,44 @@ const KINDS: CaptureKind[] = ['task', 'journal', 'goal'];
 const PRIORITIES: Priority[] = ['today', 'dash'];
 const CATEGORIES: Category[] = ['personal', 'business'];
 
-const SYSTEM_PROMPT = `You classify one captured note from the user's phone into strict JSON.
+const SYSTEM_PROMPT = `You classify one or more captured notes from the user's phone into strict JSON.
 Return ONLY a JSON object:
-{"kind":"task"|"journal"|"goal","priority":"today"|"dash","category":"personal"|"business","tags":string[] (1-3 lowercase words),"summary":string (imperative, <=80 chars),"time_estimate_min":number|null}
+{"items":[{"kind":"task"|"journal"|"goal","priority":"today"|"dash","category":"personal"|"business","tags":string[] (1-3 lowercase words),"summary":string (imperative, <=80 chars),"time_estimate_min":number|null}, ...]}
+- Most notes describe exactly ONE thing — return a single-element "items" array in that case.
+- If the note clearly describes MULTIPLE distinct, separately-actionable items (e.g. "I need to do X and also Y", or a list of things), return one object per item in "items" — each with its own accurate fields for just that item, not a merged/averaged one.
 - "task" = a single actionable item. "journal" = reflection/diary about the day. "goal" = an outcome for the week/month, not one action.
 - priority: "today" only if the note implies urgency/today, otherwise "dash".
 - category: "business" for work/client/professional items, "personal" for everything else.
 - time_estimate_min: honest working-time estimate for tasks (the user has ADHD and underestimates); null for journal/goal.
 - Recent corrections the user made to past classifications are provided — match their judgment.`;
 
-export function parseClassification(raw: string): Classification | null {
+function validateItem(obj: unknown): Classification | null {
+  if (typeof obj !== 'object' || obj === null) return null;
+  const o = obj as Record<string, unknown>;
+  if (!KINDS.includes(o.kind as CaptureKind) || !PRIORITIES.includes(o.priority as Priority)) return null;
+  if (o.category !== undefined && !CATEGORIES.includes(o.category as Category)) return null;
+  if (typeof o.summary !== 'string' || !o.summary.trim()) return null;
+  return {
+    kind: o.kind as CaptureKind,
+    priority: o.priority as Priority,
+    category: CATEGORIES.includes(o.category as Category) ? (o.category as Category) : 'personal',
+    tags: Array.isArray(o.tags) ? o.tags.filter((t: unknown): t is string => typeof t === 'string').slice(0, 3) : [],
+    summary: o.summary.trim().slice(0, 120),
+    time_estimate_min: typeof o.time_estimate_min === 'number' ? Math.round(o.time_estimate_min) : null,
+    low_confidence: false,
+  };
+}
+
+export function parseClassifications(raw: string): Classification[] | null {
   try {
     const start = raw.indexOf('{');
     const end = raw.lastIndexOf('}');
     if (start === -1 || end <= start) return null;
     const obj = JSON.parse(raw.slice(start, end + 1));
-    if (!KINDS.includes(obj.kind) || !PRIORITIES.includes(obj.priority)) return null;
-    if (obj.category !== undefined && !CATEGORIES.includes(obj.category)) return null;
-    if (typeof obj.summary !== 'string' || !obj.summary.trim()) return null;
-    return {
-      kind: obj.kind,
-      priority: obj.priority,
-      category: CATEGORIES.includes(obj.category) ? obj.category : 'personal',
-      tags: Array.isArray(obj.tags) ? obj.tags.filter((t: unknown): t is string => typeof t === 'string').slice(0, 3) : [],
-      summary: obj.summary.trim().slice(0, 120),
-      time_estimate_min: typeof obj.time_estimate_min === 'number' ? Math.round(obj.time_estimate_min) : null,
-      low_confidence: false,
-    };
+    if (!Array.isArray(obj.items)) return null;
+    const valid = obj.items.map(validateItem).filter((c: Classification | null): c is Classification => c !== null);
+    if (valid.length === 0) return null;
+    return valid;
   } catch {
     return null;
   }
@@ -85,7 +96,7 @@ function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = PROVIDER_T
   return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
-async function claudeClassify(text: string, overrides: string[]): Promise<Classification | null> {
+async function claudeClassify(text: string, overrides: string[]): Promise<Classification[] | null> {
   const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -105,10 +116,10 @@ async function claudeClassify(text: string, overrides: string[]): Promise<Classi
     return null;
   }
   const json = await res.json();
-  return parseClassification(json.content?.[0]?.text ?? '');
+  return parseClassifications(json.content?.[0]?.text ?? '');
 }
 
-async function openaiClassify(text: string, overrides: string[]): Promise<Classification | null> {
+async function openaiClassify(text: string, overrides: string[]): Promise<Classification[] | null> {
   const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -129,15 +140,15 @@ async function openaiClassify(text: string, overrides: string[]): Promise<Classi
     return null;
   }
   const json = await res.json();
-  return parseClassification(json.choices?.[0]?.message?.content ?? '');
+  return parseClassifications(json.choices?.[0]?.message?.content ?? '');
 }
 
 export async function classifyCapture(
   text: string, overrides: string[],
-): Promise<{ classification: Classification; llm_source: string }> {
+): Promise<{ classifications: Classification[]; llm_source: string }> {
   const fromClaude = await claudeClassify(text, overrides).catch((e) => { console.error(e); return null; });
-  if (fromClaude) return { classification: fromClaude, llm_source: 'anthropic' };
+  if (fromClaude) return { classifications: fromClaude, llm_source: 'anthropic' };
   const fromOpenAI = await openaiClassify(text, overrides).catch((e) => { console.error(e); return null; });
-  if (fromOpenAI) return { classification: fromOpenAI, llm_source: 'openai' };
-  return { classification: regexClassify(text), llm_source: 'regex' };
+  if (fromOpenAI) return { classifications: fromOpenAI, llm_source: 'openai' };
+  return { classifications: [regexClassify(text)], llm_source: 'regex' };
 }
