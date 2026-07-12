@@ -60,9 +60,9 @@ export default function TaskBoardDesktop() {
             display: 'grid', gridTemplateColumns: '2fr .9fr 1.1fr .8fr .9fr .9fr 1fr',
             columnGap: 28, borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2,
           }}>
-            <div style={{ ...colStyle, font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase' }}>Task</div>
-            <div style={{ ...colStyle, font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Category</div>
-            <div style={{ marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase' }}>Task</div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Category</div>
+            <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>
               <FieldPopover
                 align="left"
                 trigger={
@@ -79,7 +79,7 @@ export default function TaskBoardDesktop() {
                 }))}
               />
             </div>
-            <div style={{ marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>
               <FieldPopover
                 align="left"
                 trigger={
@@ -96,9 +96,9 @@ export default function TaskBoardDesktop() {
                 }))}
               />
             </div>
-            <div style={{ ...colStyle, font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Exp. Time</div>
-            <div style={{ ...colStyle, font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Actual Time</div>
-            <div style={{ ...colStyle, font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Timer</div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Exp. Time</div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Actual Time</div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Timer</div>
           </div>
 
           {d.tasks.map((task) => {
