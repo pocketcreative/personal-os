@@ -30,6 +30,7 @@ Return ONLY a JSON object:
 - time_estimate_min: honest working-time estimate for tasks (the user has ADHD and underestimates); null for journal/goal.
 - If the source note is written in a language other than English, "summary" AND "description_points" must both be produced in English — translate, don't transliterate. This applies even if the rest of the note is left unprocessed.
 - description_points should be genuinely summarized short phrases (not full sentences copied verbatim from the note, not the note chopped into lines) — capture the key details/sub-steps a reader would need beyond the title.
+- Do NOT include time/duration estimates in description_points (e.g. "about an hour", "30 min") — that information belongs only in time_estimate_min, never repeated as a bullet.
 - Recent corrections the user made to past classifications are provided — match their judgment.`;
 
 function validateItem(obj: unknown): Classification | null {
