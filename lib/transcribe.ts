@@ -7,11 +7,21 @@ import { requireEnv } from '@/lib/auth';
 // this: 60s here would alone exceed the route's total budget.
 const WHISPER_TIMEOUT_MS = 20_000;
 
-/** Transcribe a Telegram voice note (OGG/Opus). Telegram serves OGG — the MIME type matters (guide Part 4 bug). */
+/**
+ * Transcribe a Telegram voice note (OGG/Opus) to English.
+ *
+ * Pinned to English because Whisper's auto-detection was mis-classifying
+ * Singlish (Singaporean English with local vocabulary) as Malay, producing
+ * fully Malay transcripts. Specifying language='en' prevents this and
+ * improves both accuracy and latency.
+ *
+ * Telegram serves OGG — the MIME type matters (guide Part 4 bug).
+ */
 export async function transcribeOgg(buf: ArrayBuffer): Promise<string> {
   const form = new FormData();
   form.append('file', new Blob([buf], { type: 'audio/ogg' }), 'voice.ogg');
   form.append('model', 'whisper-1');
+  form.append('language', 'en');
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), WHISPER_TIMEOUT_MS);
