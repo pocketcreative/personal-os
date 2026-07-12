@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
   const { text } = await req.json().catch(() => ({ text: '' }));
   if (!text?.trim()) return NextResponse.json({ error: 'text required' }, { status: 400 });
   try {
-    const results = await processCapture({ text: text.trim(), source: 'web' });
-    return NextResponse.json(results);
+    const outcome = await processCapture({ text: text.trim(), source: 'web' });
+    return NextResponse.json(outcome);
   } catch (err) {
     console.error('capture failed', err);
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });

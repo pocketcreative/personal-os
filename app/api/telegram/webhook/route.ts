@@ -114,13 +114,27 @@ async function handleMessage(message: TelegramMessage, onCaptureSucceeded: () =>
   }
   if (!text.trim()) return;
 
-  const results = await processCapture({ text, source: 'telegram', audioUrl });
+  const outcome = await processCapture({ text, source: 'telegram', audioUrl });
   onCaptureSucceeded();
+
+  if (outcome.type === 'edited') {
+    await tgSendMessage(chatId, `✅ Updated '${outcome.title}': ${outcome.summary}`);
+    return;
+  }
+  if (outcome.type === 'ambiguous') {
+    const list = outcome.candidateTitles.map((t) => `• ${t}`).join('\n');
+    await tgSendMessage(chatId, `Found ${outcome.candidateTitles.length} tasks that could match — which one?\n${list}`);
+    return;
+  }
+  if (outcome.type === 'no_match') {
+    await tgSendMessage(chatId, "Couldn't find a task matching that — did you mean to create a new one?");
+    return;
+  }
 
   // One reply per extracted item, so multiple tasks pulled from a single
   // message each get their own independently-actionable message (and their
   // own inline keyboard for tasks) instead of being crammed into one.
-  for (const result of results) {
+  for (const result of outcome.results) {
     const c = result.classification;
     const flag = c.low_confidence ? ' (low confidence — AI was down)' : '';
 

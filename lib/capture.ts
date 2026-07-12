@@ -1,6 +1,8 @@
 import { serviceClient, USER_ID } from '@/lib/supabase';
 import { classifyCapture, Classification } from '@/lib/ai/classify';
+import { detectEditIntent, EditChanges } from '@/lib/ai/editIntent';
 import { localDateKey } from '@/lib/dates';
+import { STATUS_LABELS, CATEGORY_LABELS } from '@/lib/types';
 
 export interface CaptureResult {
   captureId: string;
@@ -9,12 +11,104 @@ export interface CaptureResult {
   classification: Classification;
 }
 
+// processCapture used to always return CaptureResult[] (a new item was
+// created). Now that it can also apply an edit to an EXISTING task, callers
+// (the Telegram webhook and the web /api/capture route) need to distinguish
+// "created N new items" from "edited one existing task" / "ambiguous match,
+// needs clarification" / "no match, nothing was touched" — each needs its
+// own reply, and silently forcing the latter three through the CaptureResult
+// shape would either crash or misrepresent what happened.
+export type CaptureOutcome =
+  | { type: 'captured'; results: CaptureResult[] }
+  | { type: 'edited'; taskId: string; title: string; summary: string; changes: EditChanges }
+  | { type: 'ambiguous'; candidateTitles: string[] }
+  | { type: 'no_match' };
+
+function describeChanges(changes: EditChanges): string[] {
+  const parts: string[] = [];
+  if (changes.status) parts.push(`status → ${STATUS_LABELS[changes.status]}`);
+  if (changes.key !== undefined) parts.push(`priority → ${changes.key ? 'Today' : 'Not today'}`);
+  if (changes.category) parts.push(`category → ${CATEGORY_LABELS[changes.category]}`);
+  if (changes.description) parts.push('description updated');
+  return parts;
+}
+
+async function applyTaskEdit(opts: {
+  db: ReturnType<typeof serviceClient>;
+  taskId: string;
+  changes: EditChanges;
+  source: 'telegram' | 'web';
+}): Promise<CaptureOutcome> {
+  const { db, taskId, changes, source } = opts;
+
+  // Need the current description to support "append" without clobbering
+  // whatever's already there.
+  const { data: current, error: curErr } = await db.from('tasks')
+    .select('title, description').eq('id', taskId).eq('user_id', USER_ID).single();
+  if (curErr) throw new Error(`task lookup for edit: ${curErr.message}`);
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (changes.status) {
+    patch.status = changes.status;
+    // Mirror app/api/tasks/[id]/route.ts's PATCH: completing/uncompleting via
+    // status keeps completed_at in sync the same way the manual UI does.
+    patch.completed_at = changes.status === 'completed' ? new Date().toISOString() : null;
+  }
+  if (changes.key !== undefined) patch.key = changes.key;
+  if (changes.category) patch.category = changes.category;
+  if (changes.description) {
+    patch.description = changes.description.action === 'append' && current.description
+      ? `${current.description}\n\n${changes.description.text}`
+      : changes.description.text;
+  }
+
+  const { data: updated, error } = await db.from('tasks').update(patch)
+    .eq('id', taskId).eq('user_id', USER_ID).select('title').single();
+  // Thrown (not swallowed) — e.g. an 'archived' status write will violate the
+  // CHECK constraint until migration 0004_task_archived_status.sql is applied.
+  // The webhook's outer try/catch turns this into a "⚠️ Capture failed: ..."
+  // reply rather than a crash, and — critically — nothing was applied, so
+  // there's no risk of a half-applied edit.
+  if (error) throw new Error(`task edit: ${error.message}`);
+
+  const { error: auditErr } = await db.from('audit_log').insert({
+    user_id: USER_ID, action: 'edit', resource_type: 'tasks', resource_id: taskId,
+    metadata: { source, changes },
+  });
+  if (auditErr) console.error('audit insert failed', auditErr.message);
+
+  return { type: 'edited', taskId, title: updated.title, summary: describeChanges(changes).join(', '), changes };
+}
+
 export async function processCapture(opts: {
   text: string;
   source: 'telegram' | 'web';
   audioUrl?: string | null;
-}): Promise<CaptureResult[]> {
+}): Promise<CaptureOutcome> {
   const db = serviceClient();
+
+  // Before treating this message as a brand-new capture, check whether it's
+  // actually an instruction to edit one of the user's existing open tasks
+  // ("mark X as done", "archive Y", ...). Only not_started/in_progress tasks
+  // are reasonable edit targets — completed/archived ones aren't what anyone
+  // means by "the X task" in casual conversation.
+  const { data: openTaskRows, error: openTasksErr } = await db.from('tasks')
+    .select('id, title').eq('user_id', USER_ID).in('status', ['not_started', 'in_progress']);
+  if (openTasksErr) console.error('open tasks fetch failed', openTasksErr.message);
+  const openTasks = openTaskRows ?? [];
+
+  const editIntent = await detectEditIntent(opts.text, openTasks);
+  if (editIntent.isEditIntent) {
+    if (editIntent.match === 'single' && editIntent.taskId && editIntent.changes) {
+      return applyTaskEdit({ db, taskId: editIntent.taskId, changes: editIntent.changes, source: opts.source });
+    }
+    if (editIntent.match === 'ambiguous') {
+      return { type: 'ambiguous', candidateTitles: editIntent.candidateTitles ?? [] };
+    }
+    // match === 'none' (or single without valid changes, which shouldn't
+    // happen given parseEditIntent's validation, but fails safe here too)
+    return { type: 'no_match' };
+  }
 
   // Feed the classifier the user's recent corrections so it converges on their judgment.
   const { data: overrideRows, error: ovErr } = await db
@@ -126,5 +220,5 @@ export async function processCapture(opts: {
     results.push({ captureId: capture.id, routedTo, routedId, classification });
   }
 
-  return results;
+  return { type: 'captured', results };
 }
