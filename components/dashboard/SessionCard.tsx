@@ -40,6 +40,12 @@ export default function SessionCard() {
   }, []);
 
   useEffect(() => {
+    // Standard fetch-on-mount effect: `load` is async, so its setTop/setFocus
+    // calls happen after the awaited fetches resolve, not synchronously in
+    // the effect body. No data-fetching library (React Query/SWR) is used in
+    // this codebase to restructure around — this pattern is used consistently
+    // elsewhere for the same purpose.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async load(), setState happens post-await, not sync-in-effect
     load();
     window.addEventListener('capture:done', load);
     return () => window.removeEventListener('capture:done', load);

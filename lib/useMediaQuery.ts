@@ -1,22 +1,21 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 /**
- * SSR-safe media query hook. Defaults to `false` on the server and first
- * client render (no window), then syncs to the real value after mount —
- * matches this app's existing pattern of avoiding hydration mismatches
- * (see components/dashboard/TimerStrip.tsx's clock for the same approach).
+ * SSR-safe media query hook via useSyncExternalStore — the React-recommended
+ * way to subscribe to external browser state without triggering the
+ * set-state-in-effect purity rule. Defaults to `false` on the server and
+ * first client render (no window), then syncs to the real value after mount.
  */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
-
-  useEffect(() => {
+  const subscribe = useCallback((callback: () => void) => {
     const mql = window.matchMedia(query);
-    setMatches(mql.matches);
-    const listener = (e: MediaQueryListEvent) => setMatches(e.matches);
-    mql.addEventListener('change', listener);
-    return () => mql.removeEventListener('change', listener);
+    mql.addEventListener('change', callback);
+    return () => mql.removeEventListener('change', callback);
   }, [query]);
 
-  return matches;
+  const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query]);
+  const getServerSnapshot = () => false;
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
