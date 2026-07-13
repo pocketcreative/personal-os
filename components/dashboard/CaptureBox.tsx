@@ -12,14 +12,15 @@ let nextId = 1;
 // Mirrors lib/capture.ts's CaptureOutcome + the assistant route's extra
 // 'answer'/'error' variants — kept as a loose local shape (rather than
 // importing server types into a client component) since we only read a
-// few fields off it here.
+// few fields off it here. `transcript` is only present on responses from
+// the voice route (app/api/assistant/voice) — the text route never sets it.
 type AssistantResponse =
-  | { type: 'captured'; results: { classification: { summary: string; kind: string } }[] }
-  | { type: 'edited'; taskId: string; title: string; summary: string }
-  | { type: 'ambiguous'; candidateTitles: string[] }
-  | { type: 'no_match' }
-  | { type: 'answer'; note: string; ids: string[] }
-  | { type: 'error'; message: string };
+  | { type: 'captured'; results: { classification: { summary: string; kind: string } }[]; transcript?: string }
+  | { type: 'edited'; taskId: string; title: string; summary: string; transcript?: string }
+  | { type: 'ambiguous'; candidateTitles: string[]; transcript?: string }
+  | { type: 'no_match'; transcript?: string }
+  | { type: 'answer'; note: string; ids: string[]; transcript?: string }
+  | { type: 'error'; message: string; transcript?: string };
 
 function describeOutcome(outcome: AssistantResponse): string {
   switch (outcome.type) {
@@ -44,13 +45,23 @@ function outcomeTouchedTasks(outcome: AssistantResponse): boolean {
   return outcome.type === 'captured' || outcome.type === 'edited';
 }
 
+// idle -> recording -> transcribing -> idle (or back to idle on error at
+// any point). Kept as a small enum rather than booleans so the mic button
+// only ever renders one of three unambiguous states.
+type RecState = 'idle' | 'recording' | 'transcribing';
+
 export default function CaptureBox() {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
+  const [recState, setRecState] = useState<RecState>('idle');
   const inputRef = useRef<HTMLInputElement>(null);
   const listEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const isBusy = busy || recState !== 'idle';
 
   // Auto-focus the input whenever the panel opens.
   useEffect(() => {
@@ -67,10 +78,25 @@ export default function CaptureBox() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  // Release the mic if the panel is closed mid-recording rather than
+  // leaving the browser's recording indicator on with no way to stop it.
+  useEffect(() => {
+    if (!open && recState === 'recording') {
+      mediaRecorderRef.current?.stop();
+    }
+  }, [open, recState]);
+
   // Keep the most recent message in view as the history grows.
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ block: 'end' });
   }, [messages]);
+
+  function appendOutcomeMessages(outcome: AssistantResponse) {
+    setMessages((m) => [...m, { id: nextId++, role: outcome.type === 'error' ? 'error' : 'assistant', text: describeOutcome(outcome) }]);
+    if (outcomeTouchedTasks(outcome)) {
+      window.dispatchEvent(new Event('capture:done')); // task views listen and refetch
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -78,7 +104,7 @@ export default function CaptureBox() {
     // input stays editable while busy, so Enter could otherwise fire a
     // second overlapping request before React re-renders the disabled state.
     const query = text.trim();
-    if (!query || busy) return;
+    if (!query || isBusy) return;
     setBusy(true);
     setMessages((m) => [...m, { id: nextId++, role: 'user', text: query }]);
     setText('');
@@ -99,15 +125,87 @@ export default function CaptureBox() {
       return;
     }
 
-    setMessages((m) => [...m, { id: nextId++, role: outcome.type === 'error' ? 'error' : 'assistant', text: describeOutcome(outcome) }]);
-    if (outcomeTouchedTasks(outcome)) {
-      window.dispatchEvent(new Event('capture:done')); // task views listen and refetch
-    }
+    appendOutcomeMessages(outcome);
     setBusy(false);
+  }
+
+  async function startRecording() {
+    if (isBusy) return;
+    if (typeof MediaRecorder === 'undefined') {
+      setMessages((m) => [...m, { id: nextId++, role: 'error', text: "Voice recording isn't supported in this browser." }]);
+      return;
+    }
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      console.error('getUserMedia failed', err);
+      setMessages((m) => [...m, { id: nextId++, role: 'error', text: 'Microphone access denied — check your browser permissions.' }]);
+      return;
+    }
+
+    // Let the browser pick its own supported mimeType rather than
+    // hardcoding one — Chrome/Edge/Firefox default to audio/webm (often
+    // with a codecs=opus suffix); the backend's transcribeWebm treats any
+    // webm-family type the same way.
+    const mr = new MediaRecorder(stream);
+    chunksRef.current = [];
+    mr.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
+    mr.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' });
+      void handleVoiceBlob(blob);
+    };
+    mediaRecorderRef.current = mr;
+    mr.start();
+    setRecState('recording');
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop();
+    setRecState('transcribing');
+  }
+
+  async function handleVoiceBlob(blob: Blob) {
+    const placeholderId = nextId++;
+    setMessages((m) => [...m, { id: placeholderId, role: 'user', text: '🎤 Transcribing…' }]);
+
+    const form = new FormData();
+    form.append('audio', blob, 'voice.webm');
+
+    const res = await fetch('/api/assistant/voice', { method: 'POST', body: form })
+      .catch((err) => { console.error(err); return null; });
+
+    const outcome = res ? ((await res.json().catch(() => null)) as AssistantResponse | null) : null;
+
+    if (!outcome || !outcome.transcript?.trim()) {
+      // No dangling placeholder on failure — remove it and show a clean
+      // error bubble instead.
+      setMessages((m) => m.filter((msg) => msg.id !== placeholderId));
+      const message = outcome?.type === 'error' ? outcome.message : 'Voice message failed — check your connection and try again.';
+      setMessages((m) => [...m, { id: nextId++, role: 'error', text: `⚠ ${message}` }]);
+      setRecState('idle');
+      return;
+    }
+
+    // Replace the placeholder with what was actually heard, then reuse the
+    // same outcome-to-reply mapping the text path uses.
+    setMessages((m) => m.map((msg) => (msg.id === placeholderId ? { ...msg, text: outcome.transcript! } : msg)));
+    appendOutcomeMessages(outcome);
+    setRecState('idle');
+  }
+
+  function onMicClick() {
+    if (recState === 'idle') void startRecording();
+    else if (recState === 'recording') stopRecording();
+    // 'transcribing' — ignore clicks until the round trip finishes.
   }
 
   return (
     <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 50 }}>
+      <style>{`@keyframes ac-mic-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }`}</style>
       {open && (
         <>
           {/* Click-outside-to-close overlay + stopPropagation panel — same
@@ -154,6 +252,12 @@ export default function CaptureBox() {
                 <div ref={listEndRef} />
               </div>
             )}
+            {recState === 'recording' && (
+              <div style={{ fontSize: 12, color: 'var(--danger)', padding: '0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--danger)', animation: 'ac-mic-pulse 1s ease-in-out infinite' }} />
+                Recording…
+              </div>
+            )}
             <form onSubmit={submit} className="flex gap-2">
               <input
                 ref={inputRef}
@@ -163,7 +267,23 @@ export default function CaptureBox() {
                 className="flex-1 bg-transparent px-2 text-sm outline-none"
                 style={{ color: 'var(--ink-4)' }}
               />
-              <button type="submit" disabled={busy}
+              <button
+                type="button"
+                onClick={onMicClick}
+                disabled={recState === 'transcribing' || (busy && recState === 'idle')}
+                aria-label={recState === 'recording' ? 'Stop recording' : 'Record a voice message'}
+                title={recState === 'recording' ? 'Stop recording' : 'Record a voice message'}
+                className="rounded px-3 py-1 text-sm font-medium"
+                style={{
+                  background: recState === 'recording' ? 'var(--danger)' : 'var(--ink-0)',
+                  color: recState === 'recording' ? '#fff' : 'var(--ink-4)',
+                  border: '1px solid var(--ink-2)',
+                  animation: recState === 'recording' ? 'ac-mic-pulse 1s ease-in-out infinite' : undefined,
+                }}
+              >
+                {recState === 'transcribing' ? '…' : '🎤'}
+              </button>
+              <button type="submit" disabled={isBusy}
                 className="rounded px-3 py-1 text-sm font-medium"
                 style={{ background: 'var(--accent)', color: 'var(--ink-0)' }}>
                 {busy ? '…' : 'Send'}

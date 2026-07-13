@@ -8,18 +8,18 @@ import { requireEnv } from '@/lib/auth';
 const WHISPER_TIMEOUT_MS = 20_000;
 
 /**
- * Transcribe a Telegram voice note (OGG/Opus) to English.
+ * Shared Whisper call — both Telegram (OGG/Opus) and browser (WebM/Opus)
+ * voice input funnel through here, differing only in MIME type/filename.
  *
  * Pinned to English because Whisper's auto-detection was mis-classifying
  * Singlish (Singaporean English with local vocabulary) as Malay, producing
  * fully Malay transcripts. Specifying language='en' prevents this and
- * improves both accuracy and latency.
- *
- * Telegram serves OGG — the MIME type matters (guide Part 4 bug).
+ * improves both accuracy and latency — same reasoning applies regardless
+ * of which client recorded the audio.
  */
-export async function transcribeOgg(buf: ArrayBuffer): Promise<string> {
+async function transcribeBuffer(buf: ArrayBuffer, mimeType: string, filename: string): Promise<string> {
   const form = new FormData();
-  form.append('file', new Blob([buf], { type: 'audio/ogg' }), 'voice.ogg');
+  form.append('file', new Blob([buf], { type: mimeType }), filename);
   form.append('model', 'whisper-1');
   form.append('language', 'en');
 
@@ -47,4 +47,22 @@ export async function transcribeOgg(buf: ArrayBuffer): Promise<string> {
   if (!res.ok) throw new Error(`whisper failed: ${res.status} ${await res.text()}`);
   const json = await res.json();
   return (json.text ?? '').trim();
+}
+
+/**
+ * Transcribe a Telegram voice note (OGG/Opus) to English.
+ *
+ * Telegram serves OGG — the MIME type matters (guide Part 4 bug).
+ */
+export async function transcribeOgg(buf: ArrayBuffer): Promise<string> {
+  return transcribeBuffer(buf, 'audio/ogg', 'voice.ogg');
+}
+
+/**
+ * Transcribe a browser-recorded voice message (WebM/Opus, from
+ * MediaRecorder) to English. Whisper accepts WebM directly — no
+ * transcoding needed, just the correct MIME type/filename.
+ */
+export async function transcribeWebm(buf: ArrayBuffer): Promise<string> {
+  return transcribeBuffer(buf, 'audio/webm', 'voice.webm');
 }

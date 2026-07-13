@@ -20,19 +20,30 @@ function isQuestion(text: string): boolean {
   return phrases.some((p) => lower.includes(p));
 }
 
-export async function POST(req: NextRequest) {
-  const { text } = await req.json().catch(() => ({ text: '' }));
-  if (!text?.trim()) return NextResponse.json({ error: 'text required' }, { status: 400 });
+// Routing logic shared by the text (this route) and voice
+// (app/api/assistant/voice) paths — a transcribed voice message runs
+// through the exact same question/action classification and downstream
+// handlers as typed text. Capture failures are left to throw so each
+// caller can decide its own response status (text route uses 500 like
+// before; the voice route always answers 200 with a type:'error' body).
+export async function handleAssistantText(text: string) {
   const trimmed = text.trim();
 
   if (isQuestion(trimmed)) {
     const result = await runSmartQuery(trimmed);
-    if ('error' in result) return NextResponse.json({ type: 'error', message: result.error });
-    return NextResponse.json({ type: 'answer', note: result.note, ids: result.ids });
+    if ('error' in result) return { type: 'error' as const, message: result.error };
+    return { type: 'answer' as const, note: result.note, ids: result.ids };
   }
 
+  return processCapture({ text: trimmed, source: 'web' });
+}
+
+export async function POST(req: NextRequest) {
+  const { text } = await req.json().catch(() => ({ text: '' }));
+  if (!text?.trim()) return NextResponse.json({ error: 'text required' }, { status: 400 });
+
   try {
-    const outcome = await processCapture({ text: trimmed, source: 'web' });
+    const outcome = await handleAssistantText(text);
     return NextResponse.json(outcome);
   } catch (err) {
     console.error('assistant capture failed', err);
