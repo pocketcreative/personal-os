@@ -243,6 +243,8 @@ export default function CaptureBox() {
                       alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
                       maxWidth: '85%',
                       whiteSpace: 'pre-wrap',
+                      overflowWrap: 'break-word',
+                      wordBreak: 'break-word',
                       fontSize: 13,
                       lineHeight: 1.4,
                       padding: '8px 12px',
