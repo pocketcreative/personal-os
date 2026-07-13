@@ -60,7 +60,7 @@ export default function CaptureBox() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [recState, setRecState] = useState<RecState>('idle');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const listEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -95,6 +95,17 @@ export default function CaptureBox() {
     listEndRef.current?.scrollIntoView({ block: 'end' });
   }, [messages]);
 
+  // Auto-grow the textarea to fit typed or voice-transcribed text (up to a
+  // cap, then it scrolls) — re-runs on every text change regardless of
+  // source, since voice/failure-restore set `text` programmatically and
+  // never fire a native input event.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [text]);
+
   function appendOutcomeMessages(outcome: AssistantResponse) {
     setMessages((m) => [...m, { id: nextId++, role: outcome.type === 'error' ? 'error' : 'assistant', text: describeOutcome(outcome) }]);
     if (outcomeTouchedTasks(outcome)) {
@@ -102,7 +113,7 @@ export default function CaptureBox() {
     }
   }
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.SyntheticEvent) {
     e.preventDefault();
     // Guard at the top, not just via the button's disabled attribute — the
     // input stays editable while busy, so Enter could otherwise fire a
@@ -262,14 +273,24 @@ export default function CaptureBox() {
                 🎤 Transcribing…
               </div>
             )}
-            <form onSubmit={submit} className="flex gap-2">
-              <input
+            <form onSubmit={submit} className="flex items-end gap-2">
+              <textarea
                 ref={inputRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter sends, Shift+Enter inserts a newline — standard
+                  // chat-input convention, and what makes multi-line text
+                  // (typed or voice-transcribed) actually reviewable here.
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submit(e);
+                  }
+                }}
                 placeholder="Ask, create, or update a task…"
-                className="flex-1 bg-transparent px-2 text-sm outline-none"
-                style={{ color: 'var(--ink-4)' }}
+                rows={1}
+                className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none"
+                style={{ color: 'var(--ink-4)', maxHeight: 160, overflowY: 'auto' }}
               />
               <button
                 type="button"
