@@ -39,6 +39,14 @@ async function stopTimerApi(taskId: string): Promise<boolean> {
   return res.ok;
 }
 
+async function reorderTasksApi(orderedIds: string[]): Promise<boolean> {
+  const res = await fetch('/api/tasks/reorder', {
+    method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderedIds }),
+  });
+  if (!res.ok) console.error('reorderTasks failed', res.status, await res.text());
+  return res.ok;
+}
+
 export function useTaskDashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [statusFilters, setStatusFilters] = useState<Task['status'][]>([]);
@@ -89,6 +97,21 @@ export function useTaskDashboard() {
     if (ok) load();
   }, [load]);
 
+  // Optimistically stamp each reordered task's sort_order to its new index
+  // so the UI doesn't visually snap back while the PATCH round-trips. On
+  // failure, resync from the server — same recovery pattern as deleteTask
+  // and applyPatch above.
+  const reorderTasks = useCallback(async (orderedIds: string[]) => {
+    dirtyRef.current = true;
+    const now = new Date().toISOString();
+    setTasks((cur) => cur.map((t) => {
+      const idx = orderedIds.indexOf(t.id);
+      return idx === -1 ? t : { ...t, sort_order: idx, updated_at: now };
+    }));
+    const ok = await reorderTasksApi(orderedIds);
+    if (!ok) load();
+  }, [load]);
+
   const toggleFilter = <T,>(arr: T[], val: T): T[] =>
     arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
 
@@ -118,5 +141,6 @@ export function useTaskDashboard() {
     updateDescription: (id: string, description: string) => applyPatch(id, { description }),
     deleteTask,
     startTimer, stopTimer,
+    reorderTasks,
   };
 }

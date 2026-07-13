@@ -15,6 +15,7 @@ export interface Task {
   rank_pinned: boolean; // legacy, unused by the new UI
   time_estimate_min: number | null;
   actual_time_min: number;
+  sort_order: number | null; // null = never manually dragged; use taskSort.ts's fixed rank() rule
   tags: string[];
   due_date: string | null;
   completed_at: string | null;

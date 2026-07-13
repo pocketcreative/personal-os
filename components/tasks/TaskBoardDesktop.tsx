@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { useTaskDashboard } from '@/lib/useTaskDashboard';
 import { useLiveTimer } from '@/lib/useLiveTimer';
 import ClockInput from './ClockInput';
@@ -37,10 +38,32 @@ function TimerCell({ task, onStart, onStop }: {
   );
 }
 
+const GRID_COLS = '20px 2fr .9fr 1.1fr .8fr .9fr .9fr 1fr';
+
 export default function TaskBoardDesktop() {
   const d = useTaskDashboard();
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const colStyle = { fontFamily: "'Archivo', sans-serif" };
+
+  const isActive = (t: Task) => t.status !== 'completed' && t.status !== 'archived';
+  const activeIds = d.tasks.filter(isActive).map((t) => t.id);
+
+  const handleDrop = (overId: string) => {
+    if (draggedId && draggedId !== overId) {
+      const from = activeIds.indexOf(draggedId);
+      const to = activeIds.indexOf(overId);
+      if (from !== -1 && to !== -1) {
+        const next = [...activeIds];
+        next.splice(from, 1);
+        next.splice(to, 0, draggedId);
+        d.reorderTasks(next);
+      }
+    }
+    setDraggedId(null);
+    setDragOverId(null);
+  };
 
   return (
     <div style={{ maxWidth: 1220, margin: '0 auto', padding: '56px 24px', background: '#f3f1ec' }}>
@@ -57,9 +80,10 @@ export default function TaskBoardDesktop() {
           </div>
 
           <div style={{
-            display: 'grid', gridTemplateColumns: '2fr .9fr 1.1fr .8fr .9fr .9fr 1fr',
+            display: 'grid', gridTemplateColumns: GRID_COLS,
             columnGap: 28, borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2,
           }}>
+            <div />
             <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase' }}>Task</div>
             <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Category</div>
             <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>
@@ -103,11 +127,30 @@ export default function TaskBoardDesktop() {
 
           {d.tasks.map((task) => {
             const isCompleted = task.status === 'completed';
+            const draggable = isActive(task);
+            const isDragging = draggedId === task.id;
+            const isDragOver = dragOverId === task.id && draggedId !== task.id;
             return (
-              <div key={task.id} style={{
-                display: 'grid', gridTemplateColumns: '2fr .9fr 1.1fr .8fr .9fr .9fr 1fr',
-                columnGap: 28, borderBottom: '1px solid rgba(17,17,17,.08)',
-              }}>
+              <div
+                key={task.id}
+                draggable={draggable}
+                onDragStart={draggable ? () => setDraggedId(task.id) : undefined}
+                onDragOver={draggable ? (e) => { e.preventDefault(); setDragOverId(task.id); } : undefined}
+                onDragLeave={draggable ? () => setDragOverId((cur) => (cur === task.id ? null : cur)) : undefined}
+                onDrop={draggable ? (e) => { e.preventDefault(); handleDrop(task.id); } : undefined}
+                onDragEnd={draggable ? () => { setDraggedId(null); setDragOverId(null); } : undefined}
+                style={{
+                  display: 'grid', gridTemplateColumns: GRID_COLS,
+                  columnGap: 28, borderBottom: '1px solid rgba(17,17,17,.08)',
+                  opacity: isDragging ? 0.4 : 1,
+                  boxShadow: isDragOver ? 'inset 0 2px 0 0 #9a7a2e' : 'none',
+                }}
+              >
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: draggable ? 'grab' : 'default',
+                  color: 'rgba(17,17,17,.25)', fontSize: 14, userSelect: 'none',
+                }}>{draggable ? '⠿' : ''}</div>
                 <div
                   onClick={() => d.setActiveTaskId(task.id)}
                   style={{

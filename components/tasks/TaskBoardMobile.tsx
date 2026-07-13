@@ -40,10 +40,41 @@ function MobileTimer({ task, onStart, onStop }: {
   );
 }
 
+const isActive = (t: Task) => t.status !== 'completed' && t.status !== 'archived';
+
+function MoveButtons({ taskId, activeIds, onReorder }: {
+  taskId: string; activeIds: string[]; onReorder: (orderedIds: string[]) => void;
+}) {
+  const idx = activeIds.indexOf(taskId);
+  const canUp = idx > 0;
+  const canDown = idx !== -1 && idx < activeIds.length - 1;
+
+  const swap = (a: number, b: number) => {
+    const next = [...activeIds];
+    [next[a], next[b]] = [next[b], next[a]];
+    onReorder(next);
+  };
+
+  const btnStyle = (enabled: boolean) => ({
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 22, height: 18, fontSize: 10, lineHeight: 1,
+    color: enabled ? 'rgba(17,17,17,.55)' : 'rgba(17,17,17,.15)',
+    cursor: enabled ? 'pointer' : 'default', userSelect: 'none' as const,
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 'none' }}>
+      <div style={btnStyle(canUp)} onClick={() => canUp && swap(idx, idx - 1)}>▲</div>
+      <div style={btnStyle(canDown)} onClick={() => canDown && swap(idx, idx + 1)}>▼</div>
+    </div>
+  );
+}
+
 export default function TaskBoardMobile() {
   const d = useTaskDashboard();
   const sfActive = d.statusFilters.length > 0;
   const pfActive = d.priorityFilters.length > 0;
+  const activeIds = d.tasks.filter(isActive).map((t) => t.id);
 
   return (
     <div style={{ background: '#f3f1ec', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -95,6 +126,9 @@ export default function TaskBoardMobile() {
               padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,.03)',
             }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+                {isActive(task) && (
+                  <MoveButtons taskId={task.id} activeIds={activeIds} onReorder={d.reorderTasks} />
+                )}
                 <div
                   onClick={() => d.setActiveTaskId(task.id)}
                   style={{
