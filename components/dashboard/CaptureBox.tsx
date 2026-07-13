@@ -2,12 +2,18 @@
 import { useEffect, useRef, useState } from 'react';
 
 interface ChatMessage {
-  id: number;
+  id: string;
   role: 'user' | 'assistant' | 'error';
   text: string;
 }
 
-let nextId = 1;
+// crypto.randomUUID() rather than a module-level counter — a counter
+// resets to its initial value on every dev Fast Refresh (module top-level
+// code re-runs) while the `messages` state array survives the reload,
+// so new messages would collide with existing ones' ids.
+function newId(): string {
+  return crypto.randomUUID();
+}
 
 // Mirrors lib/capture.ts's CaptureOutcome + the assistant route's extra
 // 'answer'/'error' variants — kept as a loose local shape (rather than
@@ -107,7 +113,7 @@ export default function CaptureBox() {
   }, [text]);
 
   function appendOutcomeMessages(outcome: AssistantResponse) {
-    setMessages((m) => [...m, { id: nextId++, role: outcome.type === 'error' ? 'error' : 'assistant', text: describeOutcome(outcome) }]);
+    setMessages((m) => [...m, { id: newId(), role: outcome.type === 'error' ? 'error' : 'assistant', text: describeOutcome(outcome) }]);
     if (outcomeTouchedTasks(outcome)) {
       window.dispatchEvent(new Event('capture:done')); // task views listen and refetch
     }
@@ -121,7 +127,7 @@ export default function CaptureBox() {
     const query = text.trim();
     if (!query || isBusy) return;
     setBusy(true);
-    setMessages((m) => [...m, { id: nextId++, role: 'user', text: query }]);
+    setMessages((m) => [...m, { id: newId(), role: 'user', text: query }]);
     setText('');
 
     const res = await fetch('/api/assistant', {
@@ -135,7 +141,7 @@ export default function CaptureBox() {
       // Text is intentionally restored (not left cleared) on failure so the
       // user's draft isn't lost — matches the previous CaptureBox's spirit.
       setText(query);
-      setMessages((m) => [...m, { id: nextId++, role: 'error', text: 'Message failed — check your connection and try again.' }]);
+      setMessages((m) => [...m, { id: newId(), role: 'error', text: 'Message failed — check your connection and try again.' }]);
       setBusy(false);
       return;
     }
@@ -147,7 +153,7 @@ export default function CaptureBox() {
   async function startRecording() {
     if (isBusy) return;
     if (typeof MediaRecorder === 'undefined') {
-      setMessages((m) => [...m, { id: nextId++, role: 'error', text: "Voice recording isn't supported in this browser." }]);
+      setMessages((m) => [...m, { id: newId(), role: 'error', text: "Voice recording isn't supported in this browser." }]);
       return;
     }
     let stream: MediaStream;
@@ -155,7 +161,7 @@ export default function CaptureBox() {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
       console.error('getUserMedia failed', err);
-      setMessages((m) => [...m, { id: nextId++, role: 'error', text: 'Microphone access denied — check your browser permissions.' }]);
+      setMessages((m) => [...m, { id: newId(), role: 'error', text: 'Microphone access denied — check your browser permissions.' }]);
       return;
     }
 
@@ -194,7 +200,7 @@ export default function CaptureBox() {
 
     if (!result || result.type !== 'transcript' || !result.transcript.trim()) {
       const message = result?.type === 'error' ? result.message : 'Voice message failed — check your connection and try again.';
-      setMessages((m) => [...m, { id: nextId++, role: 'error', text: `⚠ ${message}` }]);
+      setMessages((m) => [...m, { id: newId(), role: 'error', text: `⚠ ${message}` }]);
       setRecState('idle');
       return;
     }
