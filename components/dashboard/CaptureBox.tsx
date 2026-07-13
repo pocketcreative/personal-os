@@ -297,8 +297,11 @@ export default function CaptureBox() {
                 }}
                 placeholder="Ask, create, or update a task…"
                 rows={1}
-                className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none"
-                style={{ color: 'var(--ink-4)', maxHeight: 160, overflowY: 'auto' }}
+                className="flex-1 resize-none bg-transparent px-2 py-1.5 outline-none"
+                // 16px, not the text-sm class's 14px — iOS Safari auto-zooms
+                // the whole page on focus for any input under 16px, which is
+                // exactly the "everything zooms in" behavior being fixed here.
+                style={{ color: 'var(--ink-4)', maxHeight: 160, overflowY: 'auto', fontSize: 16 }}
               />
               <button
                 type="button"
