@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Task } from '@/lib/types';
 
 export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
@@ -10,6 +10,16 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
 }) {
   const [name, setName] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
+  const nameRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow the title field so a long title wraps and stays fully
+  // visible/editable instead of scrolling sideways inside a single line.
+  useEffect(() => {
+    const el = nameRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [name]);
 
   function done() {
     if (name !== task.title) onSave({ title: name });
@@ -34,11 +44,14 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
         }}
       >
         <div style={{ padding: '32px 32px 8px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-          <input
+          <textarea
+            ref={nameRef}
             value={name} onChange={(e) => setName(e.target.value)}
+            rows={1}
             style={{
               flex: 1, font: "700 21px 'Inter Tight', sans-serif", color: '#111',
               letterSpacing: '-0.01em', padding: '4px 0', border: 'none', outline: 'none', background: 'transparent',
+              resize: 'none', overflow: 'hidden',
             }}
           />
           <span onClick={done} style={{ cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 18, padding: 4 }}>✕</span>

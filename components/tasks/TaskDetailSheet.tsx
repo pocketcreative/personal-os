@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Task } from '@/lib/types';
 
 export default function TaskDetailSheet({ task, onClose, onSave, onDelete }: {
@@ -10,6 +10,16 @@ export default function TaskDetailSheet({ task, onClose, onSave, onDelete }: {
 }) {
   const [name, setName] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
+  const nameRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow the title field so a long title wraps and stays fully
+  // visible/editable instead of scrolling sideways inside a single line.
+  useEffect(() => {
+    const el = nameRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [name]);
 
   function done() {
     if (name !== task.title) onSave({ title: name });
@@ -22,25 +32,25 @@ export default function TaskDetailSheet({ task, onClose, onSave, onDelete }: {
       onClick={done}
       style={{
         position: 'fixed', inset: 0, background: 'rgba(17,17,17,.4)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 80,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80, padding: 20,
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#fbfaf7', borderRadius: '20px 20px 0 0', width: 390, maxWidth: '100%',
-          maxHeight: '70vh', overflowY: 'auto', boxShadow: '0 -10px 40px rgba(0,0,0,.2)',
+          background: '#fbfaf7', borderRadius: 16, width: 390, maxWidth: '100%',
+          maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.25)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
-          <div style={{ width: 36, height: 4, borderRadius: 3, background: 'rgba(17,17,17,.15)' }} />
-        </div>
-        <div style={{ padding: '16px 24px 8px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <input
+        <div style={{ padding: '20px 24px 8px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <textarea
+            ref={nameRef}
             value={name} onChange={(e) => setName(e.target.value)}
+            rows={1}
             style={{
               flex: 1, font: "700 19px 'Inter Tight', sans-serif", color: '#111',
               letterSpacing: '-0.01em', border: 'none', outline: 'none', background: 'transparent',
+              resize: 'none', overflow: 'hidden',
             }}
           />
           <span onClick={done} style={{ cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 17, padding: 4 }}>✕</span>
@@ -53,7 +63,7 @@ export default function TaskDetailSheet({ task, onClose, onSave, onDelete }: {
             value={description} onChange={(e) => setDescription(e.target.value)}
             placeholder="Add notes about this task…"
             style={{
-              width: '100%', minHeight: 120, fontSize: 14, lineHeight: 1.5, color: '#111',
+              width: '100%', minHeight: 120, fontSize: 16, lineHeight: 1.5, color: '#111',
               resize: 'vertical', padding: '12px 14px', border: '1px solid rgba(17,17,17,.1)',
               borderRadius: 8, background: '#fff', boxSizing: 'border-box',
               fontFamily: "'Inter Tight', sans-serif", outline: 'none',
