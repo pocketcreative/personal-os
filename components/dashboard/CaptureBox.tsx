@@ -12,15 +12,19 @@ let nextId = 1;
 // Mirrors lib/capture.ts's CaptureOutcome + the assistant route's extra
 // 'answer'/'error' variants — kept as a loose local shape (rather than
 // importing server types into a client component) since we only read a
-// few fields off it here. `transcript` is only present on responses from
-// the voice route (app/api/assistant/voice) — the text route never sets it.
+// few fields off it here.
 type AssistantResponse =
-  | { type: 'captured'; results: { classification: { summary: string; kind: string } }[]; transcript?: string }
-  | { type: 'edited'; taskId: string; title: string; summary: string; transcript?: string }
-  | { type: 'ambiguous'; candidateTitles: string[]; transcript?: string }
-  | { type: 'no_match'; transcript?: string }
-  | { type: 'answer'; note: string; ids: string[]; transcript?: string }
-  | { type: 'error'; message: string; transcript?: string };
+  | { type: 'captured'; results: { classification: { summary: string; kind: string } }[] }
+  | { type: 'edited'; taskId: string; title: string; summary: string }
+  | { type: 'ambiguous'; candidateTitles: string[] }
+  | { type: 'no_match' }
+  | { type: 'answer'; note: string; ids: string[] }
+  | { type: 'error'; message: string };
+
+// The voice endpoint (app/api/assistant/voice) transcribes only — it never
+// runs the transcript through the assistant routing pipeline itself, so the
+// user gets a chance to fix a mishearing before it becomes a wrong task/edit.
+type VoiceResponse = { type: 'transcript'; transcript: string } | { type: 'error'; message: string };
 
 function describeOutcome(outcome: AssistantResponse): string {
   switch (outcome.type) {
@@ -169,32 +173,27 @@ export default function CaptureBox() {
   }
 
   async function handleVoiceBlob(blob: Blob) {
-    const placeholderId = nextId++;
-    setMessages((m) => [...m, { id: placeholderId, role: 'user', text: '🎤 Transcribing…' }]);
-
     const form = new FormData();
     form.append('audio', blob, 'voice.webm');
 
     const res = await fetch('/api/assistant/voice', { method: 'POST', body: form })
       .catch((err) => { console.error(err); return null; });
 
-    const outcome = res ? ((await res.json().catch(() => null)) as AssistantResponse | null) : null;
+    const result = res ? ((await res.json().catch(() => null)) as VoiceResponse | null) : null;
 
-    if (!outcome || !outcome.transcript?.trim()) {
-      // No dangling placeholder on failure — remove it and show a clean
-      // error bubble instead.
-      setMessages((m) => m.filter((msg) => msg.id !== placeholderId));
-      const message = outcome?.type === 'error' ? outcome.message : 'Voice message failed — check your connection and try again.';
+    if (!result || result.type !== 'transcript' || !result.transcript.trim()) {
+      const message = result?.type === 'error' ? result.message : 'Voice message failed — check your connection and try again.';
       setMessages((m) => [...m, { id: nextId++, role: 'error', text: `⚠ ${message}` }]);
       setRecState('idle');
       return;
     }
 
-    // Replace the placeholder with what was actually heard, then reuse the
-    // same outcome-to-reply mapping the text path uses.
-    setMessages((m) => m.map((msg) => (msg.id === placeholderId ? { ...msg, text: outcome.transcript! } : msg)));
-    appendOutcomeMessages(outcome);
+    // Drop the transcript into the input for review/editing rather than
+    // sending it straight away — Whisper mishearing a short phrase should
+    // be catchable before it turns into a wrong task/edit, not after.
+    setText(result.transcript);
     setRecState('idle');
+    inputRef.current?.focus();
   }
 
   function onMicClick() {
@@ -256,6 +255,11 @@ export default function CaptureBox() {
               <div style={{ fontSize: 12, color: 'var(--danger)', padding: '0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--danger)', animation: 'ac-mic-pulse 1s ease-in-out infinite' }} />
                 Recording…
+              </div>
+            )}
+            {recState === 'transcribing' && (
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '0 2px' }}>
+                🎤 Transcribing…
               </div>
             )}
             <form onSubmit={submit} className="flex gap-2">
