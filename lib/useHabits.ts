@@ -78,6 +78,13 @@ export function useHabits() {
     if (fresh) setData(fresh);
   }, []);
 
+  // load()'s setData call happens after an await, not synchronously during
+  // this effect's execution, so the cascading-render risk this rule guards
+  // against doesn't apply — a genuine fetch-on-mount, same as
+  // useTaskDashboard's mount effect (which only dodges this lint rule by
+  // coincidence, because it also registers a window listener in the same
+  // effect).
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional, see comment above
   useEffect(() => { load(); }, [load]);
 
   // Optimistic: flip the checkbox immediately, resync from the server only
