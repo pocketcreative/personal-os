@@ -1,25 +1,26 @@
 export interface SortableTask {
   id: string;
   status: 'not_started' | 'in_progress' | 'completed' | 'archived';
-  key: boolean; // true = "TODAY" priority
   sort_order: number | null; // null = never manually dragged; use the fixed rank() rule
 }
 
 /**
  * Fixed, always-applied sort rule — ported from the design handoff's
  * taskRank(). Not user-draggable; recomputed on every render. Completed
- * tasks always sort last regardless of priority. Archived tasks sort last
+ * tasks always sort last regardless of status. Archived tasks sort last
  * of all — they're hidden by default and only appear when explicitly
  * filtered in, so their relative order barely matters.
+ *
+ * "Today" priority (key) deliberately does NOT factor into rank — it's a
+ * filter/badge only (see useTaskDashboard's priorityFilters). It used to
+ * boost today-flagged tasks above same-status ones, but that fought with
+ * manual drag-to-reorder: marking a different task "today" could shove it
+ * above a position the user had deliberately placed something else in.
  */
 function rank(t: SortableTask): number {
-  if (t.status === 'archived') return 5;
-  if (t.status === 'completed') return 4;
-  const inProgress = t.status === 'in_progress';
-  if (inProgress && t.key) return 0;
-  if (!inProgress && t.key) return 1;
-  if (inProgress) return 2;
-  return 3;
+  if (t.status === 'archived') return 3;
+  if (t.status === 'completed') return 2;
+  return t.status === 'in_progress' ? 0 : 1;
 }
 
 function isDone(t: SortableTask): boolean {
