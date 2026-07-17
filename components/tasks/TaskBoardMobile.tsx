@@ -1,6 +1,9 @@
 'use client';
+import { useRef, useState } from 'react';
+import type { PointerEvent } from 'react';
 import { useTaskDashboard } from '@/lib/useTaskDashboard';
 import { useLiveTimer } from '@/lib/useLiveTimer';
+import { reorderByPointerY, type CardRect } from '@/lib/dragReorder';
 import ClockInput from './ClockInput';
 import FieldPopover from './FieldPopover';
 import TaskDetailSheet from './TaskDetailSheet';
@@ -42,31 +45,31 @@ function MobileTimer({ task, onStart, onStop }: {
 
 const isActive = (t: Task) => t.status !== 'completed' && t.status !== 'archived';
 
-function MoveButtons({ taskId, activeIds, onReorder }: {
-  taskId: string; activeIds: string[]; onReorder: (orderedIds: string[]) => void;
+// HTML5 native drag events (used by TaskBoardDesktop) don't fire reliably on
+// touch, so this drag handle uses Pointer Events instead — they unify mouse/
+// touch/pen and are supported across modern mobile browsers with no added
+// dependency. setPointerCapture on press routes all subsequent move/up
+// events to this element regardless of where the finger travels, so the
+// move/up handlers don't need to know which card they belong to.
+function DragHandle({ dragging, onPointerDown, onPointerMove, onPointerUp }: {
+  dragging: boolean;
+  onPointerDown: (e: PointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (e: PointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (e: PointerEvent<HTMLDivElement>) => void;
 }) {
-  const idx = activeIds.indexOf(taskId);
-  const canUp = idx > 0;
-  const canDown = idx !== -1 && idx < activeIds.length - 1;
-
-  const swap = (a: number, b: number) => {
-    const next = [...activeIds];
-    [next[a], next[b]] = [next[b], next[a]];
-    onReorder(next);
-  };
-
-  const btnStyle = (enabled: boolean) => ({
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 22, height: 18, fontSize: 10, lineHeight: 1,
-    color: enabled ? 'rgba(17,17,17,.55)' : 'rgba(17,17,17,.15)',
-    cursor: enabled ? 'pointer' : 'default', userSelect: 'none' as const,
-  });
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 'none' }}>
-      <div style={btnStyle(canUp)} onClick={() => canUp && swap(idx, idx - 1)}>▲</div>
-      <div style={btnStyle(canDown)} onClick={() => canDown && swap(idx, idx + 1)}>▼</div>
-    </div>
+    <div
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 36, height: 36, marginLeft: -8, marginTop: -8, flex: 'none',
+        fontSize: 16, color: 'rgba(17,17,17,.3)', touchAction: 'none',
+        cursor: dragging ? 'grabbing' : 'grab', userSelect: 'none' as const,
+      }}
+    >⠿</div>
   );
 }
 
@@ -75,6 +78,50 @@ export default function TaskBoardMobile() {
   const sfActive = d.statusFilters.length > 0;
   const pfActive = d.priorityFilters.length > 0;
   const activeIds = d.tasks.filter(isActive).map((t) => t.id);
+
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  // Card geometry is frozen for the duration of a gesture (captured once on
+  // pointer-down) rather than re-measured on every move — see
+  // lib/dragReorder.ts. Doesn't need to be React state since nothing reads
+  // it during render.
+  const dragRectsRef = useRef<CardRect[]>([]);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropNeighbor, setDropNeighbor] = useState<{ id: string; edge: 'top' | 'bottom' } | null>(null);
+
+  const startDrag = (taskId: string) => (e: PointerEvent<HTMLDivElement>) => {
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* Safari edge case, safe to ignore */ }
+    const rects: CardRect[] = [];
+    for (const id of activeIds) {
+      const el = cardRefs.current.get(id);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        rects.push({ id, top: r.top, height: r.height });
+      }
+    }
+    dragRectsRef.current = rects;
+    setDragId(taskId);
+    setDropNeighbor(null);
+  };
+
+  // Only the card currently holding pointer capture ever receives move/up
+  // events, so these don't need to check which card triggered them.
+  const moveDrag = (e: PointerEvent<HTMLDivElement>) => {
+    if (!dragId) return;
+    const order = reorderByPointerY(dragRectsRef.current, dragId, e.clientY);
+    const idx = order.indexOf(dragId);
+    if (idx < order.length - 1) setDropNeighbor({ id: order[idx + 1], edge: 'top' });
+    else if (idx > 0) setDropNeighbor({ id: order[idx - 1], edge: 'bottom' });
+    else setDropNeighbor(null);
+  };
+
+  const endDrag = (e: PointerEvent<HTMLDivElement>) => {
+    if (dragId) {
+      const order = reorderByPointerY(dragRectsRef.current, dragId, e.clientY);
+      if (order.join() !== activeIds.join()) d.reorderTasks(order);
+    }
+    setDragId(null);
+    setDropNeighbor(null);
+  };
 
   return (
     <div style={{ background: '#f3f1ec', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -120,14 +167,29 @@ export default function TaskBoardMobile() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 16px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {d.tasks.map((task) => {
           const isCompleted = task.status === 'completed';
+          const isDragging = dragId === task.id;
+          const dropEdge = dropNeighbor?.id === task.id ? dropNeighbor.edge : null;
           return (
-            <div key={task.id} style={{
-              background: '#fbfaf7', border: '1px solid rgba(17,17,17,.08)', borderRadius: 14,
-              padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,.03)',
-            }}>
+            <div
+              key={task.id}
+              ref={(el) => { if (el) cardRefs.current.set(task.id, el); else cardRefs.current.delete(task.id); }}
+              style={{
+                background: '#fbfaf7', border: '1px solid rgba(17,17,17,.08)', borderRadius: 14,
+                padding: 16,
+                boxShadow: dropEdge === 'top' ? 'inset 0 2px 0 0 #9a7a2e, 0 1px 3px rgba(0,0,0,.03)'
+                  : dropEdge === 'bottom' ? 'inset 0 -2px 0 0 #9a7a2e, 0 1px 3px rgba(0,0,0,.03)'
+                  : '0 1px 3px rgba(0,0,0,.03)',
+                opacity: isDragging ? 0.5 : 1,
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
                 {isActive(task) && (
-                  <MoveButtons taskId={task.id} activeIds={activeIds} onReorder={d.reorderTasks} />
+                  <DragHandle
+                    dragging={isDragging}
+                    onPointerDown={startDrag(task.id)}
+                    onPointerMove={moveDrag}
+                    onPointerUp={endDrag}
+                  />
                 )}
                 <div
                   onClick={() => d.setActiveTaskId(task.id)}
