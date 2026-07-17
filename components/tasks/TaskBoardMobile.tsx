@@ -47,22 +47,18 @@ const isActive = (t: Task) => t.status !== 'completed' && t.status !== 'archived
 
 // HTML5 native drag events (used by TaskBoardDesktop) don't fire reliably on
 // touch, so this drag handle uses Pointer Events instead — they unify mouse/
-// touch/pen and are supported across modern mobile browsers with no added
-// dependency. setPointerCapture on press routes all subsequent move/up
-// events to this element regardless of where the finger travels, so the
-// move/up handlers don't need to know which card they belong to.
-function DragHandle({ dragging, onPointerDown, onPointerMove, onPointerUp }: {
+// touch/pen with no added dependency. Move/up are tracked via window
+// listeners added imperatively on press (see startDrag) rather than
+// setPointerCapture — WebKit has a history of inconsistent pointer-capture
+// behavior specifically for touch pointers, and the window-listener pattern
+// (what most production drag libraries use) works uniformly everywhere.
+function DragHandle({ dragging, onPointerDown }: {
   dragging: boolean;
   onPointerDown: (e: PointerEvent<HTMLDivElement>) => void;
-  onPointerMove: (e: PointerEvent<HTMLDivElement>) => void;
-  onPointerUp: (e: PointerEvent<HTMLDivElement>) => void;
 }) {
   return (
     <div
       onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         width: 36, height: 36, marginLeft: -8, marginTop: -8, flex: 'none',
@@ -89,7 +85,7 @@ export default function TaskBoardMobile() {
   const [dropNeighbor, setDropNeighbor] = useState<{ id: string; edge: 'top' | 'bottom' } | null>(null);
 
   const startDrag = (taskId: string) => (e: PointerEvent<HTMLDivElement>) => {
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* Safari edge case, safe to ignore */ }
+    e.preventDefault();
     const rects: CardRect[] = [];
     for (const id of activeIds) {
       const el = cardRefs.current.get(id);
@@ -101,26 +97,31 @@ export default function TaskBoardMobile() {
     dragRectsRef.current = rects;
     setDragId(taskId);
     setDropNeighbor(null);
-  };
 
-  // Only the card currently holding pointer capture ever receives move/up
-  // events, so these don't need to check which card triggered them.
-  const moveDrag = (e: PointerEvent<HTMLDivElement>) => {
-    if (!dragId) return;
-    const order = reorderByPointerY(dragRectsRef.current, dragId, e.clientY);
-    const idx = order.indexOf(dragId);
-    if (idx < order.length - 1) setDropNeighbor({ id: order[idx + 1], edge: 'top' });
-    else if (idx > 0) setDropNeighbor({ id: order[idx - 1], edge: 'bottom' });
-    else setDropNeighbor(null);
-  };
-
-  const endDrag = (e: PointerEvent<HTMLDivElement>) => {
-    if (dragId) {
-      const order = reorderByPointerY(dragRectsRef.current, dragId, e.clientY);
-      if (order.join() !== activeIds.join()) d.reorderTasks(order);
-    }
-    setDragId(null);
-    setDropNeighbor(null);
+    // Track the gesture via window listeners, added/removed for just this
+    // gesture's lifetime, rather than setPointerCapture — see DragHandle's
+    // comment above. `rects` and `taskId` are closed over directly instead
+    // of read back from refs/state, so these can't race a re-render.
+    const handleMove = (ev: globalThis.PointerEvent) => {
+      const order = reorderByPointerY(rects, taskId, ev.clientY);
+      const idx = order.indexOf(taskId);
+      if (idx < order.length - 1) setDropNeighbor({ id: order[idx + 1], edge: 'top' });
+      else if (idx > 0) setDropNeighbor({ id: order[idx - 1], edge: 'bottom' });
+      else setDropNeighbor(null);
+    };
+    const handleUp = (ev: globalThis.PointerEvent) => {
+      const order = reorderByPointerY(rects, taskId, ev.clientY);
+      const originalIds = rects.map((r) => r.id);
+      if (order.join() !== originalIds.join()) d.reorderTasks(order);
+      setDragId(null);
+      setDropNeighbor(null);
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleUp);
   };
 
   return (
@@ -184,12 +185,7 @@ export default function TaskBoardMobile() {
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
                 {isActive(task) && (
-                  <DragHandle
-                    dragging={isDragging}
-                    onPointerDown={startDrag(task.id)}
-                    onPointerMove={moveDrag}
-                    onPointerUp={endDrag}
-                  />
+                  <DragHandle dragging={isDragging} onPointerDown={startDrag(task.id)} />
                 )}
                 <div
                   onClick={() => d.setActiveTaskId(task.id)}
