@@ -133,7 +133,15 @@ export default function TaskBoardMobile() {
         <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', letterSpacing: '.04em', textTransform: 'uppercase' }}>
           {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 16, overflowX: 'auto' }}>
+        {/* No overflowX here (deliberately) — the two chips comfortably fit
+            any real phone width, and setting overflow-x to a non-visible
+            value forces the browser to compute overflow-y as auto too (per
+            the CSS overflow spec), which was silently clipping each
+            popover's dropdown panel since it opens downward past this row's
+            own short height. If more filters get added later and this row
+            genuinely needs to scroll, the popover panel will need to escape
+            via a portal rather than reintroducing overflow here. */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <FieldPopover
             trigger={
               <span style={{
