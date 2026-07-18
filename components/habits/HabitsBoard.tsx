@@ -5,6 +5,7 @@ import { calcCompletionPercent } from '@/lib/habitStats';
 import { describeSchedule } from '@/lib/habitSchedule';
 import { dateKeyDayOfWeek } from '@/lib/dates';
 import FieldPopover from '@/components/tasks/FieldPopover';
+import HabitsHeatmap from '@/components/habits/HabitsHeatmap';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; // index = day-of-week, 0=Sun
@@ -225,6 +226,12 @@ export default function HabitsBoard() {
             }}
           >Add</button>
         </div>
+
+        {data && (
+          <div style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid rgba(17,17,17,.08)' }}>
+            <HabitsHeatmap logs={data.logs} startDate={data.yearStart} endDate={data.today} />
+          </div>
+        )}
       </div>
     </div>
   );
