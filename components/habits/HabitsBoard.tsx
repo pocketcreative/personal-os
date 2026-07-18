@@ -79,6 +79,7 @@ export default function HabitsBoard() {
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Habits</div>
           {data && (
             <div style={{ display: 'flex', gap: 28 }}>
+              <StatChip label="This week" value={calcCompletionPercent(data.habits, data.logs, data.weekDates[0], data.today)} />
               <StatChip label="This month" value={calcCompletionPercent(data.habits, data.logs, data.monthStart, data.today)} />
               <StatChip label="This year" value={calcCompletionPercent(data.habits, data.logs, data.yearStart, data.today)} />
             </div>
@@ -229,7 +230,7 @@ export default function HabitsBoard() {
 
         {data && (
           <div style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid rgba(17,17,17,.08)' }}>
-            <HabitsHeatmap logs={data.logs} startDate={data.yearStart} endDate={data.today} />
+            <HabitsHeatmap habits={data.habits} logs={data.logs} startDate={data.yearStart} endDate={data.today} />
           </div>
         )}
       </div>

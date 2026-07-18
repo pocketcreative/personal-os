@@ -1,33 +1,38 @@
 'use client';
-import { buildHeatmapWeeks, dailyCompletionCounts } from '@/lib/habitHeatmap';
-import type { HabitLog } from '@/lib/useHabits';
+import { buildHeatmapWeeks, dailyCompletionPercents } from '@/lib/habitHeatmap';
+import type { Habit, HabitLog } from '@/lib/useHabits';
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function cellColor(count: number): string {
-  if (count === 0) return 'rgba(17,17,17,.05)';
-  if (count === 1) return 'rgba(154,122,46,.28)';
-  if (count === 2) return 'rgba(154,122,46,.52)';
-  if (count === 3) return 'rgba(154,122,46,.76)';
+function cellColor(percent: number | null): string {
+  if (percent === null || percent === 0) return 'rgba(17,17,17,.05)';
+  if (percent <= 25) return 'rgba(154,122,46,.28)';
+  if (percent <= 50) return 'rgba(154,122,46,.52)';
+  if (percent <= 75) return 'rgba(154,122,46,.76)';
+  // 76-99 gets its own step, distinct from the solid 100% below -- without
+  // this, a day with one scheduled habit left undone (e.g. 4-of-5, 80%)
+  // renders identically to a fully-completed day, which was the exact bug
+  // this heatmap change was meant to fix.
+  if (percent < 100) return 'rgba(154,122,46,.88)';
   return '#9a7a2e';
 }
 
 /**
  * GitHub-style contribution heatmap: one column per week (Sun-Sat, matching
- * GitHub's own convention — deliberately not this app's Mon-start weekly
- * grid above it), shaded by how many habits were completed that day. Shows
- * raw count, not a percentage of "expected" — a historical day's expected
- * count would depend on which habits existed and were scheduled as of that
- * date, which isn't tracked; raw count sidesteps that ambiguity entirely
- * and matches what GitHub itself shows (commit count, not "% of typical").
+ * GitHub's own convention -- deliberately not this app's Mon-start weekly
+ * grid above it), shaded by what PERCENTAGE of that day's scheduled habits
+ * were completed. Percentage rather than a raw count so the scale keeps
+ * working no matter how many habits exist -- a fixed count scale maxes out
+ * once the habit roster grows past its hardcoded bucket count.
  */
-export default function HabitsHeatmap({ logs, startDate, endDate }: {
+export default function HabitsHeatmap({ habits, logs, startDate, endDate }: {
+  habits: Habit[];
   logs: HabitLog[];
   startDate: string;
   endDate: string;
 }) {
   const weeks = buildHeatmapWeeks(startDate, endDate);
-  const counts = dailyCompletionCounts(logs);
+  const percents = dailyCompletionPercents(habits, logs, startDate, endDate);
 
   // Pure pass (no mutation during the JSX .map() below): each week's month
   // label only shows when it differs from the PRECEDING week's, so labels
@@ -60,16 +65,19 @@ export default function HabitsHeatmap({ logs, startDate, endDate }: {
                     font: "600 10px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', whiteSpace: 'nowrap',
                   }}>{MONTH_ABBR[month]}</div>
                 )}
-                {week.map((date, di) => (
-                  <div
-                    key={di}
-                    title={date ? `${date}: ${counts.get(date) ?? 0} habit${(counts.get(date) ?? 0) === 1 ? '' : 's'} completed` : undefined}
-                    style={{
-                      width: 11, height: 11, borderRadius: 2,
-                      background: date ? cellColor(counts.get(date) ?? 0) : 'transparent',
-                    }}
-                  />
-                ))}
+                {week.map((date, di) => {
+                  const percent = date ? percents.get(date) ?? null : null;
+                  return (
+                    <div
+                      key={di}
+                      title={date ? (percent === null ? `${date}: nothing scheduled` : `${date}: ${percent}% complete`) : undefined}
+                      style={{
+                        width: 11, height: 11, borderRadius: 2,
+                        background: date ? cellColor(percent) : 'transparent',
+                      }}
+                    />
+                  );
+                })}
               </div>
             );
           })}
