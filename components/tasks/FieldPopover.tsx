@@ -20,10 +20,14 @@ interface PopoverOption {
  * the outside-close listener by one tick (past the opening gesture) and
  * detecting "outside" via a ref instead of a covering div.
  */
-export default function FieldPopover({ trigger, options, align = 'left' }: {
+export default function FieldPopover({ trigger, options, align = 'left', closeOnSelect = true }: {
   trigger: React.ReactNode;
   options: PopoverOption[];
   align?: 'left' | 'right';
+  // false for multi-select pickers (e.g. a day-of-week toggle list) where
+  // each tap should register without dismissing the popover — the user
+  // closes it themselves by tapping outside once they're done.
+  closeOnSelect?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -58,7 +62,7 @@ export default function FieldPopover({ trigger, options, align = 'left' }: {
           {options.map((opt) => (
             <div
               key={opt.label}
-              onClick={() => { opt.onSelect(); setOpen(false); }}
+              onClick={() => { opt.onSelect(); if (closeOnSelect) setOpen(false); }}
               style={{
                 padding: '8px 10px', borderRadius: 5, cursor: 'pointer',
                 font: "500 13px 'Inter Tight', sans-serif", color: '#111',

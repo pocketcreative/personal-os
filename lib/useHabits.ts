@@ -30,6 +30,15 @@ async function fetchHabits(): Promise<HabitsData | null> {
   return res.json();
 }
 
+// Module-level, not component state: survives HabitsBoard unmounting and
+// remounting on client-side navigation away from and back to /habits (the
+// component's own useState resets on every remount, but the module stays
+// loaded for the life of the page). Lets a revisit render the last-known
+// data immediately instead of a "Loading…" flash, while load() below still
+// fires in the background to catch anything that changed elsewhere (e.g.
+// toggled from Telegram or another device) since the last visit.
+let habitsCache: HabitsData | null = null;
+
 async function toggleLogApi(habitId: string, logDate: string, completed: boolean): Promise<boolean> {
   const res = await fetch(`/api/habits/${habitId}/log`, {
     method: 'PUT',
@@ -70,12 +79,22 @@ async function archiveHabitApi(habitId: string): Promise<boolean> {
   return res.ok;
 }
 
+async function updateScheduleApi(habitId: string, scheduleDays: number[]): Promise<boolean> {
+  const res = await fetch(`/api/habits/${habitId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ schedule_days: scheduleDays }),
+  });
+  if (!res.ok) console.error('updateSchedule failed', res.status, await res.text());
+  return res.ok;
+}
+
 export function useHabits() {
-  const [data, setData] = useState<HabitsData | null>(null);
+  const [data, setData] = useState<HabitsData | null>(habitsCache);
 
   const load = useCallback(async () => {
     const fresh = await fetchHabits();
-    if (fresh) setData(fresh);
+    if (fresh) { habitsCache = fresh; setData(fresh); }
   }, []);
 
   // load()'s setData call happens after an await, not synchronously during
@@ -90,11 +109,15 @@ export function useHabits() {
   // Optimistic: flip the checkbox immediately, resync from the server only
   // if the write actually failed — same recovery pattern as
   // useTaskDashboard's applyPatch.
+  // Optimistic updates below also write through to habitsCache (not just
+  // component state) so a later remount doesn't show pre-update stale data.
   const toggleLog = useCallback(async (habitId: string, logDate: string, completed: boolean) => {
     setData((cur) => {
       if (!cur) return cur;
       const others = cur.logs.filter((l) => !(l.habit_id === habitId && l.log_date === logDate));
-      return { ...cur, logs: [...others, { habit_id: habitId, log_date: logDate, completed }] };
+      const next = { ...cur, logs: [...others, { habit_id: habitId, log_date: logDate, completed }] };
+      habitsCache = next;
+      return next;
     });
     const ok = await toggleLogApi(habitId, logDate, completed);
     if (!ok) load();
@@ -107,18 +130,40 @@ export function useHabits() {
   }, [load]);
 
   const renameHabit = useCallback(async (habitId: string, name: string) => {
-    setData((cur) => cur
-      ? { ...cur, habits: cur.habits.map((h) => (h.id === habitId ? { ...h, name } : h)) }
-      : cur);
+    setData((cur) => {
+      if (!cur) return cur;
+      const next = { ...cur, habits: cur.habits.map((h) => (h.id === habitId ? { ...h, name } : h)) };
+      habitsCache = next;
+      return next;
+    });
     const ok = await renameHabitApi(habitId, name);
     if (!ok) load();
   }, [load]);
 
   const archiveHabit = useCallback(async (habitId: string) => {
-    setData((cur) => cur ? { ...cur, habits: cur.habits.filter((h) => h.id !== habitId) } : cur);
+    setData((cur) => {
+      if (!cur) return cur;
+      const next = { ...cur, habits: cur.habits.filter((h) => h.id !== habitId) };
+      habitsCache = next;
+      return next;
+    });
     const ok = await archiveHabitApi(habitId);
     if (!ok) load();
   }, [load]);
 
-  return { data, toggleLog, addHabit, renameHabit, archiveHabit };
+  const updateSchedule = useCallback(async (habitId: string, scheduleDays: number[]) => {
+    setData((cur) => {
+      if (!cur) return cur;
+      const next = {
+        ...cur,
+        habits: cur.habits.map((h) => (h.id === habitId ? { ...h, schedule_days: scheduleDays } : h)),
+      };
+      habitsCache = next;
+      return next;
+    });
+    const ok = await updateScheduleApi(habitId, scheduleDays);
+    if (!ok) load();
+  }, [load]);
+
+  return { data, toggleLog, addHabit, renameHabit, archiveHabit, updateSchedule };
 }

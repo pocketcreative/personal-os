@@ -1,10 +1,31 @@
 'use client';
 import { useState } from 'react';
-import { useHabits } from '@/lib/useHabits';
+import { useHabits, type Habit } from '@/lib/useHabits';
 import { calcCompletionPercent } from '@/lib/habitStats';
+import { describeSchedule } from '@/lib/habitSchedule';
 import { dateKeyDayOfWeek } from '@/lib/dates';
+import FieldPopover from '@/components/tasks/FieldPopover';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; // index = day-of-week, 0=Sun
+const DAY_PICKER_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon..Sun
+
+function scheduleOptions(habit: Habit, updateSchedule: (id: string, days: number[]) => void) {
+  return DAY_PICKER_ORDER.map((d) => {
+    const active = habit.schedule_days.includes(d);
+    const isOnlyDay = active && habit.schedule_days.length === 1;
+    return {
+      label: `${active ? '✓' : ' '} ${DAY_NAMES[d]}`,
+      onSelect: () => {
+        if (isOnlyDay) return; // a habit must stay scheduled on at least one day
+        const next = active
+          ? habit.schedule_days.filter((x) => x !== d)
+          : [...habit.schedule_days, d];
+        updateSchedule(habit.id, next);
+      },
+    };
+  });
+}
 
 function StatChip({ label, value }: { label: string; value: number | null }) {
   return (
@@ -21,7 +42,7 @@ function StatChip({ label, value }: { label: string; value: number | null }) {
 }
 
 export default function HabitsBoard() {
-  const { data, toggleLog, addHabit, renameHabit, archiveHabit } = useHabits();
+  const { data, toggleLog, addHabit, renameHabit, archiveHabit, updateSchedule } = useHabits();
   const [addingName, setAddingName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -111,12 +132,26 @@ export default function HabitsBoard() {
                           style={{
                             width: '100%', padding: '4px 6px', borderRadius: 6,
                             border: '1px solid rgba(17,17,17,.15)',
-                            font: "500 14px 'Inter Tight', sans-serif", color: '#111',
+                            // 16px, not 14px — iOS Safari auto-zooms the whole
+                            // page on focus for any input under 16px.
+                            fontFamily: "'Inter Tight', sans-serif", fontWeight: 500,
+                            fontSize: 16, color: '#111',
                           }}
                         />
                       ) : (
                         <span onClick={() => startEdit(habit)} style={{ cursor: 'pointer' }}>{habit.name}</span>
                       )}
+                      <div style={{ marginTop: 2 }}>
+                        <FieldPopover
+                          closeOnSelect={false}
+                          trigger={
+                            <span style={{
+                              font: "600 11px 'Inter Tight', sans-serif", color: '#9a7a2e',
+                            }}>{describeSchedule(habit.schedule_days)}</span>
+                          }
+                          options={scheduleOptions(habit, updateSchedule)}
+                        />
+                      </div>
                     </td>
                     {data.weekDates.map((date) => {
                       const scheduled = habit.schedule_days.includes(dateKeyDayOfWeek(date));
@@ -124,13 +159,23 @@ export default function HabitsBoard() {
                         (l) => l.habit_id === habit.id && l.log_date === date && l.completed,
                       );
                       return (
-                        <td key={date} style={{ textAlign: 'center', borderTop: '1px solid rgba(17,17,17,.06)' }}>
+                        <td
+                          key={date}
+                          onClick={() => scheduled && toggleLog(habit.id, date, !done)}
+                          style={{
+                            textAlign: 'center', borderTop: '1px solid rgba(17,17,17,.06)',
+                            // Padding makes the whole 44px-wide cell tappable
+                            // (not just the 24px checkbox visual inside it) —
+                            // ~44px is the accepted minimum comfortable
+                            // mobile touch target.
+                            padding: '10px 0', cursor: scheduled ? 'pointer' : 'default',
+                          }}
+                        >
                           <div
-                            onClick={() => scheduled && toggleLog(habit.id, date, !done)}
                             style={{
                               width: 24, height: 24, borderRadius: 6, margin: '0 auto',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              cursor: scheduled ? 'pointer' : 'default',
+                              pointerEvents: 'none',
                               background: done ? '#9a7a2e' : scheduled ? '#fff' : 'transparent',
                               border: scheduled ? '1px solid rgba(17,17,17,.15)' : 'none',
                               color: '#fff', fontSize: 13, fontWeight: 700,
@@ -165,7 +210,11 @@ export default function HabitsBoard() {
             placeholder="Add a habit…"
             style={{
               flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(17,17,17,.15)',
-              font: "500 13px 'Inter Tight', sans-serif", color: '#111', background: '#fff',
+              // 16px, not 13px — iOS Safari auto-zooms the whole page on
+              // focus for any input under 16px (bit us once already on the
+              // chat input; same fix here).
+              fontFamily: "'Inter Tight', sans-serif", fontWeight: 500,
+              fontSize: 16, color: '#111', background: '#fff',
             }}
           />
           <button

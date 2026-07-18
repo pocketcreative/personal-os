@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
 
-const PATCHABLE = new Set(['name', 'active']);
+const PATCHABLE = new Set(['name', 'active', 'schedule_days']);
+
+function isValidScheduleDays(v: unknown): v is number[] {
+  return Array.isArray(v) && v.length > 0
+    && v.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+    && new Set(v).size === v.length;
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,6 +19,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if ('name' in patch && (typeof patch.name !== 'string' || !(patch.name as string).trim())) {
     return NextResponse.json({ error: 'name must be non-empty' }, { status: 400 });
+  }
+  if ('schedule_days' in patch && !isValidScheduleDays(patch.schedule_days)) {
+    return NextResponse.json(
+      { error: 'schedule_days must be a non-empty array of unique integers 0-6' },
+      { status: 400 },
+    );
   }
 
   const db = serviceClient();
