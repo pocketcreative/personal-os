@@ -148,7 +148,7 @@ async function handleMessage(message: TelegramMessage, onCaptureSucceeded: () =>
           taskActionKeyboard(result.routedId),
         );
       } else if (c.kind === 'journal') {
-        await tgSendMessage(chatId, `📓 Journaled for today.${flag}`);
+        await tgSendMessage(chatId, `📓 Reflection saved for today.${flag}`);
       } else {
         await tgSendMessage(chatId, `🎯 Goal added: ${c.summary}${flag}`);
       }
