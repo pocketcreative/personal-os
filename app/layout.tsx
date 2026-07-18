@@ -33,7 +33,14 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col antialiased">
         <TopRail />
-        <main className="mx-auto max-w-6xl p-6">{children}</main>
+        {/* w-full is load-bearing here, not decorative: body is a flex
+            column, and auto margins on a flex item disable cross-axis
+            stretch — without an explicit width, <main> sizes to its
+            content's max-content width instead of the viewport, letting
+            any sufficiently wide descendant (e.g. a table needing to
+            scroll internally) inflate the whole page's width instead of
+            scrolling in place. */}
+        <main className="w-full mx-auto max-w-6xl p-6">{children}</main>
         <CaptureBox />
       </body>
     </html>
