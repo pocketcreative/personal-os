@@ -1,14 +1,26 @@
 import { addDaysToKey, dateKeyDayOfWeek } from '@/lib/dates';
-import type { HabitLogForStats } from '@/lib/habitStats';
+import { calcCompletionPercent, type HabitForStats, type HabitLogForStats } from '@/lib/habitStats';
 
-/** Number of completed habit_logs per date key, e.g. for shading a heatmap cell. */
-export function dailyCompletionCounts(logs: HabitLogForStats[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const log of logs) {
-    if (!log.completed) continue;
-    counts.set(log.log_date, (counts.get(log.log_date) ?? 0) + 1);
+/**
+ * Percentage of that day's SCHEDULED habits that were completed, one entry
+ * per date in range. Reuses calcCompletionPercent (the same function behind
+ * the month/year stats) with a single-day window, rather than a separate raw
+ * completion count -- a fixed count scale breaks as soon as the habit
+ * roster grows past its hardcoded bucket count (this was the actual bug:
+ * with 5 habits, a 4-of-5 day and a 5-of-5 day were indistinguishable).
+ * Percentage scales correctly regardless of how many habits exist.
+ */
+export function dailyCompletionPercents(
+  habits: HabitForStats[],
+  logs: HabitLogForStats[],
+  startDate: string,
+  endDate: string,
+): Map<string, number | null> {
+  const percents = new Map<string, number | null>();
+  for (let d = startDate; d <= endDate; d = addDaysToKey(d, 1)) {
+    percents.set(d, calcCompletionPercent(habits, logs, d, d));
   }
-  return counts;
+  return percents;
 }
 
 /**

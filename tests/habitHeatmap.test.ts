@@ -1,29 +1,56 @@
 import { describe, it, expect } from 'vitest';
-import { dailyCompletionCounts, buildHeatmapWeeks } from '@/lib/habitHeatmap';
-import type { HabitLogForStats } from '@/lib/habitStats';
+import { dailyCompletionPercents, buildHeatmapWeeks } from '@/lib/habitHeatmap';
+import type { HabitForStats, HabitLogForStats } from '@/lib/habitStats';
 
+const daily = (id: string): HabitForStats => ({ id, schedule_days: [0, 1, 2, 3, 4, 5, 6], active: true });
+const weekdaysOnly = (id: string): HabitForStats => ({ id, schedule_days: [1, 2, 3, 4, 5], active: true });
 const log = (habit_id: string, log_date: string, completed: boolean): HabitLogForStats =>
   ({ habit_id, log_date, completed });
 
-describe('dailyCompletionCounts', () => {
-  it('counts completed logs per day, one per matching date key', () => {
+describe('dailyCompletionPercents', () => {
+  it('returns null for a day with nothing scheduled', () => {
+    const percents = dailyCompletionPercents([], [], '2026-07-13', '2026-07-13');
+    expect(percents.get('2026-07-13')).toBeNull();
+  });
+
+  it('computes 100 when every scheduled habit was completed that day', () => {
+    const habits = [daily('h1'), daily('h2')];
+    const logs = [log('h1', '2026-07-13', true), log('h2', '2026-07-13', true)];
+    const percents = dailyCompletionPercents(habits, logs, '2026-07-13', '2026-07-13');
+    expect(percents.get('2026-07-13')).toBe(100);
+  });
+
+  it('keeps 4-of-5 distinguishable from 5-of-5 -- the exact bug being fixed', () => {
+    const habits = [daily('h1'), daily('h2'), daily('h3'), daily('h4'), daily('h5')];
     const logs = [
-      log('a', '2026-07-01', true),
-      log('b', '2026-07-01', true),
-      log('a', '2026-07-02', true),
+      log('h1', '2026-07-13', true), log('h2', '2026-07-13', true),
+      log('h3', '2026-07-13', true), log('h4', '2026-07-13', true),
+      log('h5', '2026-07-13', false),
     ];
-    const counts = dailyCompletionCounts(logs);
-    expect(counts.get('2026-07-01')).toBe(2);
-    expect(counts.get('2026-07-02')).toBe(1);
+    const percents = dailyCompletionPercents(habits, logs, '2026-07-13', '2026-07-13');
+    expect(percents.get('2026-07-13')).toBe(80);
   });
 
-  it('ignores completed:false entries entirely', () => {
-    const logs = [log('a', '2026-07-01', false)];
-    expect(dailyCompletionCounts(logs).size).toBe(0);
+  it('excludes archived habits from the denominator', () => {
+    const habits = [daily('h1'), { id: 'h2', schedule_days: [0, 1, 2, 3, 4, 5, 6], active: false }];
+    const logs = [log('h1', '2026-07-13', true)];
+    const percents = dailyCompletionPercents(habits, logs, '2026-07-13', '2026-07-13');
+    expect(percents.get('2026-07-13')).toBe(100);
   });
 
-  it('returns undefined (not 0) for a day with no entries at all', () => {
-    expect(dailyCompletionCounts([]).get('2026-07-01')).toBeUndefined();
+  it('only counts a habit on the days it is actually scheduled', () => {
+    // 2026-07-17 is a Friday (weekday); 2026-07-19 is a Sunday (weekend)
+    const habits = [weekdaysOnly('h1')];
+    const logs = [log('h1', '2026-07-17', true)];
+    const percents = dailyCompletionPercents(habits, logs, '2026-07-17', '2026-07-19');
+    expect(percents.get('2026-07-17')).toBe(100);
+    expect(percents.get('2026-07-19')).toBeNull();
+  });
+
+  it('returns one entry per day in the range, inclusive', () => {
+    const percents = dailyCompletionPercents([daily('h1')], [], '2026-07-13', '2026-07-15');
+    expect(percents.size).toBe(3);
+    expect([...percents.keys()]).toEqual(['2026-07-13', '2026-07-14', '2026-07-15']);
   });
 });
 
