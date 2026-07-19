@@ -25,8 +25,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ dat
  * present, this is a conditional write scoped to raw_text only: the server
  * re-reads the current text first and, if it doesn't match what the caller
  * started from, rejects with 409 rather than overwriting. topic is never
- * conflict-checked -- Telegram capture only ever touches raw_text, so there
- * is no concurrent-write risk on topic to guard against.
+ * conflict-checked -- Telegram capture only ever touches raw_text, never
+ * topic, so there is no cross-channel write risk to guard against there.
+ * This does NOT protect topic against a same-channel race (e.g. two native
+ * sessions editing the same date at once) -- last write silently wins for
+ * topic specifically, unlike raw_text. Accepted tradeoff: the sole caller
+ * today always sends both fields together, and this is a low-stakes label,
+ * not the entry's actual content.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ date: string }> }) {
   const { date } = await params;
