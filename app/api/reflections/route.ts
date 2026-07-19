@@ -7,7 +7,7 @@ export async function GET() {
   const today = localDateKey();
 
   const { data, error } = await db.from('journal_entries')
-    .select('id, entry_date, raw_text, created_at')
+    .select('id, entry_date, raw_text, topic, created_at')
     .eq('user_id', USER_ID)
     .order('entry_date', { ascending: false })
     .limit(1000 + (Date.now() % 1000)); // cache-bust PostgREST edge cache
