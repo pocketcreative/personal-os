@@ -1,21 +1,8 @@
 'use client';
-import { buildHeatmapWeeks, dailyCompletionPercents } from '@/lib/habitHeatmap';
+import { buildHeatmapWeeks, cellColor, dailyCompletionPercents } from '@/lib/habitHeatmap';
 import type { Habit, HabitLog } from '@/lib/useHabits';
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function cellColor(percent: number | null): string {
-  if (percent === null || percent === 0) return 'rgba(17,17,17,.05)';
-  if (percent <= 25) return 'rgba(154,122,46,.28)';
-  if (percent <= 50) return 'rgba(154,122,46,.52)';
-  if (percent <= 75) return 'rgba(154,122,46,.76)';
-  // 76-99 gets its own step, distinct from the solid 100% below -- without
-  // this, a day with one scheduled habit left undone (e.g. 4-of-5, 80%)
-  // renders identically to a fully-completed day, which was the exact bug
-  // this heatmap change was meant to fix.
-  if (percent < 100) return 'rgba(154,122,46,.88)';
-  return '#9a7a2e';
-}
 
 /**
  * GitHub-style contribution heatmap: one column per week (Sun-Sat, matching
@@ -73,9 +60,16 @@ export default function HabitsHeatmap({ habits, logs, startDate, endDate }: {
                       title={date ? (percent === null ? `${date}: nothing scheduled` : `${date}: ${percent}% complete`) : undefined}
                       style={{
                         width: 11, height: 11, borderRadius: 2,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: date ? cellColor(percent) : 'transparent',
+                        // Perfect-day reinforcement: a fully-completed day gets a
+                        // tiny white check mark on top of the solid gold fill, not
+                        // just a color that's a shade darker than 76-99 -- matches
+                        // the white-check-on-gold pattern from the weekly grid's
+                        // checkbox cells in HabitsBoard.tsx.
+                        color: '#fff', fontSize: 8, fontWeight: 700,
                       }}
-                    />
+                    >{percent === 100 ? '✓' : ''}</div>
                   );
                 })}
               </div>

@@ -43,3 +43,23 @@ export function buildHeatmapWeeks(startDate: string, endDate: string): (string |
   }
   return weeks;
 }
+
+/**
+ * Maps a day's completion percentage to the heatmap cell's background color.
+ * Five visually distinct buckets: empty (null or 0%), then increasingly
+ * opaque gold for 1-25 / 26-50 / 51-75 / 76-99, with a solid fill reserved
+ * for exactly 100 -- see the inline comment below for why 76-99 and 100 must
+ * stay visually distinct.
+ */
+export function cellColor(percent: number | null): string {
+  if (percent === null || percent === 0) return 'rgba(17,17,17,.05)';
+  if (percent <= 25) return 'rgba(154,122,46,.28)';
+  if (percent <= 50) return 'rgba(154,122,46,.52)';
+  if (percent <= 75) return 'rgba(154,122,46,.76)';
+  // 76-99 gets its own step, distinct from the solid 100% below -- without
+  // this, a day with one scheduled habit left undone (e.g. 4-of-5, 80%)
+  // renders identically to a fully-completed day, which was the exact bug
+  // this heatmap change was meant to fix.
+  if (percent < 100) return 'rgba(154,122,46,.88)';
+  return '#9a7a2e';
+}

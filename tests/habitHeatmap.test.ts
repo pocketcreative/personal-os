@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dailyCompletionPercents, buildHeatmapWeeks } from '@/lib/habitHeatmap';
+import { dailyCompletionPercents, buildHeatmapWeeks, cellColor } from '@/lib/habitHeatmap';
 import type { HabitForStats, HabitLogForStats } from '@/lib/habitStats';
 
 const daily = (id: string): HabitForStats => ({ id, schedule_days: [0, 1, 2, 3, 4, 5, 6], active: true });
@@ -80,5 +80,52 @@ describe('buildHeatmapWeeks', () => {
     expect(buildHeatmapWeeks('2026-07-01', '2026-07-01')).toEqual([
       [null, null, null, '2026-07-01', null, null, null],
     ]);
+  });
+});
+
+describe('cellColor', () => {
+  it('returns the empty color for null (nothing scheduled)', () => {
+    expect(cellColor(null)).toBe('rgba(17,17,17,.05)');
+  });
+
+  it('returns the empty color for 0', () => {
+    expect(cellColor(0)).toBe('rgba(17,17,17,.05)');
+  });
+
+  it('buckets 1-25 into the first shade', () => {
+    expect(cellColor(1)).toBe('rgba(154,122,46,.28)');
+    expect(cellColor(24)).toBe('rgba(154,122,46,.28)');
+    expect(cellColor(25)).toBe('rgba(154,122,46,.28)');
+  });
+
+  it('buckets 26-50 into the second shade', () => {
+    expect(cellColor(26)).toBe('rgba(154,122,46,.52)');
+    expect(cellColor(50)).toBe('rgba(154,122,46,.52)');
+  });
+
+  it('buckets 51-75 into the third shade', () => {
+    expect(cellColor(51)).toBe('rgba(154,122,46,.76)');
+    expect(cellColor(75)).toBe('rgba(154,122,46,.76)');
+  });
+
+  it('buckets 76-99 into a fourth shade, distinct from both 75 and 100', () => {
+    expect(cellColor(76)).toBe('rgba(154,122,46,.88)');
+    expect(cellColor(99)).toBe('rgba(154,122,46,.88)');
+  });
+
+  it('returns a solid color for exactly 100', () => {
+    expect(cellColor(100)).toBe('#9a7a2e');
+  });
+
+  it('keeps 75 and 76 visually distinct (the bucket boundary)', () => {
+    expect(cellColor(75)).not.toBe(cellColor(76));
+  });
+
+  it('keeps 76 and 99 the same shade', () => {
+    expect(cellColor(76)).toBe(cellColor(99));
+  });
+
+  it('keeps 99 and 100 visually distinct -- the exact bug that was already fixed once', () => {
+    expect(cellColor(99)).not.toBe(cellColor(100));
   });
 });
