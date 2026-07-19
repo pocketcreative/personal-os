@@ -80,7 +80,17 @@ function ReflectionModal({ date, saveEntry, onClose }: {
     // A ceiling independent of the debounce, so a long uninterrupted typing
     // session (never pausing 1.5s) still can't lose more than ~10s of work.
     const interval = setInterval(doSave, MAX_SAVE_INTERVAL_MS);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      // Flush any pending debounced edit on unmount, not just on the
+      // explicit close button -- otherwise a future navigation path that
+      // unmounts this modal without going through handleClose would drop
+      // the last few keystrokes typed since the previous autosave tick.
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        doSave();
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- doSave reads current values via stateRef, not a stale closure
   }, []);
 
@@ -135,7 +145,7 @@ function ReflectionModal({ date, saveEntry, onClose }: {
               }}>
                 {status === 'saving' && 'Saving…'}
                 {status === 'saved' && 'Saved automatically'}
-                {status === 'merged' && 'Merged a Telegram update in — saved'}
+                {status === 'merged' && 'Merged a recent change in — saved'}
                 {status === 'error' && 'Save failed — will retry automatically'}
               </div>
             </>
@@ -233,7 +243,11 @@ export default function ReflectionsBoard() {
       </div>
 
       {openDate && (
-        <ReflectionModal date={openDate} saveEntry={saveEntry} onClose={() => setOpenDate(null)} />
+        // key={openDate} forces a clean unmount/remount if openDate ever
+        // changes directly from one date to another without passing through
+        // handleClose first (no such path exists today, but this removes
+        // the implicit dependence on that being true).
+        <ReflectionModal key={openDate} date={openDate} saveEntry={saveEntry} onClose={() => setOpenDate(null)} />
       )}
     </div>
   );
