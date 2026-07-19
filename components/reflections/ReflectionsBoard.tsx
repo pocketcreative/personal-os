@@ -205,13 +205,13 @@ export default function ReflectionsBoard() {
           Reflections
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by topic, date, or reflection text…"
             style={{
-              flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(17,17,17,.15)',
+              flex: '1 1 220px', minWidth: 0, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(17,17,17,.15)',
               fontFamily: "'Inter Tight', sans-serif", fontWeight: 500, fontSize: 16, color: '#111',
               background: '#fff', boxSizing: 'border-box',
             }}
