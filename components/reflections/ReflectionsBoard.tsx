@@ -1,6 +1,9 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useReflections, fetchEntryFresh, type SaveResult } from '@/lib/useReflections';
+import { useEffect, useRef, useState } from 'react';
+import { useReflections, fetchEntryFresh, type AutosaveResult, type ReflectionEntry } from '@/lib/useReflections';
+
+const AUTOSAVE_DEBOUNCE_MS = 1500;
+const MAX_SAVE_INTERVAL_MS = 10_000;
 
 function formatEntryDate(dateKey: string): string {
   const [y, m, d] = dateKey.split('-').map(Number);
@@ -9,158 +12,178 @@ function formatEntryDate(dateKey: string): string {
   }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 
-type SaveEntryFn = (date: string, text: string, expected?: string) => Promise<SaveResult>;
+type SaveEntryFn = (date: string, text: string, topic: string | null, expected: string) => Promise<AutosaveResult>;
 
-/**
- * Core textarea-plus-save editor, shared by the always-open "Today" card and
- * any expanded past entry. Tracks its own conflict-comparison baseline
- * separately from the initial prop: after every successful save, `baseline`
- * updates to the text that was just written, so a SECOND save in the same
- * session compares against the last known-good state rather than the
- * original mount-time value (which would otherwise cause every second save
- * in a row to falsely conflict against itself).
- */
-function ReflectionEditor({ date, initialText, saveEntry }: {
+function ReflectionModal({ date, saveEntry, onClose }: {
   date: string;
-  initialText: string;
   saveEntry: SaveEntryFn;
+  onClose: () => void;
 }) {
-  const [text, setText] = useState(initialText);
-  const [baseline, setBaseline] = useState(initialText);
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [conflictText, setConflictText] = useState<string | null>(null);
-
-  const doSave = async (force: boolean) => {
-    setStatus('saving');
-    const result = await saveEntry(date, text, force ? undefined : baseline);
-    if (result.ok) {
-      setStatus('saved');
-      setConflictText(null);
-      setBaseline(text);
-    } else if (result.conflictText !== null) {
-      setStatus('idle');
-      setConflictText(result.conflictText);
-    } else {
-      setStatus('error');
-    }
-  };
-
-  return (
-    <div>
-      <textarea
-        value={text}
-        onChange={(e) => { setText(e.target.value); setStatus('idle'); }}
-        placeholder="What happened today?"
-        style={{
-          width: '100%', minHeight: 120, lineHeight: 1.5, color: '#111',
-          resize: 'vertical', padding: '12px 14px', border: '1px solid rgba(17,17,17,.1)',
-          borderRadius: 6, background: '#fff', boxSizing: 'border-box',
-          fontFamily: "'Inter Tight', sans-serif", outline: 'none',
-          // 16px, not smaller — iOS Safari auto-zooms the whole page on
-          // focus for any input under 16px (bit us on the chat input and
-          // twice in Habits already; same fix here).
-          fontSize: 16,
-        }}
-      />
-      {conflictText !== null && (
-        <div style={{
-          marginTop: 10, padding: '10px 12px', borderRadius: 6,
-          background: 'rgba(179,38,30,.06)', border: '1px solid rgba(179,38,30,.2)',
-        }}>
-          <div style={{ font: "700 12px 'Inter Tight', sans-serif", color: '#b3261e', marginBottom: 6 }}>
-            This entry changed since you opened it — probably from Telegram. Current version:
-          </div>
-          <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: '#111', whiteSpace: 'pre-wrap', marginBottom: 8 }}>
-            {conflictText || '(empty)'}
-          </div>
-          <button
-            onClick={() => doSave(true)}
-            style={{
-              padding: '6px 12px', borderRadius: 6, border: 'none', background: '#b3261e', color: '#fff',
-              font: "700 12px 'Inter Tight', sans-serif", cursor: 'pointer',
-            }}
-          >Overwrite anyway</button>
-        </div>
-      )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-        <button
-          onClick={() => doSave(false)}
-          disabled={status === 'saving'}
-          style={{
-            padding: '8px 16px', borderRadius: 8, border: 'none', background: '#9a7a2e', color: '#fff',
-            font: "700 13px 'Inter Tight', sans-serif", cursor: status === 'saving' ? 'default' : 'pointer',
-            opacity: status === 'saving' ? .6 : 1,
-          }}
-        >Save</button>
-        {status === 'saved' && <span style={{ font: "600 12px 'Inter Tight', sans-serif", color: '#4b7a4f' }}>Saved</span>}
-        {status === 'error' && <span style={{ font: "600 12px 'Inter Tight', sans-serif", color: '#b3261e' }}>Save failed — try again</span>}
-      </div>
-    </div>
-  );
-}
-
-function TodayCard({ today, saveEntry }: { today: string; saveEntry: SaveEntryFn }) {
-  const [initialText, setInitialText] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [text, setText] = useState('');
+  const [topic, setTopic] = useState('');
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'merged' | 'error'>('idle');
+  // Refs, not state, for values doSave needs to read at call time -- doSave
+  // is invoked from a debounce timeout and a periodic interval, both set up
+  // once on mount, so they must not close over stale state snapshots.
+  const stateRef = useRef({ text: '', topic: '', savedText: '', savedTopic: '' });
+  const isSavingRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchEntryFresh(today).then((e) => { if (!cancelled) setInitialText(e.raw_text); });
+    fetchEntryFresh(date).then((e) => {
+      if (cancelled) return;
+      const initialTopic = e.topic ?? '';
+      setText(e.raw_text);
+      setTopic(initialTopic);
+      stateRef.current = { text: e.raw_text, topic: initialTopic, savedText: e.raw_text, savedTopic: initialTopic };
+      setReady(true);
+    });
     return () => { cancelled = true; };
-  }, [today]);
+  }, [date]);
+
+  useEffect(() => {
+    stateRef.current.text = text;
+    stateRef.current.topic = topic;
+  }, [text, topic]);
+
+  const doSave = async () => {
+    if (isSavingRef.current) return;
+    const { text: submittedText, topic: submittedTopic, savedText, savedTopic } = stateRef.current;
+    if (submittedText === savedText && submittedTopic === savedTopic) return;
+    isSavingRef.current = true;
+    setStatus('saving');
+    try {
+      const result = await saveEntry(date, submittedText, submittedTopic.trim() || null, savedText);
+      if (!result.ok) { setStatus('error'); return; }
+      stateRef.current.savedText = result.savedText;
+      stateRef.current.savedTopic = submittedTopic;
+      // Only overwrite the visible textarea if the user hasn't typed
+      // anything new since this particular save was submitted -- otherwise
+      // a slow round-trip could clobber a newer in-progress draft with the
+      // merged result of an OLDER one. If they have kept typing, the saved
+      // baseline above still updates correctly for the NEXT autosave tick.
+      setText((current) => (current === submittedText ? result.savedText : current));
+      setStatus(result.merged ? 'merged' : 'saved');
+    } finally {
+      isSavingRef.current = false;
+    }
+  };
+
+  const scheduleAutosave = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(doSave, AUTOSAVE_DEBOUNCE_MS);
+  };
+
+  useEffect(() => {
+    // A ceiling independent of the debounce, so a long uninterrupted typing
+    // session (never pausing 1.5s) still can't lose more than ~10s of work.
+    const interval = setInterval(doSave, MAX_SAVE_INTERVAL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- doSave reads current values via stateRef, not a stale closure
+  }, []);
+
+  const handleClose = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    doSave();
+    onClose();
+  };
 
   return (
-    <div style={{ marginBottom: 28, paddingBottom: 24, borderBottom: '1px solid rgba(17,17,17,.08)' }}>
-      <div style={{
-        font: "700 12px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)',
-        letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 10,
-      }}>Today — {formatEntryDate(today)}</div>
-      {initialText === null ? (
-        <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Loading…</div>
-      ) : (
-        <ReflectionEditor key={today} date={today} initialText={initialText} saveEntry={saveEntry} />
-      )}
+    <div onClick={handleClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(17,17,17,.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 24,
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: '#fbfaf7', borderRadius: 10, width: '100%', maxWidth: 560,
+        boxShadow: '0 20px 60px rgba(0,0,0,.25)',
+      }}>
+        <div style={{ padding: '20px 24px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <div style={{ font: "800 16px 'Archivo', sans-serif", color: '#111' }}>{formatEntryDate(date)}</div>
+          <span onClick={handleClose} style={{ cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 18 }}>✕</span>
+        </div>
+        <div style={{ padding: '14px 24px 24px' }}>
+          {!ready ? (
+            <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Loading…</div>
+          ) : (
+            <>
+              <input
+                value={topic}
+                onChange={(e) => { setTopic(e.target.value); scheduleAutosave(); }}
+                placeholder="Topic (optional)"
+                style={{
+                  width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(17,17,17,.12)',
+                  marginBottom: 10, fontFamily: "'Inter Tight', sans-serif", fontWeight: 600, fontSize: 16,
+                  color: '#111', background: '#fff', boxSizing: 'border-box',
+                }}
+              />
+              <textarea
+                value={text}
+                onChange={(e) => { setText(e.target.value); scheduleAutosave(); }}
+                placeholder="What happened today?"
+                style={{
+                  width: '100%', minHeight: 160, lineHeight: 1.5, color: '#111',
+                  resize: 'vertical', padding: '12px 14px', border: '1px solid rgba(17,17,17,.1)',
+                  borderRadius: 6, background: '#fff', boxSizing: 'border-box',
+                  fontFamily: "'Inter Tight', sans-serif", outline: 'none', fontSize: 16,
+                }}
+              />
+              <div style={{
+                marginTop: 8, font: "600 11px 'Inter Tight', sans-serif",
+                color: status === 'error' ? '#b3261e' : 'rgba(17,17,17,.35)',
+              }}>
+                {status === 'saving' && 'Saving…'}
+                {status === 'saved' && 'Saved automatically'}
+                {status === 'merged' && 'Merged a Telegram update in — saved'}
+                {status === 'error' && 'Save failed — will retry automatically'}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-function PastEntryRow({ entry, saveEntry }: {
-  entry: { entry_date: string; raw_text: string };
-  saveEntry: SaveEntryFn;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [freshText, setFreshText] = useState<string | null>(null);
-
-  const expand = () => {
-    setExpanded(true);
-    fetchEntryFresh(entry.entry_date).then((e) => setFreshText(e.raw_text));
-  };
-
+function ReflectionRow({ entry, onOpen }: { entry: ReflectionEntry; onOpen: (date: string) => void }) {
   const preview = entry.raw_text.length > 150 ? `${entry.raw_text.slice(0, 150)}…` : entry.raw_text;
-
   return (
-    <div style={{ padding: '14px 0', borderBottom: '1px solid rgba(17,17,17,.06)' }}>
-      <div style={{ font: "700 13px 'Inter Tight', sans-serif", color: '#9a7a2e', marginBottom: 6 }}>
+    <div
+      onClick={() => onOpen(entry.entry_date)}
+      style={{ padding: '14px 0', borderBottom: '1px solid rgba(17,17,17,.06)', cursor: 'pointer' }}
+    >
+      <div style={{ font: "700 13px 'Inter Tight', sans-serif", color: '#9a7a2e', marginBottom: 4 }}>
         {formatEntryDate(entry.entry_date)}
+        {entry.topic && <span style={{ color: 'rgba(17,17,17,.55)', fontWeight: 600 }}> — {entry.topic}</span>}
       </div>
-      {!expanded ? (
-        <div
-          onClick={expand}
-          style={{ font: "500 14px 'Inter Tight', sans-serif", color: '#111', whiteSpace: 'pre-wrap', cursor: 'pointer' }}
-        >
-          {preview || <span style={{ color: 'rgba(17,17,17,.35)' }}>(empty — click to write)</span>}
-        </div>
-      ) : freshText === null ? (
-        <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Loading…</div>
-      ) : (
-        <ReflectionEditor key={entry.entry_date} date={entry.entry_date} initialText={freshText} saveEntry={saveEntry} />
-      )}
+      <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: '#111', whiteSpace: 'pre-wrap' }}>
+        {preview || <span style={{ color: 'rgba(17,17,17,.35)' }}>(empty — click to write)</span>}
+      </div>
     </div>
+  );
+}
+
+function matchesSearch(entry: ReflectionEntry, query: string): boolean {
+  if (!query.trim()) return true;
+  const q = query.trim().toLowerCase();
+  return (
+    formatEntryDate(entry.entry_date).toLowerCase().includes(q) ||
+    (entry.topic?.toLowerCase().includes(q) ?? false) ||
+    entry.raw_text.toLowerCase().includes(q)
   );
 }
 
 export default function ReflectionsBoard() {
   const { data, saveEntry } = useReflections();
-  const pastEntries = data ? data.entries.filter((e) => e.entry_date !== data.today) : [];
+  const [query, setQuery] = useState('');
+  const [openDate, setOpenDate] = useState<string | null>(null);
+
+  // Deliberately NOT synthesizing a placeholder row for today when no entry
+  // exists yet -- the list shows only reflections that actually exist. A new
+  // entry is created explicitly (the button below), not implicitly conjured
+  // every day just because the calendar turned over.
+  const visibleEntries = data ? data.entries.filter((e) => matchesSearch(e, query)) : [];
 
   return (
     <div style={{ maxWidth: 1220, margin: '0 auto', padding: '32px 16px 56px', background: '#f3f1ec' }}>
@@ -168,31 +191,50 @@ export default function ReflectionsBoard() {
         background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
         boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: '32px 24px 28px',
       }}>
-        <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em', marginBottom: 28 }}>
+        <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em', marginBottom: 20 }}>
           Reflections
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by topic, date, or reflection text…"
+            style={{
+              flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(17,17,17,.15)',
+              fontFamily: "'Inter Tight', sans-serif", fontWeight: 500, fontSize: 16, color: '#111',
+              background: '#fff', boxSizing: 'border-box',
+            }}
+          />
+          <button
+            onClick={() => data && setOpenDate(data.today)}
+            disabled={!data}
+            style={{
+              padding: '10px 18px', borderRadius: 8, border: 'none', background: '#9a7a2e', color: '#fff',
+              font: "700 13px 'Inter Tight', sans-serif", cursor: data ? 'pointer' : 'default',
+              whiteSpace: 'nowrap', opacity: data ? 1 : .6,
+            }}
+          >Write today&apos;s reflection</button>
         </div>
 
         {!data && (
           <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Loading…</div>
         )}
 
-        {data && (
-          <>
-            <TodayCard today={data.today} saveEntry={saveEntry} />
-            {pastEntries.length === 0 ? (
-              <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>
-                No past reflections yet — write today&apos;s above, or send one via Telegram.
-              </div>
-            ) : (
-              <div>
-                {pastEntries.map((entry) => (
-                  <PastEntryRow key={entry.entry_date} entry={entry} saveEntry={saveEntry} />
-                ))}
-              </div>
-            )}
-          </>
+        {data && visibleEntries.length === 0 && (
+          <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>
+            {query.trim() ? 'No reflections match that search.' : 'No reflections yet — write one above, or send one via Telegram.'}
+          </div>
         )}
+
+        {data && visibleEntries.map((entry) => (
+          <ReflectionRow key={entry.entry_date} entry={entry} onOpen={setOpenDate} />
+        ))}
       </div>
+
+      {openDate && (
+        <ReflectionModal date={openDate} saveEntry={saveEntry} onClose={() => setOpenDate(null)} />
+      )}
     </div>
   );
 }
