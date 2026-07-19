@@ -20,9 +20,14 @@ export type AutosaveResult =
   | { ok: false };
 
 async function fetchReflections(): Promise<ReflectionsData | null> {
-  const res = await fetch('/api/reflections');
-  if (!res.ok) { console.error('fetchReflections failed', res.status, await res.text()); return null; }
-  return res.json();
+  try {
+    const res = await fetch('/api/reflections');
+    if (!res.ok) { console.error('fetchReflections failed', res.status, await res.text()); return null; }
+    return await res.json();
+  } catch (err) {
+    console.error('fetchReflections network error', err);
+    return null;
+  }
 }
 
 // Module-level, not component state: survives ReflectionsBoard unmounting
@@ -38,23 +43,29 @@ export async function fetchEntryFresh(date: string): Promise<{ raw_text: string;
   return res.json();
 }
 
+/** Omitting `expectedPreviousText` performs an unconditional write -- no conflict check against the server's current text. */
 async function putEntry(
   date: string,
   rawText: string,
   topic: string | null,
   expectedPreviousText?: string,
 ): Promise<{ status: number; data: { current_text?: string; error?: string } }> {
-  const res = await fetch(`/api/reflections/${date}`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(
-      expectedPreviousText === undefined
-        ? { raw_text: rawText, topic }
-        : { raw_text: rawText, topic, expected_previous_text: expectedPreviousText },
-    ),
-  });
-  const data = await res.json().catch(() => ({}));
-  return { status: res.status, data };
+  try {
+    const res = await fetch(`/api/reflections/${date}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(
+        expectedPreviousText === undefined
+          ? { raw_text: rawText, topic }
+          : { raw_text: rawText, topic, expected_previous_text: expectedPreviousText },
+      ),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { status: res.status, data };
+  } catch (err) {
+    console.error('putEntry network error', err);
+    return { status: 0, data: {} };
+  }
 }
 
 export function useReflections() {
@@ -73,11 +84,15 @@ export function useReflections() {
    * raw_text no longer matches `expectedPreviousText` (e.g. a Telegram
    * message landed since this editor last knew the true state), this
    * automatically merges the server's current text with the caller's
-   * draft and retries -- unconditionally, since we just read the true
-   * current state. The caller never needs to know a conflict happened
-   * except to react to `merged: true` in the result (e.g. show a brief
-   * non-blocking notice). This is what lets autosave fire without ever
-   * interrupting active typing with a blocking dialog.
+   * draft and retries once -- itself conflict-checked against the server
+   * text just read, so a second concurrent write landing during the retry
+   * can't be silently overwritten either. If that retry also conflicts,
+   * this does not loop; it returns `{ ok: false }` and defers to the
+   * caller's next autosave tick to re-read and merge again. The caller
+   * never needs to know a conflict happened except to react to
+   * `merged: true` in the result (e.g. show a brief non-blocking notice).
+   * This is what lets autosave fire without ever interrupting active
+   * typing with a blocking dialog.
    */
   const saveEntry = useCallback(async (
     date: string,
@@ -91,13 +106,23 @@ export function useReflections() {
       return { ok: true, savedText: rawText, merged: false };
     }
     if (first.status === 409) {
-      // expectedPreviousText IS the ancestor: the text this save attempt
-      // started from, before the server told us it had since changed.
-      const mergedText = mergeConflictingText(first.data.current_text ?? '', rawText, expectedPreviousText);
-      const retry = await putEntry(date, mergedText, topic);
+      const serverText = first.data.current_text ?? '';
+      const mergedText = mergeConflictingText(serverText, rawText, expectedPreviousText);
+      // The retry is ALSO conflict-checked, against the server text we just
+      // read -- if a THIRD write lands in the gap between reading it and
+      // retrying, we must not silently overwrite that one too.
+      const retry = await putEntry(date, mergedText, topic, serverText);
       if (retry.status === 200) {
         load();
         return { ok: true, savedText: mergedText, merged: true };
+      }
+      if (retry.status === 409) {
+        // A second concurrent write landed in the narrow window between
+        // reading the first conflict and retrying. Don't loop or silently
+        // overwrite -- defer to the caller's next autosave tick, which will
+        // re-read the truly-current state and merge again then.
+        console.error('saveEntry: second concurrent conflict during merge retry, deferring to next autosave tick');
+        return { ok: false };
       }
       console.error('saveEntry retry after merge failed', retry.status, retry.data);
       return { ok: false };
