@@ -72,6 +72,14 @@ describe('habitTrackingStart', () => {
   it('defaults to HABITS_LAUNCH_DATE when no launchDate argument is given', () => {
     expect(habitTrackingStart('2026-01-01T00:00:00Z')).toBe(HABITS_LAUNCH_DATE);
   });
+  it('correctly resolves the LOCAL (SGT) calendar date, not the raw UTC date -- a habit created late at night UTC lands on the next SGT day', () => {
+    // 2026-07-18T20:00:00Z is 2026-07-19 04:00 in Asia/Singapore (UTC+8) --
+    // naive UTC slicing would incorrectly read this as still 2026-07-18.
+    expect(habitTrackingStart('2026-07-18T20:00:00Z', '2026-07-18')).toBe('2026-07-19');
+  });
+  it('degrades gracefully (not a throw or a false 0%) if created_at is after today -- e.g. clock skew', () => {
+    expect(habitTrackingStart('2099-01-01T00:00:00Z', '2026-07-18')).toBe('2099-01-01');
+  });
 });
 
 describe('calcHabitPeriodStats', () => {

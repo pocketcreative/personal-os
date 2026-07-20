@@ -1,4 +1,4 @@
-import { addDaysToKey, dateKeyDayOfWeek, daysBetween } from '@/lib/dates';
+import { addDaysToKey, dateKeyDayOfWeek, daysBetween, localDateKey } from '@/lib/dates';
 
 export interface HabitForStats {
   id: string;
@@ -53,7 +53,7 @@ export function calcCompletionPercent(
  * after launch isn't penalized for days before it existed.
  */
 export function habitTrackingStart(habitCreatedAt: string, launchDate: string = HABITS_LAUNCH_DATE): string {
-  const createdDateKey = habitCreatedAt.slice(0, 10);
+  const createdDateKey = localDateKey(new Date(habitCreatedAt));
   return createdDateKey > launchDate ? createdDateKey : launchDate;
 }
 
