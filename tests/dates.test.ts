@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { localDateKey, dateKeyDayOfWeek, addDaysToKey, getWeekDates } from '@/lib/dates';
+import { localDateKey, dateKeyDayOfWeek, addDaysToKey, getWeekDates, daysBetween } from '@/lib/dates';
 
 describe('localDateKey', () => {
   it('is still "today" at 23:59 SGT (15:59 UTC)', () => {
@@ -66,5 +66,20 @@ describe('getWeekDates', () => {
       '2026-07-27', '2026-07-28', '2026-07-29', '2026-07-30',
       '2026-07-31', '2026-08-01', '2026-08-02',
     ]);
+  });
+});
+
+describe('daysBetween', () => {
+  it('returns 0 for the same date', () => {
+    expect(daysBetween('2026-07-18', '2026-07-18')).toBe(0);
+  });
+  it('returns a positive count when b is after a', () => {
+    expect(daysBetween('2026-07-18', '2026-07-21')).toBe(3);
+  });
+  it('returns a negative count when b is before a', () => {
+    expect(daysBetween('2026-07-21', '2026-07-18')).toBe(-3);
+  });
+  it('handles a month boundary', () => {
+    expect(daysBetween('2026-07-30', '2026-08-02')).toBe(3);
   });
 });

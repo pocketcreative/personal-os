@@ -42,3 +42,10 @@ export function getWeekDates(dateKey: string): string[] {
   const monday = addDaysToKey(dateKey, diffToMonday);
   return Array.from({ length: 7 }, (_, i) => addDaysToKey(monday, i));
 }
+
+/** Whole calendar days from `a` to `b` (positive if b is later), via pure Date.UTC arithmetic. */
+export function daysBetween(a: string, b: string): number {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000);
+}

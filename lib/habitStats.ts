@@ -1,4 +1,4 @@
-import { addDaysToKey, dateKeyDayOfWeek } from '@/lib/dates';
+import { addDaysToKey, dateKeyDayOfWeek, daysBetween } from '@/lib/dates';
 
 export interface HabitForStats {
   id: string;
@@ -11,6 +11,9 @@ export interface HabitLogForStats {
   log_date: string; // YYYY-MM-DD
   completed: boolean;
 }
+
+/** The date the habits feature itself launched -- nothing was tracked before this, for any habit. */
+export const HABITS_LAUNCH_DATE = '2026-07-18';
 
 /**
  * Completed / expected check-ins across `habits`, counting only days each
@@ -42,4 +45,41 @@ export function calcCompletionPercent(
     }
   }
   return expected === 0 ? null : Math.round((completed / expected) * 100);
+}
+
+/**
+ * The earliest date a habit's stats should ever consider: the later of the
+ * habits-launch date and the habit's own creation date, so a habit added
+ * after launch isn't penalized for days before it existed.
+ */
+export function habitTrackingStart(habitCreatedAt: string, launchDate: string = HABITS_LAUNCH_DATE): string {
+  const createdDateKey = habitCreatedAt.slice(0, 10);
+  return createdDateKey > launchDate ? createdDateKey : launchDate;
+}
+
+export interface HabitPeriodStats {
+  week: number | null;
+  month: number | null;
+  year: number | null;
+  allTime: number | null;
+}
+
+/**
+ * Week/Month/Year/All-time completion percentage for a single habit, each
+ * period's start clamped forward to habitTrackingStart so nothing before
+ * launch or before the habit's own creation is ever counted as "expected".
+ */
+export function calcHabitPeriodStats(
+  habit: HabitForStats & { created_at: string },
+  logs: HabitLogForStats[],
+  periods: { weekStart: string; monthStart: string; yearStart: string; today: string },
+): HabitPeriodStats {
+  const trackingStart = habitTrackingStart(habit.created_at);
+  const clamp = (natural: string) => (trackingStart > natural ? trackingStart : natural);
+  return {
+    week: calcCompletionPercent([habit], logs, clamp(periods.weekStart), periods.today),
+    month: calcCompletionPercent([habit], logs, clamp(periods.monthStart), periods.today),
+    year: calcCompletionPercent([habit], logs, clamp(periods.yearStart), periods.today),
+    allTime: calcCompletionPercent([habit], logs, trackingStart, periods.today),
+  };
 }
