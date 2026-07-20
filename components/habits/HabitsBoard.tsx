@@ -1,11 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { useHabits, type Habit } from '@/lib/useHabits';
-import { calcCompletionPercent } from '@/lib/habitStats';
+import { calcCompletionPercent, HABITS_LAUNCH_DATE } from '@/lib/habitStats';
 import { describeSchedule } from '@/lib/habitSchedule';
 import { dateKeyDayOfWeek } from '@/lib/dates';
 import FieldPopover from '@/components/tasks/FieldPopover';
 import HabitsHeatmap from '@/components/habits/HabitsHeatmap';
+import HabitStatsTable from '@/components/habits/HabitStatsTable';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; // index = day-of-week, 0=Sun
@@ -79,9 +80,9 @@ export default function HabitsBoard() {
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Habits</div>
           {data && (
             <div style={{ display: 'flex', gap: 28 }}>
-              <StatChip label="This week" value={calcCompletionPercent(data.habits, data.logs, data.weekDates[0], data.today)} />
-              <StatChip label="This month" value={calcCompletionPercent(data.habits, data.logs, data.monthStart, data.today)} />
-              <StatChip label="This year" value={calcCompletionPercent(data.habits, data.logs, data.yearStart, data.today)} />
+              <StatChip label="This week" value={calcCompletionPercent(data.habits, data.logs, data.weekDates[0] > HABITS_LAUNCH_DATE ? data.weekDates[0] : HABITS_LAUNCH_DATE, data.today)} />
+              <StatChip label="This month" value={calcCompletionPercent(data.habits, data.logs, data.monthStart > HABITS_LAUNCH_DATE ? data.monthStart : HABITS_LAUNCH_DATE, data.today)} />
+              <StatChip label="This year" value={calcCompletionPercent(data.habits, data.logs, data.yearStart > HABITS_LAUNCH_DATE ? data.yearStart : HABITS_LAUNCH_DATE, data.today)} />
             </div>
           )}
         </div>
@@ -230,6 +231,14 @@ export default function HabitsBoard() {
 
         {data && (
           <div style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid rgba(17,17,17,.08)' }}>
+            <HabitStatsTable
+              habits={data.habits}
+              logs={data.logs}
+              weekStart={data.weekDates[0]}
+              monthStart={data.monthStart}
+              yearStart={data.yearStart}
+              today={data.today}
+            />
             <HabitsHeatmap habits={data.habits} logs={data.logs} startDate={data.yearStart} endDate={data.today} />
           </div>
         )}
