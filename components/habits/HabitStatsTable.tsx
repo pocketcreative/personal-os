@@ -59,7 +59,11 @@ export default function HabitStatsTable({ habits, logs, weekStart, monthStart, y
               const stats = calcHabitPeriodStats(habit, logs, { weekStart, monthStart, yearStart, today });
               const trackingStart = habitTrackingStart(habit.created_at);
               const isNew = trackingStart > weekStart;
-              const age = daysBetween(trackingStart, today);
+              // Clamp to non-negative: a future created_at (bad data, clock
+              // skew) would otherwise render "added -N days ago", which is
+              // visibly wrong even though the percentages themselves already
+              // degrade safely to "—" in that case.
+              const age = Math.max(0, daysBetween(trackingStart, today));
               return (
                 <tr key={habit.id} style={{ borderTop: '1px solid rgba(17,17,17,.06)' }}>
                   <td style={{ padding: '10px 12px 10px 0', font: "500 14px 'Inter Tight', sans-serif", color: '#111' }}>
