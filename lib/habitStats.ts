@@ -1,4 +1,4 @@
-import { addDaysToKey, dateKeyDayOfWeek, daysBetween, localDateKey } from '@/lib/dates';
+import { addDaysToKey, dateKeyDayOfWeek, localDateKey } from '@/lib/dates';
 
 export interface HabitForStats {
   id: string;
