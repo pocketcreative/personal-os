@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
 import { localDateKey, getWeekDates } from '@/lib/dates';
+import { HABITS_LAUNCH_DATE } from '@/lib/habitStats';
 
 export async function GET() {
   const db = serviceClient();
@@ -9,18 +10,20 @@ export async function GET() {
   const monthStart = `${today.slice(0, 7)}-01`;
 
   const { data: habits, error: habitsErr } = await db.from('habits')
-    .select('id, name, schedule_days, sort_order, active')
+    .select('id, name, schedule_days, sort_order, active, created_at')
     .eq('user_id', USER_ID).eq('active', true)
     .order('sort_order', { ascending: true })
     .limit(1000 + (Date.now() % 1000)); // cache-bust PostgREST edge cache
   if (habitsErr) return NextResponse.json({ error: habitsErr.message }, { status: 500 });
 
-  // Fetching from yearStart covers both the monthly and yearly stats in one
-  // query, since the current month is always a subset of year-to-date.
+  // Fetching from the habits-launch date (not yearStart) covers month/year/
+  // all-time stats in one query AND stays correct once the calendar rolls
+  // into a new year, when yearStart would otherwise land after launch and
+  // silently truncate "all-time" history.
   const { data: logs, error: logsErr } = await db.from('habit_logs')
     .select('habit_id, log_date, completed')
     .eq('user_id', USER_ID)
-    .gte('log_date', yearStart)
+    .gte('log_date', HABITS_LAUNCH_DATE)
     .lte('log_date', today)
     .limit(10000 + (Date.now() % 1000));
   if (logsErr) return NextResponse.json({ error: logsErr.message }, { status: 500 });

@@ -7,6 +7,7 @@ export interface Habit {
   schedule_days: number[];
   sort_order: number;
   active: boolean;
+  created_at: string;
 }
 
 export interface HabitLog {
