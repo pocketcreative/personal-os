@@ -58,7 +58,13 @@ export default function HabitStatsTable({ habits, logs, weekStart, monthStart, y
             {habits.map((habit) => {
               const stats = calcHabitPeriodStats(habit, logs, { weekStart, monthStart, yearStart, today });
               const trackingStart = habitTrackingStart(habit.created_at);
-              const isNew = trackingStart > weekStart;
+              // >= (not >) so a habit created exactly on the current week's
+              // start (e.g. added on a Monday, when weekStart === today)
+              // still gets the explanatory badge -- otherwise the week
+              // period wasn't "clamped" in the strict sense, but the habit
+              // is still brand new and its numbers are still misleadingly
+              // uniform.
+              const isNew = trackingStart >= weekStart;
               // Clamp to non-negative: a future created_at (bad data, clock
               // skew) would otherwise render "added -N days ago", which is
               // visibly wrong even though the percentages themselves already
