@@ -65,3 +65,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ date
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ date: string }> }) {
+  const { date } = await params;
+  if (!DATE_RE.test(date)) return NextResponse.json({ error: 'date must be YYYY-MM-DD' }, { status: 400 });
+
+  const db = serviceClient();
+  const { error } = await db.from('journal_entries')
+    .delete()
+    .eq('user_id', USER_ID).eq('entry_date', date);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

@@ -156,16 +156,35 @@ function ReflectionModal({ date, saveEntry, onClose }: {
   );
 }
 
-function ReflectionRow({ entry, onOpen }: { entry: ReflectionEntry; onOpen: (date: string) => void }) {
+function ReflectionRow({ entry, onOpen, onDelete }: {
+  entry: ReflectionEntry;
+  onOpen: (date: string) => void;
+  onDelete: (date: string) => void;
+}) {
   const preview = entry.raw_text.length > 150 ? `${entry.raw_text.slice(0, 150)}…` : entry.raw_text;
   return (
     <div
       onClick={() => onOpen(entry.entry_date)}
       style={{ padding: '14px 0', borderBottom: '1px solid rgba(17,17,17,.06)', cursor: 'pointer' }}
     >
-      <div style={{ font: "700 13px 'Inter Tight', sans-serif", color: '#9a7a2e', marginBottom: 4 }}>
-        {formatEntryDate(entry.entry_date)}
-        {entry.topic && <span style={{ color: 'rgba(17,17,17,.55)', fontWeight: 600 }}> — {entry.topic}</span>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ font: "700 13px 'Inter Tight', sans-serif", color: '#9a7a2e', marginBottom: 4 }}>
+          {formatEntryDate(entry.entry_date)}
+          {entry.topic && <span style={{ color: 'rgba(17,17,17,.55)', fontWeight: 600 }}> — {entry.topic}</span>}
+        </div>
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirm(`Delete the reflection for ${formatEntryDate(entry.entry_date)}? This can't be undone.`)) {
+              onDelete(entry.entry_date);
+            }
+          }}
+          title="Delete reflection"
+          style={{
+            cursor: 'pointer', color: 'rgba(17,17,17,.3)', fontSize: 15,
+            padding: '2px 4px', flexShrink: 0, lineHeight: 1,
+          }}
+        >🗑️</span>
       </div>
       <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: '#111', whiteSpace: 'pre-wrap' }}>
         {preview || <span style={{ color: 'rgba(17,17,17,.35)' }}>(empty — click to write)</span>}
@@ -185,7 +204,7 @@ function matchesSearch(entry: ReflectionEntry, query: string): boolean {
 }
 
 export default function ReflectionsBoard() {
-  const { data, saveEntry } = useReflections();
+  const { data, saveEntry, deleteEntry } = useReflections();
   const [query, setQuery] = useState('');
   const [openDate, setOpenDate] = useState<string | null>(null);
 
@@ -238,7 +257,7 @@ export default function ReflectionsBoard() {
         )}
 
         {data && visibleEntries.map((entry) => (
-          <ReflectionRow key={entry.entry_date} entry={entry} onOpen={setOpenDate} />
+          <ReflectionRow key={entry.entry_date} entry={entry} onOpen={setOpenDate} onDelete={deleteEntry} />
         ))}
       </div>
 

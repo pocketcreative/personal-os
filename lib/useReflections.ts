@@ -68,6 +68,12 @@ async function putEntry(
   }
 }
 
+async function deleteEntryApi(date: string): Promise<boolean> {
+  const res = await fetch(`/api/reflections/${date}`, { method: 'DELETE' });
+  if (!res.ok) console.error('deleteEntry failed', res.status, await res.text());
+  return res.ok;
+}
+
 export function useReflections() {
   const [data, setData] = useState<ReflectionsData | null>(reflectionsCache);
 
@@ -131,5 +137,11 @@ export function useReflections() {
     return { ok: false };
   }, [load]);
 
-  return { data, saveEntry };
+  const deleteEntry = useCallback(async (date: string): Promise<boolean> => {
+    const ok = await deleteEntryApi(date);
+    if (ok) load();
+    return ok;
+  }, [load]);
+
+  return { data, saveEntry, deleteEntry };
 }
