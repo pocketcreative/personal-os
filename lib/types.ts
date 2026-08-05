@@ -33,3 +33,11 @@ export const STATUSES = ['not_started', 'in_progress', 'completed', 'archived'] 
 export const STATUS_LABELS: Record<Task['status'], string> = {
   not_started: 'Not started', in_progress: 'In progress', completed: 'Completed', archived: 'Archived',
 };
+
+export interface Idea {
+  id: string;
+  text: string;
+  used: boolean;
+  created_at: string;
+  updated_at: string;
+}
