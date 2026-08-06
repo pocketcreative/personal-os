@@ -101,57 +101,50 @@ function ReflectionModal({ date, saveEntry, onClose }: {
   };
 
   return (
-    <div onClick={handleClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(17,17,17,.4)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 24,
+    <div style={{
+      position: 'fixed', inset: 0, background: '#fbfaf7', zIndex: 70,
+      display: 'flex', flexDirection: 'column', padding: '20px 24px 24px',
     }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#fbfaf7', borderRadius: 10, width: '100%', maxWidth: 560,
-        boxShadow: '0 20px 60px rgba(0,0,0,.25)',
-      }}>
-        <div style={{ padding: '20px 24px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <div style={{ font: "800 16px 'Archivo', sans-serif", color: '#111' }}>{formatEntryDate(date)}</div>
-          <span onClick={handleClose} style={{ cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 18 }}>✕</span>
-        </div>
-        <div style={{ padding: '14px 24px 24px' }}>
-          {!ready ? (
-            <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Loading…</div>
-          ) : (
-            <>
-              <input
-                value={topic}
-                onChange={(e) => { setTopic(e.target.value); scheduleAutosave(); }}
-                placeholder="Topic (optional)"
-                style={{
-                  width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(17,17,17,.12)',
-                  marginBottom: 10, fontFamily: "'Inter Tight', sans-serif", fontWeight: 600, fontSize: 16,
-                  color: '#111', background: '#fff', boxSizing: 'border-box',
-                }}
-              />
-              <textarea
-                value={text}
-                onChange={(e) => { setText(e.target.value); scheduleAutosave(); }}
-                placeholder="What happened today?"
-                style={{
-                  width: '100%', minHeight: 160, lineHeight: 1.5, color: '#111',
-                  resize: 'vertical', padding: '12px 14px', border: '1px solid rgba(17,17,17,.1)',
-                  borderRadius: 6, background: '#fff', boxSizing: 'border-box',
-                  fontFamily: "'Inter Tight', sans-serif", outline: 'none', fontSize: 16,
-                }}
-              />
-              <div style={{
-                marginTop: 8, font: "600 11px 'Inter Tight', sans-serif",
-                color: status === 'error' ? '#b3261e' : 'rgba(17,17,17,.35)',
-              }}>
-                {status === 'saving' && 'Saving…'}
-                {status === 'saved' && 'Saved automatically'}
-                {status === 'merged' && 'Merged a recent change in — saved'}
-                {status === 'error' && 'Save failed — will retry automatically'}
-              </div>
-            </>
-          )}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+        <div style={{ font: "800 16px 'Archivo', sans-serif", color: '#111' }}>{formatEntryDate(date)}</div>
+        <span onClick={handleClose} style={{ cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 18 }}>✕</span>
       </div>
+      {!ready ? (
+        <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Loading…</div>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <input
+            value={topic}
+            onChange={(e) => { setTopic(e.target.value); scheduleAutosave(); }}
+            placeholder="Topic (optional)"
+            style={{
+              width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(17,17,17,.12)',
+              marginBottom: 10, fontFamily: "'Inter Tight', sans-serif", fontWeight: 600, fontSize: 16,
+              color: '#111', background: '#fff', boxSizing: 'border-box', flexShrink: 0,
+            }}
+          />
+          <textarea
+            value={text}
+            onChange={(e) => { setText(e.target.value); scheduleAutosave(); }}
+            placeholder="What happened today?"
+            style={{
+              width: '100%', flex: 1, lineHeight: 1.5, color: '#111',
+              resize: 'none', padding: '12px 14px', border: '1px solid rgba(17,17,17,.1)',
+              borderRadius: 6, background: '#fff', boxSizing: 'border-box',
+              fontFamily: "'Inter Tight', sans-serif", outline: 'none', fontSize: 16,
+            }}
+          />
+          <div style={{
+            marginTop: 8, font: "600 11px 'Inter Tight', sans-serif", flexShrink: 0,
+            color: status === 'error' ? '#b3261e' : 'rgba(17,17,17,.35)',
+          }}>
+            {status === 'saving' && 'Saving…'}
+            {status === 'saved' && 'Saved automatically'}
+            {status === 'merged' && 'Merged a recent change in — saved'}
+            {status === 'error' && 'Save failed — will retry automatically'}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
