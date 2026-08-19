@@ -5,6 +5,7 @@ import { useLiveTimer } from '@/lib/useLiveTimer';
 import ClockInput from './ClockInput';
 import FieldPopover from './FieldPopover';
 import TaskDetailModal from './TaskDetailModal';
+import GoalBanner from './GoalBanner';
 import type { Task } from '@/lib/types';
 import { CATEGORY_LABELS, STATUS_LABELS } from '@/lib/types';
 
@@ -78,6 +79,8 @@ export default function TaskBoardDesktop() {
               {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
           </div>
+
+          <GoalBanner />
 
           <div style={{
             display: 'grid', gridTemplateColumns: GRID_COLS,

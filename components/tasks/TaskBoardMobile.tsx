@@ -7,6 +7,7 @@ import { reorderByPointerY, type CardRect } from '@/lib/dragReorder';
 import ClockInput from './ClockInput';
 import FieldPopover from './FieldPopover';
 import TaskDetailSheet from './TaskDetailSheet';
+import GoalBanner from './GoalBanner';
 import type { Task } from '@/lib/types';
 import { CATEGORY_LABELS, STATUS_LABELS } from '@/lib/types';
 
@@ -132,6 +133,9 @@ export default function TaskBoardMobile() {
         </div>
         <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', letterSpacing: '.04em', textTransform: 'uppercase' }}>
           {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <GoalBanner />
         </div>
         {/* No overflowX here (deliberately) — the two chips comfortably fit
             any real phone width, and setting overflow-x to a non-visible

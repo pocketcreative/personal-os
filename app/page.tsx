@@ -1,9 +1,5 @@
-import SessionCard from '@/components/dashboard/SessionCard';
+import { redirect } from 'next/navigation';
 
 export default function Home() {
-  return (
-    <div className="grid gap-4">
-      <SessionCard />
-    </div>
-  );
+  redirect('/tasks');
 }
