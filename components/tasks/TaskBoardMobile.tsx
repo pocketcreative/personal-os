@@ -128,7 +128,11 @@ export default function TaskBoardMobile() {
 
   return (
     <div style={{ background: '#f3f1ec', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '20px 20px 16px', flex: 'none' }}>
+      <div style={{ padding: 'clamp(12px, 4vw, 20px) clamp(6px, 2vw, 20px) 0', flex: 'none' }}>
+      <div style={{
+        background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
+        boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: '16px 16px 16px',
+      }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Task Dashboard</div>
         </div>
@@ -177,8 +181,11 @@ export default function TaskBoardMobile() {
           />
         </div>
       </div>
+      </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 16px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 'clamp(8px, 3vw, 16px) clamp(6px, 2vw, 16px) 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <AddTaskInput onAdd={d.addTask} />
+
         {d.tasks.map((task) => {
           const isCompleted = task.status === 'completed';
           const isDragging = dragId === task.id;

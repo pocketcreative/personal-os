@@ -129,6 +129,8 @@ export default function TaskBoardDesktop() {
             <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Timer</div>
           </div>
 
+          <AddTaskInput onAdd={d.addTask} />
+
           {d.tasks.map((task) => {
             const isCompleted = task.status === 'completed';
             const draggable = isActive(task);
@@ -222,8 +224,6 @@ export default function TaskBoardDesktop() {
               </div>
             );
           })}
-
-          <AddTaskInput onAdd={d.addTask} />
         </div>
         <div style={{ height: 32 }} />
       </div>
