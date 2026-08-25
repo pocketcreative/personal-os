@@ -62,3 +62,17 @@ export const CONTENT_STATUS_LABELS: Record<ContentPiece['status'], string> = {
   draft: 'Draft', ready_to_record: 'Ready To Record', editing: 'Editing',
   ready_to_post: 'Ready To Post', scheduled: 'Scheduled',
 };
+
+export interface AgentRun {
+  id: string;
+  title: string;
+  status: 'running' | 'blocked' | 'done' | 'failed';
+  summary: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const AGENT_RUN_STATUSES = ['running', 'blocked', 'done', 'failed'] as const;
+export const AGENT_RUN_STATUS_LABELS: Record<AgentRun['status'], string> = {
+  running: 'Running', blocked: 'Needs Input', done: 'Done', failed: 'Failed',
+};
