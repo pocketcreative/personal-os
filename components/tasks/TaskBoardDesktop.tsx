@@ -6,6 +6,7 @@ import ClockInput from './ClockInput';
 import FieldPopover from './FieldPopover';
 import TaskDetailModal from './TaskDetailModal';
 import GoalBanner from './GoalBanner';
+import AddTaskInput from './AddTaskInput';
 import type { Task } from '@/lib/types';
 import { CATEGORY_LABELS, STATUS_LABELS } from '@/lib/types';
 
@@ -221,6 +222,8 @@ export default function TaskBoardDesktop() {
               </div>
             );
           })}
+
+          <AddTaskInput onAdd={d.addTask} />
         </div>
         <div style={{ height: 32 }} />
       </div>

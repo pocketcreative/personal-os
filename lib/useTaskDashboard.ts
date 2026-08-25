@@ -9,6 +9,14 @@ async function fetchAllTasks(): Promise<Task[]> {
   return res.json();
 }
 
+async function createTask(title: string): Promise<Task | null> {
+  const res = await fetch('/api/tasks', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title }),
+  });
+  if (!res.ok) { console.error('createTask failed', res.status, await res.text()); return null; }
+  return res.json();
+}
+
 async function patchTask(id: string, patch: Partial<Task>): Promise<Task | null> {
   const res = await fetch(`/api/tasks/${id}`, {
     method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch),
@@ -68,6 +76,11 @@ export function useTaskDashboard() {
     window.addEventListener('capture:done', load);
     return () => window.removeEventListener('capture:done', load);
   }, [load]);
+
+  const addTask = useCallback(async (title: string) => {
+    const created = await createTask(title);
+    if (created) setTasks((cur) => [{ ...created, active_timer: null }, ...cur]);
+  }, []);
 
   const applyPatch = useCallback(async (id: string, patch: Partial<Task>) => {
     dirtyRef.current = true;
@@ -132,6 +145,7 @@ export function useTaskDashboard() {
     togglePriorityFilter: (v: 'today' | 'dash') => setPriorityFilters((f) => toggleFilter(f, v)),
     activeTaskId, setActiveTaskId,
     activeTask: tasks.find((t) => t.id === activeTaskId) ?? null,
+    addTask,
     updateCategory: (id: string, category: Task['category']) => applyPatch(id, { category }),
     updateStatus: (id: string, status: Task['status']) => applyPatch(id, { status }),
     updatePriority: (id: string, today: boolean) => applyPatch(id, { key: today }),

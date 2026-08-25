@@ -8,6 +8,7 @@ import ClockInput from './ClockInput';
 import FieldPopover from './FieldPopover';
 import TaskDetailSheet from './TaskDetailSheet';
 import GoalBanner from './GoalBanner';
+import AddTaskInput from './AddTaskInput';
 import type { Task } from '@/lib/types';
 import { CATEGORY_LABELS, STATUS_LABELS } from '@/lib/types';
 
@@ -268,6 +269,8 @@ export default function TaskBoardMobile() {
             </div>
           );
         })}
+
+        <AddTaskInput onAdd={d.addTask} />
       </div>
 
       {d.activeTask && (
