@@ -101,13 +101,19 @@ export default function IdeasBoard() {
   };
 
   return (
-    <div style={{ maxWidth: 1220, margin: '0 auto', padding: '32px 16px 56px', background: '#f3f1ec' }}>
+    <div style={{ maxWidth: 1220, margin: '0 auto', padding: '56px 24px', background: '#f3f1ec' }}>
       <div style={{
         background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
-        boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: '32px 24px 28px',
+        boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: '40px 44px 28px',
       }}>
-        <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em', marginBottom: 20 }}>
-          Ideas
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Ideas</div>
+          <div style={{
+            font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)',
+            letterSpacing: '.04em', textTransform: 'uppercase',
+          }}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
