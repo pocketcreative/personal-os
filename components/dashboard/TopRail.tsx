@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 const TABS = [
@@ -12,6 +12,7 @@ const TABS = [
 
 export default function TopRail() {
   const pathname = usePathname();
+  const router = useRouter();
   const [time, setTime] = useState('');
   const [dateStr, setDateStr] = useState('');
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function TopRail() {
       <span style={{ font: "800 15px 'Archivo', sans-serif", color: 'var(--ink-4)', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
         Brendan OS
       </span>
-      <div className="flex gap-7">
+      <div className="hidden md:flex gap-7">
         {TABS.map((t) => {
           const active = pathname === t.href;
           return (
@@ -57,6 +58,25 @@ export default function TopRail() {
           );
         })}
       </div>
+
+      {/* Below md, the 4 tab labels plus the logo and clock don't fit on one
+          row (the logo text was getting visually cut/overlapped by the first
+          tab). A native <select> is the most reliable cross-browser way to
+          get dropdown navigation without a custom menu component. */}
+      <select
+        className="md:hidden"
+        value={pathname}
+        onChange={(e) => router.push(e.target.value)}
+        style={{
+          fontFamily: "'Inter Tight', sans-serif", fontSize: 13, fontWeight: 700,
+          color: 'var(--ink-4)', background: 'var(--ink-1)', border: '1px solid var(--ink-2)',
+          borderRadius: 6, padding: '4px 8px',
+        }}
+      >
+        {TABS.map((t) => (
+          <option key={t.href} value={t.href}>{t.label}</option>
+        ))}
+      </select>
       <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
         <span className="hidden sm:inline">{dateStr} · </span>{time}
       </span>
