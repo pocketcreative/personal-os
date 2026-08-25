@@ -213,7 +213,7 @@ export default function ReflectionsBoard() {
         background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
         boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: 'clamp(20px, 5vw, 40px) clamp(10px, 3vw, 44px) 28px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div className="board-header">
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Reflections</div>
           <div style={{
             font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)',

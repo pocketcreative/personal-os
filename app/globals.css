@@ -29,3 +29,21 @@ body {
 }
 
 .mono { font-family: ui-monospace, Menlo, monospace; }
+
+/* Matches TaskBoardMobile's header: title and date stack on narrow screens
+   instead of squeezing onto one row like TaskBoardDesktop does. Applied to
+   Reflections/Ideas/Media, which (unlike Tasks) have no separate mobile
+   component of their own to make this distinction in JS. */
+.board-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+@media (max-width: 640px) {
+  .board-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

@@ -111,7 +111,7 @@ export default function ContentBoard() {
         background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
         boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: 'clamp(20px, 5vw, 40px) clamp(6px, 2vw, 44px) 32px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div className="board-header" style={{ marginBottom: 28 }}>
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Media Tracker</div>
           <div style={{
             font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)',
