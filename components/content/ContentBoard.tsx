@@ -49,6 +49,9 @@ function ContentCard({ piece, dragging, onOpen, onDragStart, onDragEnd }: {
           )}
         </div>
       )}
+      <div style={{ font: "600 10px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.3)', marginTop: 6 }}>
+        Added {new Date(piece.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+      </div>
     </div>
   );
 }
