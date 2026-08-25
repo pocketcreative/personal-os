@@ -12,6 +12,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const patch: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) if (PATCHABLE.has(k)) patch[k] = v;
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
+  if (typeof patch.title === 'string' && !patch.title.trim()) {
+    return NextResponse.json({ error: 'title cannot be blank' }, { status: 400 });
+  }
   patch.updated_at = new Date().toISOString();
   const db = serviceClient();
   const { data, error } = await db.from('content_pieces').update(patch)
