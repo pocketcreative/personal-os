@@ -41,3 +41,24 @@ export interface Idea {
   created_at: string;
   updated_at: string;
 }
+
+export interface ContentPiece {
+  id: string;
+  title: string;
+  visual_hook: string | null;
+  script: string | null;
+  status: 'draft' | 'ready_to_record' | 'editing' | 'ready_to_post' | 'scheduled';
+  platform: string[];
+  target_post_date: string | null;
+  raw_footage_link: string | null;
+  additional_footage: string | null;
+  sort_order: number | null; // null = never manually dragged; falls back to created_at order
+  created_at: string;
+  updated_at: string;
+}
+
+export const CONTENT_STATUSES = ['draft', 'ready_to_record', 'editing', 'ready_to_post', 'scheduled'] as const;
+export const CONTENT_STATUS_LABELS: Record<ContentPiece['status'], string> = {
+  draft: 'Draft', ready_to_record: 'Ready To Record', editing: 'Editing',
+  ready_to_post: 'Ready To Post', scheduled: 'Scheduled',
+};

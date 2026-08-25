@@ -1,5 +1,5 @@
-import MediaTrackerBoard from '@/components/media/MediaTrackerBoard';
+import ContentBoard from '@/components/content/ContentBoard';
 
 export default function MediaPage() {
-  return <MediaTrackerBoard />;
+  return <ContentBoard />;
 }
