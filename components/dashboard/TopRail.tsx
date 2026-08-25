@@ -7,6 +7,7 @@ const TABS = [
   { href: '/tasks', label: 'Tasks' },
   { href: '/reflections', label: 'Reflections' },
   { href: '/ideas', label: 'Ideas' },
+  { href: '/media', label: 'Media' },
 ];
 
 export default function TopRail() {
