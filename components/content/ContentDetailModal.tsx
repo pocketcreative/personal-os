@@ -39,7 +39,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete }:
   const fieldStyle = {
     width: '100%', padding: '10px 12px', border: '1px solid rgba(17,17,17,.1)',
     borderRadius: 6, background: '#fff', boxSizing: 'border-box' as const,
-    fontFamily: "'Inter Tight', sans-serif", fontSize: 14, color: '#111', outline: 'none',
+    fontFamily: "'Inter Tight', sans-serif", fontSize: 16, color: '#111', outline: 'none',
   };
   const labelStyle = {
     font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)',

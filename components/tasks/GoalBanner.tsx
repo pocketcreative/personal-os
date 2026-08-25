@@ -62,7 +62,7 @@ export default function GoalBanner() {
             if (e.key === 'Escape') setEditing(false);
           }}
           style={{
-            font: "700 15px 'Archivo', sans-serif", color: '#fff', letterSpacing: '-0.01em',
+            font: "700 16px 'Archivo', sans-serif", color: '#fff', letterSpacing: '-0.01em',
             background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,.35)',
             outline: 'none', flex: 1, padding: '0 0 1px',
           }}

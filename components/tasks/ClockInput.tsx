@@ -36,8 +36,8 @@ export default function ClockInput({ minutes, onChange, size = 'md' }: {
         border: '1px solid rgba(17,17,17,.1)', borderRadius: 5,
         background: '#fff', color: 'rgba(17,17,17,.75)',
         textAlign: 'center', letterSpacing: '.03em',
-        width: size === 'sm' ? '100%' : 82,
-        fontSize: size === 'sm' ? 13.5 : 14,
+        width: size === 'sm' ? '100%' : 88,
+        fontSize: 16,
         padding: size === 'sm' ? '6px 4px' : '4px 8px',
       }}
     />

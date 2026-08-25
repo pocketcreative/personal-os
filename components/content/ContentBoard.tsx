@@ -83,7 +83,7 @@ function AddCardInput({ onAdd }: { onAdd: (title: string) => void }) {
       placeholder="Title…"
       style={{
         width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(17,17,17,.15)',
-        font: "500 13px 'Inter Tight', sans-serif", color: '#111', background: '#fff', boxSizing: 'border-box',
+        font: "500 16px 'Inter Tight', sans-serif", color: '#111', background: '#fff', boxSizing: 'border-box',
       }}
     />
   );
@@ -106,10 +106,10 @@ export default function ContentBoard() {
   };
 
   return (
-    <div style={{ maxWidth: 1220, margin: '0 auto', padding: '56px 24px', background: '#f3f1ec' }}>
+    <div style={{ maxWidth: 1220, margin: '0 auto', padding: 'clamp(24px, 6vw, 56px) clamp(8px, 3vw, 24px)', background: '#f3f1ec' }}>
       <div style={{
         background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
-        boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: '40px 44px 32px',
+        boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: 'clamp(20px, 5vw, 40px) clamp(12px, 4vw, 44px) 32px',
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 28 }}>
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Media Tracker</div>

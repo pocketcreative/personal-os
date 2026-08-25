@@ -64,7 +64,7 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
             value={description} onChange={(e) => setDescription(e.target.value)}
             placeholder="Add notes about this task…"
             style={{
-              width: '100%', minHeight: 140, fontSize: 14, lineHeight: 1.5, color: '#111',
+              width: '100%', minHeight: 140, fontSize: 16, lineHeight: 1.5, color: '#111',
               resize: 'vertical', padding: '12px 14px', border: '1px solid rgba(17,17,17,.1)',
               borderRadius: 6, background: '#fff', boxSizing: 'border-box',
               fontFamily: "'Inter Tight', sans-serif", outline: 'none',
