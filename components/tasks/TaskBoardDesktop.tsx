@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTaskDashboard } from '@/lib/useTaskDashboard';
 import FieldPopover from './FieldPopover';
 import TaskDetailModal from './TaskDetailModal';
@@ -29,23 +29,94 @@ const STATUS_TEXT: Record<Task['status'], string> = {
   not_started: 'rgba(17,17,17,.45)', in_progress: '#a16207', completed: '#227a37', archived: 'rgba(154,122,46,.65)',
 };
 
-// minmax(0, Nfr) instead of a bare `Nfr` on every flexible column: a plain
-// `fr` track still refuses to shrink below its content's min-content width,
-// which is what was forcing the whole page to overflow horizontally rather
-// than truncating text when the window was narrower than the sum of every
-// column's natural width. minmax(0, ...) lets the track actually shrink,
-// so ellipsis/line-clamp on the text inside can do its job instead.
-//
+// Resizable columns: Task, Description, Owner, Status, Priority (the leading
+// 20px drag-handle column is fixed, not user-resizable). Widths are in px,
+// not fr — once Brendan can drag a column, "fr" no longer means anything
+// stable to save/restore, so this switches the whole row to fixed-width
+// tracks the moment a resize happens, persisted per-browser in
+// localStorage (a display preference, not data worth a DB round-trip).
+const COL_KEYS = ['task', 'description', 'owner', 'status', 'priority'] as const;
+const DEFAULT_COL_WIDTHS: Record<(typeof COL_KEYS)[number], number> = {
+  task: 380, description: 380, owner: 130, status: 170, priority: 110,
+};
+const COL_WIDTHS_STORAGE_KEY = 'taskBoardColWidths';
+const MIN_COL_WIDTH = 70;
+
+function loadColWidths(): Record<(typeof COL_KEYS)[number], number> {
+  if (typeof window === 'undefined') return DEFAULT_COL_WIDTHS;
+  try {
+    const raw = window.localStorage.getItem(COL_WIDTHS_STORAGE_KEY);
+    if (!raw) return DEFAULT_COL_WIDTHS;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_COL_WIDTHS, ...parsed };
+  } catch {
+    return DEFAULT_COL_WIDTHS;
+  }
+}
+
 // Category, Exp./Actual Time, and Timer columns are removed from the UI
 // (2026-08-27, Brendan doesn't use them) — the underlying task fields and
 // hook methods (updateCategory/updateExpected/updateActual/startTimer/
 // stopTimer) are left alone in case he wants them back.
-const GRID_COLS = '20px minmax(0,1.6fr) minmax(0,1.6fr) minmax(0,.9fr) minmax(0,1.1fr) minmax(0,.8fr)';
+
+// Declared outside the component (not inline in render) so it's a stable
+// component reference across renders, per react-hooks/static-components —
+// an inline function component defined inside render gets recreated (and
+// loses any of its own state) on every parent re-render.
+function ResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      style={{
+        position: 'absolute', top: 0, bottom: -8, right: -14, width: 10,
+        cursor: 'col-resize', zIndex: 1,
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(154,122,46,.25)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+    />
+  );
+}
 
 export default function TaskBoardDesktop() {
   const d = useTaskDashboard();
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  // Lazy initializer (not useEffect-after-mount) so there's no extra render
+  // just to swap in the saved widths — SSR/first paint gets the defaults
+  // (loadColWidths short-circuits when `window` doesn't exist yet), and the
+  // client's real first render already has whatever Brendan last saved.
+  const [colWidths, setColWidths] = useState(() => loadColWidths());
+
+  const resizingRef = useRef<{ key: (typeof COL_KEYS)[number]; startX: number; startWidth: number } | null>(null);
+  const startResize = (key: (typeof COL_KEYS)[number]) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    // This write only ever runs inside this returned mousedown handler,
+    // never during render itself — calling startResize(key) in JSX just
+    // builds and returns the handler below. The static react-hooks/refs
+    // check can't see through the two-level closure, hence the disable.
+    // eslint-disable-next-line react-hooks/refs
+    resizingRef.current = { key, startX: e.clientX, startWidth: colWidths[key] };
+    const onMove = (ev: MouseEvent) => {
+      const r = resizingRef.current;
+      if (!r) return;
+      const next = Math.max(MIN_COL_WIDTH, r.startWidth + (ev.clientX - r.startX));
+      setColWidths((prev) => ({ ...prev, [r.key]: next }));
+    };
+    const onUp = () => {
+      resizingRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      setColWidths((prev) => {
+        try { window.localStorage.setItem(COL_WIDTHS_STORAGE_KEY, JSON.stringify(prev)); } catch { /* ignore */ }
+        return prev;
+      });
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const GRID_COLS = `20px ${COL_KEYS.map((k) => `${colWidths[k]}px`).join(' ')}`;
 
   const colStyle = { fontFamily: "'Archivo', sans-serif" };
 
@@ -91,13 +162,16 @@ export default function TaskBoardDesktop() {
               same spot on every row regardless of content height — separate
               per-row grids could round `fr` widths by a sub-pixel or two
               independently of each other, which is what was causing the
-              misaligned columns. */}
-          <div style={{ display: 'grid', gridTemplateColumns: GRID_COLS, columnGap: 28 }}>
+              misaligned columns. Wrapped in overflowX:auto so a deliberate
+              resize that pushes the total width past the container scrolls
+              the table itself instead of the whole page. */}
+          <div style={{ overflowX: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: GRID_COLS, columnGap: 28, minWidth: 'max-content' }}>
             <div />
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Task</div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Description</div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Owner</div>
-            <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>
+            <div style={{ ...colStyle, position: 'relative', display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Task<ResizeHandle onMouseDown={startResize('task')} /></div>
+            <div style={{ ...colStyle, position: 'relative', display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Description<ResizeHandle onMouseDown={startResize('description')} /></div>
+            <div style={{ ...colStyle, position: 'relative', display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Owner<ResizeHandle onMouseDown={startResize('owner')} /></div>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>
               <FieldPopover
                 align="left"
                 trigger={
@@ -113,8 +187,9 @@ export default function TaskBoardDesktop() {
                   onSelect: () => d.toggleStatusFilter(s),
                 }))}
               />
+              <ResizeHandle onMouseDown={startResize('status')} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>
               <FieldPopover
                 align="left"
                 trigger={
@@ -256,6 +331,7 @@ export default function TaskBoardDesktop() {
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
         <div style={{ height: 32 }} />
