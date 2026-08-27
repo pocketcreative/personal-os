@@ -5,11 +5,14 @@ import type { Task } from '@/lib/types';
 export default function TaskDetailSheet({ task, onClose, onSave, onDelete }: {
   task: Task;
   onClose: () => void;
-  onSave: (patch: { title?: string; description?: string }) => void;
+  onSave: (patch: { title?: string; description?: string; owner?: string; needs_input?: boolean; input_note?: string | null }) => void;
   onDelete: () => void;
 }) {
   const [name, setName] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
+  const [owner, setOwner] = useState(task.owner ?? 'brendan');
+  const [needsInput, setNeedsInput] = useState(!!task.needs_input);
+  const [inputNote, setInputNote] = useState(task.input_note ?? '');
   const nameRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-grow the title field so a long title wraps and stays fully
@@ -24,6 +27,11 @@ export default function TaskDetailSheet({ task, onClose, onSave, onDelete }: {
   function done() {
     if (name !== task.title) onSave({ title: name });
     if (description !== (task.description ?? '')) onSave({ description });
+    if (owner !== task.owner) onSave({ owner });
+    const trimmedNote = inputNote.trim() || null;
+    if (needsInput !== task.needs_input || trimmedNote !== task.input_note) {
+      onSave({ needs_input: needsInput, input_note: needsInput ? trimmedNote : null });
+    }
     onClose();
   }
 
@@ -69,6 +77,35 @@ export default function TaskDetailSheet({ task, onClose, onSave, onDelete }: {
               fontFamily: "'Inter Tight', sans-serif", outline: 'none',
             }}
           />
+
+          <div style={{ font: "700 10px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)', letterSpacing: '.06em', textTransform: 'uppercase', margin: '18px 0 8px' }}>
+            Owner
+          </div>
+          <input
+            value={owner} onChange={(e) => setOwner(e.target.value)}
+            placeholder="brendan, ai, fahad…"
+            style={{
+              width: '100%', fontSize: 15, color: '#111', padding: '10px 14px',
+              border: '1px solid rgba(17,17,17,.1)', borderRadius: 8, background: '#fff',
+              boxSizing: 'border-box', fontFamily: "'Inter Tight', sans-serif", outline: 'none',
+            }}
+          />
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 18, cursor: 'pointer' }}>
+            <input type="checkbox" checked={needsInput} onChange={(e) => setNeedsInput(e.target.checked)} />
+            <span style={{ font: "600 13px 'Inter Tight', sans-serif", color: '#111' }}>Needs Brendan&apos;s input</span>
+          </label>
+          {needsInput && (
+            <input
+              value={inputNote} onChange={(e) => setInputNote(e.target.value)}
+              placeholder="What do you need from Brendan?"
+              style={{
+                width: '100%', fontSize: 14, color: '#111', padding: '10px 14px', marginTop: 10,
+                border: '1px solid rgba(154,122,46,.35)', borderRadius: 8, background: 'rgba(198,161,91,.08)',
+                boxSizing: 'border-box', fontFamily: "'Inter Tight', sans-serif", outline: 'none',
+              }}
+            />
+          )}
         </div>
         <div style={{ padding: '4px 24px 24px' }}>
           <button

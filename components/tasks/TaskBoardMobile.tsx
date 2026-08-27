@@ -10,7 +10,14 @@ import TaskDetailSheet from './TaskDetailSheet';
 import GoalBanner from './GoalBanner';
 import AddTaskInput from './AddTaskInput';
 import type { Task } from '@/lib/types';
-import { CATEGORY_LABELS, STATUS_LABELS } from '@/lib/types';
+import { CATEGORY_LABELS, STATUS_LABELS, KNOWN_OWNERS, OWNER_LABELS } from '@/lib/types';
+
+// Defensive against `owner` being undefined for a moment right after this
+// column ships but before the Supabase migration adding it has been run.
+function ownerLabel(owner: string | undefined): string {
+  if (!owner) return 'Brendan';
+  return OWNER_LABELS[owner] ?? (owner.charAt(0).toUpperCase() + owner.slice(1));
+}
 
 const STATUS_DOT: Record<Task['status'], string> = {
   not_started: 'rgba(17,17,17,.3)', in_progress: '#eab308', completed: '#2f9e44', archived: 'rgba(154,122,46,.4)',
@@ -209,17 +216,33 @@ export default function TaskBoardMobile() {
                 )}
                 <div
                   onClick={() => d.setActiveTaskId(task.id)}
-                  style={{
-                    font: "600 16px 'Inter Tight', sans-serif",
-                    color: isCompleted ? 'rgba(17,17,17,.4)' : '#111',
-                    textDecorationLine: isCompleted ? 'line-through' : 'none',
-                    textDecorationColor: 'rgba(17,17,17,.25)', flex: 1,
-                  }}
-                >{task.title}</div>
+                  style={{ flex: 1 }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{
+                      font: "600 16px 'Inter Tight', sans-serif",
+                      color: isCompleted ? 'rgba(17,17,17,.4)' : '#111',
+                      textDecorationLine: isCompleted ? 'line-through' : 'none',
+                      textDecorationColor: 'rgba(17,17,17,.25)',
+                    }}>{task.title}</span>
+                    {task.needs_input && <span title={task.input_note ?? 'Needs your input'} style={{ fontSize: 13 }}>⚠️</span>}
+                  </div>
+                  {task.needs_input && task.input_note && (
+                    <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: '#9a7a2e', marginTop: 3 }}>{task.input_note}</div>
+                  )}
+                </div>
                 <MobileTimer task={task} onStart={() => d.startTimer(task.id)} onStop={() => d.stopTimer(task.id)} />
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                <FieldPopover
+                  trigger={<span style={{
+                    padding: '5px 11px', borderRadius: 20, background: 'rgba(17,17,17,.05)',
+                    font: "600 11.5px 'Inter Tight', sans-serif",
+                    color: task.owner === 'ai' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
+                  }}>{ownerLabel(task.owner)}</span>}
+                  options={KNOWN_OWNERS.map((o) => ({ label: ownerLabel(o), onSelect: () => d.updateOwner(task.id, o) }))}
+                />
                 <FieldPopover
                   trigger={<span style={{
                     padding: '5px 11px', borderRadius: 20, background: 'rgba(17,17,17,.05)',
@@ -287,6 +310,8 @@ export default function TaskBoardMobile() {
           onSave={(patch) => {
             if (patch.title !== undefined) d.updateName(d.activeTask!.id, patch.title);
             if (patch.description !== undefined) d.updateDescription(d.activeTask!.id, patch.description);
+            if (patch.owner !== undefined) d.updateOwner(d.activeTask!.id, patch.owner);
+            if (patch.needs_input !== undefined) d.updateNeedsInput(d.activeTask!.id, patch.needs_input, patch.input_note ?? null);
           }}
           onDelete={() => { d.deleteTask(d.activeTask!.id); d.setActiveTaskId(null); }}
         />

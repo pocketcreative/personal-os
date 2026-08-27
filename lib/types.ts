@@ -22,7 +22,15 @@ export interface Task {
   created_at: string;
   updated_at: string;
   active_timer: ActiveTimerSession | null;
+  owner: string; // free text: 'brendan', 'ai', or a named team member (e.g. 'fahad')
+  needs_input: boolean; // true = blocked waiting on Brendan, shows a warning badge
+  input_note: string | null; // what's needed from Brendan when needs_input is true
 }
+
+export const KNOWN_OWNERS = ['brendan', 'ai'] as const;
+export const OWNER_LABELS: Record<string, string> = {
+  brendan: 'Brendan', ai: 'AI',
+};
 
 export const CATEGORIES = ['personal', 'business'] as const;
 export const CATEGORY_LABELS: Record<Task['category'], string> = {

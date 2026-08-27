@@ -153,6 +153,9 @@ export function useTaskDashboard() {
     updateActual: (id: string, actual_time_min: number) => applyPatch(id, { actual_time_min }),
     updateName: (id: string, title: string) => applyPatch(id, { title }),
     updateDescription: (id: string, description: string) => applyPatch(id, { description }),
+    updateOwner: (id: string, owner: string) => applyPatch(id, { owner }),
+    updateNeedsInput: (id: string, needs_input: boolean, input_note: string | null) =>
+      applyPatch(id, { needs_input, input_note }),
     deleteTask,
     startTimer, stopTimer,
     reorderTasks,

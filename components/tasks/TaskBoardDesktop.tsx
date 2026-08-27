@@ -8,7 +8,14 @@ import TaskDetailModal from './TaskDetailModal';
 import GoalBanner from './GoalBanner';
 import AddTaskInput from './AddTaskInput';
 import type { Task } from '@/lib/types';
-import { CATEGORY_LABELS, STATUS_LABELS } from '@/lib/types';
+import { CATEGORY_LABELS, STATUS_LABELS, KNOWN_OWNERS, OWNER_LABELS } from '@/lib/types';
+
+// Defensive against `owner` being undefined for a moment right after this
+// column ships but before the Supabase migration adding it has been run.
+function ownerLabel(owner: string | undefined): string {
+  if (!owner) return 'Brendan';
+  return OWNER_LABELS[owner] ?? (owner.charAt(0).toUpperCase() + owner.slice(1));
+}
 
 const STATUS_DOT: Record<Task['status'], string> = {
   not_started: 'rgba(17,17,17,.3)', in_progress: '#eab308', completed: '#2f9e44', archived: 'rgba(154,122,46,.4)',
@@ -40,7 +47,7 @@ function TimerCell({ task, onStart, onStop }: {
   );
 }
 
-const GRID_COLS = '20px 2fr .9fr 1.1fr .8fr .9fr .9fr 1fr';
+const GRID_COLS = '20px 2fr .9fr .8fr 1.1fr .8fr .9fr .9fr 1fr';
 
 export default function TaskBoardDesktop() {
   const d = useTaskDashboard();
@@ -90,6 +97,7 @@ export default function TaskBoardDesktop() {
             <div />
             <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase' }}>Task</div>
             <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Category</div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Owner</div>
             <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>
               <FieldPopover
                 align="left"
@@ -160,13 +168,25 @@ export default function TaskBoardDesktop() {
                 <div
                   onClick={() => d.setActiveTaskId(task.id)}
                   style={{
-                    font: "500 15px 'Inter Tight', sans-serif",
-                    color: isCompleted ? 'rgba(17,17,17,.4)' : '#111',
-                    padding: '18px 0', textDecorationLine: isCompleted ? 'line-through' : 'none',
-                    textDecorationColor: 'rgba(17,17,17,.25)', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center',
+                    padding: '18px 0', cursor: 'pointer',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4,
                   }}
-                >{task.title}</div>
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      font: "500 15px 'Inter Tight', sans-serif",
+                      color: isCompleted ? 'rgba(17,17,17,.4)' : '#111',
+                      textDecorationLine: isCompleted ? 'line-through' : 'none',
+                      textDecorationColor: 'rgba(17,17,17,.25)',
+                    }}>{task.title}</span>
+                    {task.needs_input && (
+                      <span title={task.input_note ?? 'Needs your input'} style={{ fontSize: 13, lineHeight: 1 }}>⚠️</span>
+                    )}
+                  </div>
+                  {task.needs_input && task.input_note && (
+                    <div style={{ font: "500 12.5px 'Inter Tight', sans-serif", color: '#9a7a2e' }}>{task.input_note}</div>
+                  )}
+                </div>
 
                 <div style={{ padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
                   <FieldPopover
@@ -178,6 +198,18 @@ export default function TaskBoardDesktop() {
                       { label: 'Personal', onSelect: () => d.updateCategory(task.id, 'personal') },
                       { label: 'Business', onSelect: () => d.updateCategory(task.id, 'business') },
                     ]}
+                  />
+                </div>
+
+                <div style={{ padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                  <FieldPopover
+                    trigger={<span style={{
+                      font: "600 12px 'Inter Tight', sans-serif",
+                      color: task.owner === 'ai' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
+                    }}>{ownerLabel(task.owner)}</span>}
+                    options={KNOWN_OWNERS.map((o) => ({
+                      label: ownerLabel(o), onSelect: () => d.updateOwner(task.id, o),
+                    }))}
                   />
                 </div>
 
@@ -235,6 +267,8 @@ export default function TaskBoardDesktop() {
           onSave={(patch) => {
             if (patch.title !== undefined) d.updateName(d.activeTask!.id, patch.title);
             if (patch.description !== undefined) d.updateDescription(d.activeTask!.id, patch.description);
+            if (patch.owner !== undefined) d.updateOwner(d.activeTask!.id, patch.owner);
+            if (patch.needs_input !== undefined) d.updateNeedsInput(d.activeTask!.id, patch.needs_input, patch.input_note ?? null);
           }}
           onDelete={() => { d.deleteTask(d.activeTask!.id); d.setActiveTaskId(null); }}
         />

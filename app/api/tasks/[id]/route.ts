@@ -5,7 +5,7 @@ import { closeOpenSessionForTask } from '@/lib/timers';
 const PATCHABLE = new Set([
   'title', 'description', 'urgency', 'key', 'priority_score', 'rank_pinned',
   'time_estimate_min', 'actual_time_min', 'tags', 'due_date', 'completed_at',
-  'category', 'status',
+  'category', 'status', 'owner', 'needs_input', 'input_note',
 ]);
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
