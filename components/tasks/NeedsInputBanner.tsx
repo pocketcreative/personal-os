@@ -39,20 +39,26 @@ export default function NeedsInputBanner({ tasks, onSelect }: {
             key={task.id}
             onClick={() => onSelect(task.id)}
             style={{
-              display: 'flex', alignItems: 'baseline', gap: 8,
               padding: '6px 4px', borderRadius: 5, cursor: 'pointer',
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(198,161,91,.14)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
-            <span style={{
-              font: "600 13.5px 'Inter Tight', sans-serif", color: '#111', flex: 'none',
-            }}>{task.title}</span>
+            {/* Title and note stack on separate lines and wrap naturally,
+                matching how the same title/input_note pair is rendered on
+                the task cards themselves (TaskBoardMobile.tsx). Cramming
+                both into one nowrap flex row overflowed the card on long
+                titles and truncated notes inconsistently early on others -
+                a classic flexbox min-width bug, since a fixed-width sibling
+                fighting a shrinking one has no stable point to truncate at. */}
+            <div style={{
+              font: "600 13.5px 'Inter Tight', sans-serif", color: '#111',
+            }}>{task.title}</div>
             {task.input_note && (
-              <span style={{
+              <div style={{
                 font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.6)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
-              }}>{task.input_note}</span>
+                marginTop: 2,
+              }}>{task.input_note}</div>
             )}
           </div>
         ))}
