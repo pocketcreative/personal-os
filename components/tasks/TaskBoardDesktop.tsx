@@ -297,7 +297,7 @@ export default function TaskBoardDesktop() {
                       onChange={(value) => d.updateOwner(task.id, value)}
                       textStyle={{
                         font: "600 12px 'Inter Tight', sans-serif",
-                        color: task.owner === 'ai' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
+                        color: /agent|^ai$/i.test(task.owner) ? '#9a7a2e' : 'rgba(17,17,17,.55)',
                       }}
                     />
                   </div>

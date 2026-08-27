@@ -213,7 +213,7 @@ export default function TaskBoardMobile() {
                   containerStyle={{ padding: '5px 11px', borderRadius: 20, background: 'rgba(17,17,17,.05)' }}
                   textStyle={{
                     font: "600 11.5px 'Inter Tight', sans-serif",
-                    color: task.owner === 'ai' ? '#9a7a2e' : task.owner ? 'rgba(17,17,17,.55)' : 'rgba(17,17,17,.35)',
+                    color: /agent|^ai$/i.test(task.owner) ? '#9a7a2e' : task.owner ? 'rgba(17,17,17,.55)' : 'rgba(17,17,17,.35)',
                   }}
                   empty="+ owner"
                 />
