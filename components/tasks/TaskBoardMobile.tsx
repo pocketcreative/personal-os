@@ -6,6 +6,7 @@ import { reorderByPointerY, type CardRect } from '@/lib/dragReorder';
 import FieldPopover from './FieldPopover';
 import TaskDetailSheet from './TaskDetailSheet';
 import GoalBanner from './GoalBanner';
+import NeedsInputBanner from './NeedsInputBanner';
 import AddTaskInput from './AddTaskInput';
 import type { Task } from '@/lib/types';
 import { STATUS_LABELS, KNOWN_OWNERS, OWNER_LABELS } from '@/lib/types';
@@ -124,6 +125,7 @@ export default function TaskBoardMobile() {
         </div>
         <div style={{ marginTop: 14 }}>
           <GoalBanner />
+          <NeedsInputBanner tasks={d.tasks} onSelect={d.setActiveTaskId} />
         </div>
         {/* No overflowX here (deliberately) — the two chips comfortably fit
             any real phone width, and setting overflow-x to a non-visible

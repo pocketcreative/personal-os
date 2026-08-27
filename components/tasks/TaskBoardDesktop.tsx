@@ -4,6 +4,7 @@ import { useTaskDashboard } from '@/lib/useTaskDashboard';
 import FieldPopover from './FieldPopover';
 import TaskDetailModal from './TaskDetailModal';
 import GoalBanner from './GoalBanner';
+import NeedsInputBanner from './NeedsInputBanner';
 import AddTaskInput from './AddTaskInput';
 import type { Task } from '@/lib/types';
 import { STATUS_LABELS, KNOWN_OWNERS, OWNER_LABELS } from '@/lib/types';
@@ -153,6 +154,7 @@ export default function TaskBoardDesktop() {
           </div>
 
           <GoalBanner />
+          <NeedsInputBanner tasks={d.tasks} onSelect={d.setActiveTaskId} />
 
           {/* Header cells and every task-row's cells are ALL direct children
               of this one grid (each task row below is a display:contents
@@ -220,18 +222,32 @@ export default function TaskBoardDesktop() {
                 opacity: isDragging ? 0.4 : 1,
                 boxShadow: isDragOver ? 'inset 0 2px 0 0 #9a7a2e' : 'none',
               };
+              // Native HTML5 drag-and-drop needs a real rendered box to act as
+              // both the drag source and the drop target — `display: contents`
+              // (used on this row's own wrapper below, purely so its cells fall
+              // into the shared grid) strips the element from the box tree
+              // entirely, so `draggable`/dragstart/dragover/drop never fired
+              // when they lived on that wrapper. Fixed by moving them onto the
+              // actual cell divs instead: dragstart/dragend live only on the
+              // ⠿ handle cell (that's the one visual grab affordance), while
+              // dragover/dragleave/drop are spread onto every real cell in the
+              // row so the whole row still acts as a drop target.
+              const dropZoneProps = draggable ? {
+                onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragOverId(task.id); },
+                onDragLeave: () => setDragOverId((cur) => (cur === task.id ? null : cur)),
+                onDrop: (e: React.DragEvent) => { e.preventDefault(); handleDrop(task.id); },
+              } : {};
               return (
                 <div
                   key={task.id}
                   style={{ display: 'contents' }}
-                  draggable={draggable}
-                  onDragStart={draggable ? () => setDraggedId(task.id) : undefined}
-                  onDragOver={draggable ? (e) => { e.preventDefault(); setDragOverId(task.id); } : undefined}
-                  onDragLeave={draggable ? () => setDragOverId((cur) => (cur === task.id ? null : cur)) : undefined}
-                  onDrop={draggable ? (e) => { e.preventDefault(); handleDrop(task.id); } : undefined}
-                  onDragEnd={draggable ? () => { setDraggedId(null); setDragOverId(null); } : undefined}
                 >
-                  <div style={{
+                  <div
+                    draggable={draggable}
+                    onDragStart={draggable ? () => setDraggedId(task.id) : undefined}
+                    onDragEnd={draggable ? () => { setDraggedId(null); setDragOverId(null); } : undefined}
+                    {...dropZoneProps}
+                    style={{
                     ...rowVisual,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: draggable ? 'grab' : 'default',
@@ -239,6 +255,7 @@ export default function TaskBoardDesktop() {
                   }}>{draggable ? '⠿' : ''}</div>
                   <div
                     onClick={() => d.setActiveTaskId(task.id)}
+                    {...dropZoneProps}
                     style={{
                       ...rowVisual,
                       padding: '18px 0', cursor: 'pointer',
@@ -262,6 +279,7 @@ export default function TaskBoardDesktop() {
                       needs Brendan's input. */}
                   <div
                     onClick={() => d.setActiveTaskId(task.id)}
+                    {...dropZoneProps}
                     style={{
                       ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14,
                       borderLeft: '1px solid rgba(17,17,17,.08)', cursor: 'pointer',
@@ -286,7 +304,7 @@ export default function TaskBoardDesktop() {
                     </span>
                   </div>
 
-                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                  <div {...dropZoneProps} style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
                     <FieldPopover
                       trigger={<span style={{
                         font: "600 12px 'Inter Tight', sans-serif",
@@ -298,7 +316,7 @@ export default function TaskBoardDesktop() {
                     />
                   </div>
 
-                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                  <div {...dropZoneProps} style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
                     <FieldPopover
                       trigger={
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: "600 12px 'Inter Tight', sans-serif", color: STATUS_TEXT[task.status] }}>
@@ -315,7 +333,7 @@ export default function TaskBoardDesktop() {
                     />
                   </div>
 
-                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                  <div {...dropZoneProps} style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
                     <FieldPopover
                       trigger={
                         task.key
