@@ -1,19 +1,24 @@
 'use client';
 import { useState } from 'react';
 import { useTaskDashboard } from '@/lib/useTaskDashboard';
-import { useLiveTimer } from '@/lib/useLiveTimer';
-import ClockInput from './ClockInput';
 import FieldPopover from './FieldPopover';
 import TaskDetailModal from './TaskDetailModal';
 import GoalBanner from './GoalBanner';
 import AddTaskInput from './AddTaskInput';
 import type { Task } from '@/lib/types';
-import { CATEGORY_LABELS, STATUS_LABELS, KNOWN_OWNERS, OWNER_LABELS } from '@/lib/types';
+import { STATUS_LABELS, KNOWN_OWNERS, OWNER_LABELS } from '@/lib/types';
 
-// Defensive against `owner` being undefined for a moment right after this
-// column ships but before the Supabase migration adding it has been run.
-function ownerLabel(owner: string | undefined): string {
-  if (!owner) return 'Brendan';
+// '' (blank) means Brendan — shown as nothing, not the word "Brendan", so
+// the column stays quiet except when it's actually telling you something
+// (a named teammate, or "ai"). Also covers `undefined` defensively, for a
+// moment right after this column ships but before its migration has run.
+function ownerCellLabel(owner: string | undefined): string {
+  if (!owner) return '';
+  return OWNER_LABELS[owner] ?? (owner.charAt(0).toUpperCase() + owner.slice(1));
+}
+// The popover OPTION for the blank value still needs a real label so
+// Brendan knows what selecting it means — that's "Brendan", not blank text.
+function ownerOptionLabel(owner: string): string {
   return OWNER_LABELS[owner] ?? (owner.charAt(0).toUpperCase() + owner.slice(1));
 }
 
@@ -24,30 +29,18 @@ const STATUS_TEXT: Record<Task['status'], string> = {
   not_started: 'rgba(17,17,17,.45)', in_progress: '#a16207', completed: '#227a37', archived: 'rgba(154,122,46,.65)',
 };
 
-function TimerCell({ task, onStart, onStop }: {
-  task: Task; onStart: () => void; onStop: () => void;
-}) {
-  const liveMin = useLiveTimer(task.active_timer?.started_at ?? null);
-  if (task.status === 'completed') {
-    return <span style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.3)' }}>—</span>;
-  }
-  const running = !!task.active_timer;
-  const totalMin = running ? task.actual_time_min + liveMin : task.actual_time_min;
-  const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
-  const mm = String(Math.floor(totalMin % 60)).padStart(2, '0');
-  const ss = String(Math.floor((totalMin * 60) % 60)).padStart(2, '0');
-  return (
-    <div onClick={running ? onStop : onStart} style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' }}>
-      <span style={{ fontSize: 15, lineHeight: 1 }}>{running ? '⏳' : '⌛'}</span>
-      <span style={{
-        fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, fontWeight: 600,
-        letterSpacing: '.02em', color: running ? '#9a7a2e' : '#111',
-      }}>{hh}:{mm}:{ss}</span>
-    </div>
-  );
-}
-
-const GRID_COLS = '20px 1.6fr 1.4fr .9fr .8fr 1.1fr .8fr .9fr .9fr 1fr';
+// minmax(0, Nfr) instead of a bare `Nfr` on every flexible column: a plain
+// `fr` track still refuses to shrink below its content's min-content width,
+// which is what was forcing the whole page to overflow horizontally rather
+// than truncating text when the window was narrower than the sum of every
+// column's natural width. minmax(0, ...) lets the track actually shrink,
+// so ellipsis/line-clamp on the text inside can do its job instead.
+//
+// Category, Exp./Actual Time, and Timer columns are removed from the UI
+// (2026-08-27, Brendan doesn't use them) — the underlying task fields and
+// hook methods (updateCategory/updateExpected/updateActual/startTimer/
+// stopTimer) are left alone in case he wants them back.
+const GRID_COLS = '20px minmax(0,1.6fr) minmax(0,1.6fr) minmax(0,.9fr) minmax(0,1.1fr) minmax(0,.8fr)';
 
 export default function TaskBoardDesktop() {
   const d = useTaskDashboard();
@@ -100,10 +93,9 @@ export default function TaskBoardDesktop() {
               independently of each other, which is what was causing the
               misaligned columns. */}
           <div style={{ display: 'grid', gridTemplateColumns: GRID_COLS, columnGap: 28 }}>
-            <div style={{ borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }} />
+            <div />
             <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Task</div>
             <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Description</div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Category</div>
             <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Owner</div>
             <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>
               <FieldPopover
@@ -139,10 +131,6 @@ export default function TaskBoardDesktop() {
                 }))}
               />
             </div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Exp. Time</div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Actual Time</div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Timer</div>
-
             <div style={{ gridColumn: '1 / -1' }}>
               <AddTaskInput onAdd={d.addTask} />
             </div>
@@ -179,7 +167,7 @@ export default function TaskBoardDesktop() {
                     style={{
                       ...rowVisual,
                       padding: '18px 0', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center',
+                      display: 'flex', alignItems: 'center', minWidth: 0,
                     }}
                   >
                     <span style={{
@@ -187,34 +175,35 @@ export default function TaskBoardDesktop() {
                       color: isCompleted ? 'rgba(17,17,17,.4)' : '#111',
                       textDecorationLine: isCompleted ? 'line-through' : 'none',
                       textDecorationColor: 'rgba(17,17,17,.25)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>{task.title}</span>
                   </div>
 
-                  {/* Description column: a short 2-line preview, click to
-                      open the full task detail (same target as the title).
-                      The ⚠️ badge sits top-right of THIS cell specifically
-                      when the task needs Brendan's input — that's what the
-                      badge is actually about (something to read/decide),
-                      not the task title itself. */}
+                  {/* Description column: a compact one-line signal (mainly
+                      "does this need my input"), click to open the full
+                      task detail — not meant to show the whole description,
+                      that's what clicking in is for. The ⚠️ badge sits
+                      top-right of THIS cell specifically when the task
+                      needs Brendan's input. */}
                   <div
                     onClick={() => d.setActiveTaskId(task.id)}
                     style={{
                       ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14,
                       borderLeft: '1px solid rgba(17,17,17,.08)', cursor: 'pointer',
-                      display: 'flex', alignItems: 'flex-start', position: 'relative',
+                      display: 'flex', alignItems: 'center', position: 'relative', minWidth: 0,
                     }}
                   >
                     {task.needs_input && (
                       <span
                         title={task.input_note ?? 'Needs your input'}
-                        style={{ position: 'absolute', top: 10, right: 6, fontSize: 13, lineHeight: 1 }}
+                        style={{ position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)', fontSize: 13, lineHeight: 1 }}
                       >⚠️</span>
                     )}
                     <span style={{
                       font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.65)',
                       paddingRight: task.needs_input ? 20 : 0,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      display: 'block', width: '100%',
                     }}>
                       {task.needs_input && task.input_note
                         ? task.input_note
@@ -226,23 +215,10 @@ export default function TaskBoardDesktop() {
                     <FieldPopover
                       trigger={<span style={{
                         font: "600 12px 'Inter Tight', sans-serif",
-                        color: task.category === 'business' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
-                      }}>{CATEGORY_LABELS[task.category]}</span>}
-                      options={[
-                        { label: 'Personal', onSelect: () => d.updateCategory(task.id, 'personal') },
-                        { label: 'Business', onSelect: () => d.updateCategory(task.id, 'business') },
-                      ]}
-                    />
-                  </div>
-
-                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                    <FieldPopover
-                      trigger={<span style={{
-                        font: "600 12px 'Inter Tight', sans-serif",
                         color: task.owner === 'ai' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
-                      }}>{ownerLabel(task.owner)}</span>}
+                      }}>{ownerCellLabel(task.owner)}</span>}
                       options={KNOWN_OWNERS.map((o) => ({
-                        label: ownerLabel(o), onSelect: () => d.updateOwner(task.id, o),
+                        label: ownerOptionLabel(o), onSelect: () => d.updateOwner(task.id, o),
                       }))}
                     />
                   </div>
@@ -276,16 +252,6 @@ export default function TaskBoardDesktop() {
                         { label: '—', onSelect: () => d.updatePriority(task.id, false) },
                       ]}
                     />
-                  </div>
-
-                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                    <ClockInput minutes={task.time_estimate_min ?? 0} onChange={(m) => d.updateExpected(task.id, m)} />
-                  </div>
-                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                    <ClockInput minutes={task.actual_time_min} onChange={(m) => d.updateActual(task.id, m)} />
-                  </div>
-                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                    <TimerCell task={task} onStart={() => d.startTimer(task.id)} onStop={() => d.stopTimer(task.id)} />
                   </div>
                 </div>
               );

@@ -10,7 +10,7 @@ export default function TaskDetailSheet({ task, onClose, onSave, onDelete }: {
 }) {
   const [name, setName] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
-  const [owner, setOwner] = useState(task.owner ?? 'brendan');
+  const [owner, setOwner] = useState(task.owner ?? '');
   const [needsInput, setNeedsInput] = useState(!!task.needs_input);
   const [inputNote, setInputNote] = useState(task.input_note ?? '');
   const nameRef = useRef<HTMLTextAreaElement>(null);
@@ -83,7 +83,7 @@ export default function TaskDetailSheet({ task, onClose, onSave, onDelete }: {
           </div>
           <input
             value={owner} onChange={(e) => setOwner(e.target.value)}
-            placeholder="brendan, ai, fahad…"
+            placeholder="Leave blank for Brendan, or type ai / azel / fahad…"
             style={{
               width: '100%', fontSize: 15, color: '#111', padding: '10px 14px',
               border: '1px solid rgba(17,17,17,.1)', borderRadius: 8, background: '#fff',

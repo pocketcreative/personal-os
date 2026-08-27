@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     time_estimate_min: body.time_estimate_min ?? null,
     tags: body.tags ?? [],
     due_date: body.due_date ?? null,
-    owner: body.owner ?? 'brendan',
+    owner: body.owner ?? '',
     needs_input: body.needs_input ?? false,
     input_note: body.input_note ?? null,
   }).select('*').single();

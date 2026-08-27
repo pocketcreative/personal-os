@@ -2,20 +2,22 @@
 import { useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import { useTaskDashboard } from '@/lib/useTaskDashboard';
-import { useLiveTimer } from '@/lib/useLiveTimer';
 import { reorderByPointerY, type CardRect } from '@/lib/dragReorder';
-import ClockInput from './ClockInput';
 import FieldPopover from './FieldPopover';
 import TaskDetailSheet from './TaskDetailSheet';
 import GoalBanner from './GoalBanner';
 import AddTaskInput from './AddTaskInput';
 import type { Task } from '@/lib/types';
-import { CATEGORY_LABELS, STATUS_LABELS, KNOWN_OWNERS, OWNER_LABELS } from '@/lib/types';
+import { STATUS_LABELS, KNOWN_OWNERS, OWNER_LABELS } from '@/lib/types';
 
-// Defensive against `owner` being undefined for a moment right after this
-// column ships but before the Supabase migration adding it has been run.
-function ownerLabel(owner: string | undefined): string {
-  if (!owner) return 'Brendan';
+// '' (blank) means Brendan — shown as nothing on the card, not the word
+// "Brendan", so the chip only appears when it's actually telling you
+// something (a named teammate, or "ai").
+function ownerCellLabel(owner: string | undefined): string {
+  if (!owner) return '';
+  return OWNER_LABELS[owner] ?? (owner.charAt(0).toUpperCase() + owner.slice(1));
+}
+function ownerOptionLabel(owner: string): string {
   return OWNER_LABELS[owner] ?? (owner.charAt(0).toUpperCase() + owner.slice(1));
 }
 
@@ -25,32 +27,6 @@ const STATUS_DOT: Record<Task['status'], string> = {
 const STATUS_TEXT: Record<Task['status'], string> = {
   not_started: 'rgba(17,17,17,.45)', in_progress: '#a16207', completed: '#227a37', archived: 'rgba(154,122,46,.65)',
 };
-
-function MobileTimer({ task, onStart, onStop }: {
-  task: Task; onStart: () => void; onStop: () => void;
-}) {
-  const isCompleted = task.status === 'completed';
-  // Completed tasks never count as "running" for display purposes, even if
-  // stale local state still has an active_timer (server already auto-closed
-  // it — see applyPatch in useTaskDashboard). Don't feed useLiveTimer a live
-  // startedAt in that case either, so the displayed time freezes instead of
-  // continuing to tick on a card that shows "Completed".
-  const liveMin = useLiveTimer(isCompleted ? null : task.active_timer?.started_at ?? null);
-  const running = !isCompleted && !!task.active_timer;
-  const totalMin = running ? task.actual_time_min + liveMin : task.actual_time_min;
-  const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
-  const mm = String(Math.floor(totalMin % 60)).padStart(2, '0');
-  const ss = String(Math.floor((totalMin * 60) % 60)).padStart(2, '0');
-  return (
-    <div onClick={running ? onStop : onStart} style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-      <span style={{ fontSize: 17, lineHeight: 1 }}>{running ? '⏳' : '⌛'}</span>
-      <span style={{
-        fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, fontWeight: 600,
-        letterSpacing: '.02em', color: isCompleted ? 'rgba(17,17,17,.35)' : (running ? '#9a7a2e' : '#111'),
-      }}>{hh}:{mm}:{ss}</span>
-    </div>
-  );
-}
 
 const isActive = (t: Task) => t.status !== 'completed' && t.status !== 'archived';
 
@@ -231,29 +207,22 @@ export default function TaskBoardMobile() {
                     <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: '#9a7a2e', marginTop: 3 }}>{task.input_note}</div>
                   )}
                 </div>
-                <MobileTimer task={task} onStart={() => d.startTimer(task.id)} onStop={() => d.stopTimer(task.id)} />
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-                <FieldPopover
-                  trigger={<span style={{
-                    padding: '5px 11px', borderRadius: 20, background: 'rgba(17,17,17,.05)',
-                    font: "600 11.5px 'Inter Tight', sans-serif",
-                    color: task.owner === 'ai' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
-                  }}>{ownerLabel(task.owner)}</span>}
-                  options={KNOWN_OWNERS.map((o) => ({ label: ownerLabel(o), onSelect: () => d.updateOwner(task.id, o) }))}
-                />
-                <FieldPopover
-                  trigger={<span style={{
-                    padding: '5px 11px', borderRadius: 20, background: 'rgba(17,17,17,.05)',
-                    font: "600 11.5px 'Inter Tight', sans-serif",
-                    color: task.category === 'business' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
-                  }}>{CATEGORY_LABELS[task.category]}</span>}
-                  options={[
-                    { label: 'Personal', onSelect: () => d.updateCategory(task.id, 'personal') },
-                    { label: 'Business', onSelect: () => d.updateCategory(task.id, 'business') },
-                  ]}
-                />
+                {/* Blank owner means Brendan — no chip shown at all, only a
+                    named teammate or "ai" is worth a pill here. Tap into
+                    the task detail to set one if it's currently blank. */}
+                {ownerCellLabel(task.owner) && (
+                  <FieldPopover
+                    trigger={<span style={{
+                      padding: '5px 11px', borderRadius: 20, background: 'rgba(17,17,17,.05)',
+                      font: "600 11.5px 'Inter Tight', sans-serif",
+                      color: task.owner === 'ai' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
+                    }}>{ownerCellLabel(task.owner)}</span>}
+                    options={KNOWN_OWNERS.map((o) => ({ label: ownerOptionLabel(o), onSelect: () => d.updateOwner(task.id, o) }))}
+                  />
+                )}
                 <FieldPopover
                   trigger={
                     <span style={{
@@ -284,17 +253,6 @@ export default function TaskBoardMobile() {
                     { label: 'No priority', onSelect: () => d.updatePriority(task.id, false) },
                   ]}
                 />
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid rgba(17,17,17,.06)' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ font: "700 9.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.35)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 5 }}>Expected</div>
-                  <ClockInput size="sm" minutes={task.time_estimate_min ?? 0} onChange={(m) => d.updateExpected(task.id, m)} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ font: "700 9.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.35)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 5 }}>Actual</div>
-                  <ClockInput size="sm" minutes={task.actual_time_min} onChange={(m) => d.updateActual(task.id, m)} />
-                </div>
               </div>
             </div>
           );

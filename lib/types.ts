@@ -27,9 +27,15 @@ export interface Task {
   input_note: string | null; // what's needed from Brendan when needs_input is true
 }
 
-export const KNOWN_OWNERS = ['brendan', 'ai'] as const;
+// '' (blank) means "Brendan" implicitly — his own tasks don't get an owner
+// label at all, only named others (a teammate, or "ai" for Claude/a
+// sub-agent) show up, so the column stays quiet except when it's telling you
+// something. `owner: string` on Task can hold ANY name (e.g. 'azel',
+// 'fahad'), typed via the task detail view — KNOWN_OWNERS is just the quick
+// pick list in the row popover, not an exhaustive/enforced set.
+export const KNOWN_OWNERS = ['', 'ai'] as const;
 export const OWNER_LABELS: Record<string, string> = {
-  brendan: 'Brendan', ai: 'AI',
+  '': 'Brendan', ai: 'AI',
 };
 
 export const CATEGORIES = ['personal', 'business'] as const;
