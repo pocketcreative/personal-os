@@ -68,7 +68,7 @@ export default function TaskBoardDesktop() {
   };
 
   return (
-    <div style={{ maxWidth: 1220, margin: '0 auto', padding: '56px 24px', background: '#f3f1ec' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '56px 24px', background: '#f3f1ec' }}>
       <div style={{ background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10, boxShadow: '0 2px 18px rgba(0,0,0,.05)' }}>
         <div style={{ padding: '40px 44px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 36 }}>
