@@ -4,23 +4,13 @@ import type { PointerEvent } from 'react';
 import { useTaskDashboard } from '@/lib/useTaskDashboard';
 import { reorderByPointerY, type CardRect } from '@/lib/dragReorder';
 import FieldPopover from './FieldPopover';
+import OwnerCell from './OwnerCell';
 import TaskDetailSheet from './TaskDetailSheet';
 import GoalBanner from './GoalBanner';
 import NeedsInputBanner from './NeedsInputBanner';
 import AddTaskInput from './AddTaskInput';
 import type { Task } from '@/lib/types';
-import { STATUS_LABELS, KNOWN_OWNERS, OWNER_LABELS } from '@/lib/types';
-
-// '' (blank) means Brendan — shown as nothing on the card, not the word
-// "Brendan", so the chip only appears when it's actually telling you
-// something (a named teammate, or "ai").
-function ownerCellLabel(owner: string | undefined): string {
-  if (!owner) return '';
-  return OWNER_LABELS[owner] ?? (owner.charAt(0).toUpperCase() + owner.slice(1));
-}
-function ownerOptionLabel(owner: string): string {
-  return OWNER_LABELS[owner] ?? (owner.charAt(0).toUpperCase() + owner.slice(1));
-}
+import { STATUS_LABELS } from '@/lib/types';
 
 const STATUS_DOT: Record<Task['status'], string> = {
   not_started: 'rgba(17,17,17,.3)', in_progress: '#eab308', completed: '#2f9e44', archived: 'rgba(154,122,46,.4)',
@@ -212,19 +202,21 @@ export default function TaskBoardMobile() {
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-                {/* Blank owner means Brendan — no chip shown at all, only a
-                    named teammate or "ai" is worth a pill here. Tap into
-                    the task detail to set one if it's currently blank. */}
-                {ownerCellLabel(task.owner) && (
-                  <FieldPopover
-                    trigger={<span style={{
-                      padding: '5px 11px', borderRadius: 20, background: 'rgba(17,17,17,.05)',
-                      font: "600 11.5px 'Inter Tight', sans-serif",
-                      color: task.owner === 'ai' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
-                    }}>{ownerCellLabel(task.owner)}</span>}
-                    options={KNOWN_OWNERS.map((o) => ({ label: ownerOptionLabel(o), onSelect: () => d.updateOwner(task.id, o) }))}
-                  />
-                )}
+                {/* Blank owner still gets a chip now (a faint "+ owner"),
+                    since it's the tap target for setting one inline — see
+                    OwnerCell. A named teammate or "ai" shows its real
+                    label/color as before. */}
+                <OwnerCell
+                  owner={task.owner}
+                  onChange={(value) => d.updateOwner(task.id, value)}
+                  fullWidth={false}
+                  containerStyle={{ padding: '5px 11px', borderRadius: 20, background: 'rgba(17,17,17,.05)' }}
+                  textStyle={{
+                    font: "600 11.5px 'Inter Tight', sans-serif",
+                    color: task.owner === 'ai' ? '#9a7a2e' : task.owner ? 'rgba(17,17,17,.55)' : 'rgba(17,17,17,.35)',
+                  }}
+                  empty="+ owner"
+                />
                 <FieldPopover
                   trigger={
                     <span style={{

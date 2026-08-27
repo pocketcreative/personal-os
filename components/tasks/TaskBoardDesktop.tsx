@@ -2,26 +2,13 @@
 import { useRef, useState } from 'react';
 import { useTaskDashboard } from '@/lib/useTaskDashboard';
 import FieldPopover from './FieldPopover';
+import OwnerCell from './OwnerCell';
 import TaskDetailModal from './TaskDetailModal';
 import GoalBanner from './GoalBanner';
 import NeedsInputBanner from './NeedsInputBanner';
 import AddTaskInput from './AddTaskInput';
 import type { Task } from '@/lib/types';
-import { STATUS_LABELS, KNOWN_OWNERS, OWNER_LABELS } from '@/lib/types';
-
-// '' (blank) means Brendan — shown as nothing, not the word "Brendan", so
-// the column stays quiet except when it's actually telling you something
-// (a named teammate, or "ai"). Also covers `undefined` defensively, for a
-// moment right after this column ships but before its migration has run.
-function ownerCellLabel(owner: string | undefined): string {
-  if (!owner) return '';
-  return OWNER_LABELS[owner] ?? (owner.charAt(0).toUpperCase() + owner.slice(1));
-}
-// The popover OPTION for the blank value still needs a real label so
-// Brendan knows what selecting it means — that's "Brendan", not blank text.
-function ownerOptionLabel(owner: string): string {
-  return OWNER_LABELS[owner] ?? (owner.charAt(0).toUpperCase() + owner.slice(1));
-}
+import { STATUS_LABELS } from '@/lib/types';
 
 const STATUS_DOT: Record<Task['status'], string> = {
   not_started: 'rgba(17,17,17,.3)', in_progress: '#eab308', completed: '#2f9e44', archived: 'rgba(154,122,46,.4)',
@@ -305,14 +292,13 @@ export default function TaskBoardDesktop() {
                   </div>
 
                   <div {...dropZoneProps} style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                    <FieldPopover
-                      trigger={<span style={{
+                    <OwnerCell
+                      owner={task.owner}
+                      onChange={(value) => d.updateOwner(task.id, value)}
+                      textStyle={{
                         font: "600 12px 'Inter Tight', sans-serif",
                         color: task.owner === 'ai' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
-                      }}>{ownerCellLabel(task.owner)}</span>}
-                      options={KNOWN_OWNERS.map((o) => ({
-                        label: ownerOptionLabel(o), onSelect: () => d.updateOwner(task.id, o),
-                      }))}
+                      }}
                     />
                   </div>
 
