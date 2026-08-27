@@ -39,8 +39,14 @@ export default function RootLayout({
             content's max-content width instead of the viewport, letting
             any sufficiently wide descendant (e.g. a table needing to
             scroll internally) inflate the whole page's width instead of
-            scrolling in place. */}
-        <main className="w-full mx-auto max-w-6xl p-6">{children}</main>
+            scrolling in place.
+
+            No max-width/padding here on purpose (removed 2026-08-27): each
+            page's own board component already sets its own `maxWidth` and
+            padding (Reflections/Ideas/Media all use 1220px, Tasks now wants
+            2200px) — a shared cap here was silently clipping all of them
+            down to 1152px regardless of what they actually asked for. */}
+        <main className="w-full">{children}</main>
         <CaptureBox />
       </body>
     </html>

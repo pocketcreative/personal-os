@@ -47,7 +47,7 @@ function TimerCell({ task, onStart, onStop }: {
   );
 }
 
-const GRID_COLS = '20px 2fr .9fr .8fr 1.1fr .8fr .9fr .9fr 1fr';
+const GRID_COLS = '20px 1.6fr 1.4fr .9fr .8fr 1.1fr .8fr .9fr .9fr 1fr';
 
 export default function TaskBoardDesktop() {
   const d = useTaskDashboard();
@@ -75,7 +75,7 @@ export default function TaskBoardDesktop() {
   };
 
   return (
-    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '56px 24px', background: '#f3f1ec' }}>
+    <div style={{ width: '96%', maxWidth: 2200, margin: '0 auto', padding: '56px 0', background: '#f3f1ec' }}>
       <div style={{ background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10, boxShadow: '0 2px 18px rgba(0,0,0,.05)' }}>
         <div style={{ padding: '40px 44px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 36 }}>
@@ -90,15 +90,22 @@ export default function TaskBoardDesktop() {
 
           <GoalBanner />
 
-          <div style={{
-            display: 'grid', gridTemplateColumns: GRID_COLS,
-            columnGap: 28, borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2,
-          }}>
-            <div />
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase' }}>Task</div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Category</div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Owner</div>
-            <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>
+          {/* Header cells and every task-row's cells are ALL direct children
+              of this one grid (each task row below is a display:contents
+              wrapper, so its 9 cells fall straight into this shared column
+              track instead of forming their own independent grid). That's
+              what guarantees the vertical divider lines land in exactly the
+              same spot on every row regardless of content height — separate
+              per-row grids could round `fr` widths by a sub-pixel or two
+              independently of each other, which is what was causing the
+              misaligned columns. */}
+          <div style={{ display: 'grid', gridTemplateColumns: GRID_COLS, columnGap: 28 }}>
+            <div style={{ borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }} />
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Task</div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Description</div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Category</div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Owner</div>
+            <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>
               <FieldPopover
                 align="left"
                 trigger={
@@ -115,7 +122,7 @@ export default function TaskBoardDesktop() {
                 }))}
               />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>
               <FieldPopover
                 align="left"
                 trigger={
@@ -132,130 +139,158 @@ export default function TaskBoardDesktop() {
                 }))}
               />
             </div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Exp. Time</div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Actual Time</div>
-            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)' }}>Timer</div>
-          </div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Exp. Time</div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Actual Time</div>
+            <div style={{ ...colStyle, display: 'flex', alignItems: 'center', font: "700 13px 'Archivo', sans-serif", color: '#111', letterSpacing: '.02em', textTransform: 'uppercase', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.15)', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 2 }}>Timer</div>
 
-          <AddTaskInput onAdd={d.addTask} />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <AddTaskInput onAdd={d.addTask} />
+            </div>
 
-          {d.tasks.map((task) => {
-            const isCompleted = task.status === 'completed';
-            const draggable = isActive(task);
-            const isDragging = draggedId === task.id;
-            const isDragOver = dragOverId === task.id && draggedId !== task.id;
-            return (
-              <div
-                key={task.id}
-                draggable={draggable}
-                onDragStart={draggable ? () => setDraggedId(task.id) : undefined}
-                onDragOver={draggable ? (e) => { e.preventDefault(); setDragOverId(task.id); } : undefined}
-                onDragLeave={draggable ? () => setDragOverId((cur) => (cur === task.id ? null : cur)) : undefined}
-                onDrop={draggable ? (e) => { e.preventDefault(); handleDrop(task.id); } : undefined}
-                onDragEnd={draggable ? () => { setDraggedId(null); setDragOverId(null); } : undefined}
-                style={{
-                  display: 'grid', gridTemplateColumns: GRID_COLS,
-                  columnGap: 28, borderBottom: '1px solid rgba(17,17,17,.08)',
-                  opacity: isDragging ? 0.4 : 1,
-                  boxShadow: isDragOver ? 'inset 0 2px 0 0 #9a7a2e' : 'none',
-                }}
-              >
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: draggable ? 'grab' : 'default',
-                  color: 'rgba(17,17,17,.25)', fontSize: 14, userSelect: 'none',
-                }}>{draggable ? '⠿' : ''}</div>
+            {d.tasks.map((task) => {
+              const isCompleted = task.status === 'completed';
+              const draggable = isActive(task);
+              const isDragging = draggedId === task.id;
+              const isDragOver = dragOverId === task.id && draggedId !== task.id;
+              const rowVisual = {
+                borderBottom: '1px solid rgba(17,17,17,.08)',
+                opacity: isDragging ? 0.4 : 1,
+                boxShadow: isDragOver ? 'inset 0 2px 0 0 #9a7a2e' : 'none',
+              };
+              return (
                 <div
-                  onClick={() => d.setActiveTaskId(task.id)}
-                  style={{
-                    padding: '18px 0', cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4,
-                  }}
+                  key={task.id}
+                  style={{ display: 'contents' }}
+                  draggable={draggable}
+                  onDragStart={draggable ? () => setDraggedId(task.id) : undefined}
+                  onDragOver={draggable ? (e) => { e.preventDefault(); setDragOverId(task.id); } : undefined}
+                  onDragLeave={draggable ? () => setDragOverId((cur) => (cur === task.id ? null : cur)) : undefined}
+                  onDrop={draggable ? (e) => { e.preventDefault(); handleDrop(task.id); } : undefined}
+                  onDragEnd={draggable ? () => { setDraggedId(null); setDragOverId(null); } : undefined}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{
+                    ...rowVisual,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: draggable ? 'grab' : 'default',
+                    color: 'rgba(17,17,17,.25)', fontSize: 14, userSelect: 'none',
+                  }}>{draggable ? '⠿' : ''}</div>
+                  <div
+                    onClick={() => d.setActiveTaskId(task.id)}
+                    style={{
+                      ...rowVisual,
+                      padding: '18px 0', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center',
+                    }}
+                  >
                     <span style={{
                       font: "500 15px 'Inter Tight', sans-serif",
                       color: isCompleted ? 'rgba(17,17,17,.4)' : '#111',
                       textDecorationLine: isCompleted ? 'line-through' : 'none',
                       textDecorationColor: 'rgba(17,17,17,.25)',
                     }}>{task.title}</span>
-                    {task.needs_input && (
-                      <span title={task.input_note ?? 'Needs your input'} style={{ fontSize: 13, lineHeight: 1 }}>⚠️</span>
-                    )}
                   </div>
-                  {task.needs_input && task.input_note && (
-                    <div style={{ font: "500 12.5px 'Inter Tight', sans-serif", color: '#9a7a2e' }}>{task.input_note}</div>
-                  )}
-                </div>
 
-                <div style={{ padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                  <FieldPopover
-                    trigger={<span style={{
-                      font: "600 12px 'Inter Tight', sans-serif",
-                      color: task.category === 'business' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
-                    }}>{CATEGORY_LABELS[task.category]}</span>}
-                    options={[
-                      { label: 'Personal', onSelect: () => d.updateCategory(task.id, 'personal') },
-                      { label: 'Business', onSelect: () => d.updateCategory(task.id, 'business') },
-                    ]}
-                  />
-                </div>
+                  {/* Description column: a short 2-line preview, click to
+                      open the full task detail (same target as the title).
+                      The ⚠️ badge sits top-right of THIS cell specifically
+                      when the task needs Brendan's input — that's what the
+                      badge is actually about (something to read/decide),
+                      not the task title itself. */}
+                  <div
+                    onClick={() => d.setActiveTaskId(task.id)}
+                    style={{
+                      ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14,
+                      borderLeft: '1px solid rgba(17,17,17,.08)', cursor: 'pointer',
+                      display: 'flex', alignItems: 'flex-start', position: 'relative',
+                    }}
+                  >
+                    {task.needs_input && (
+                      <span
+                        title={task.input_note ?? 'Needs your input'}
+                        style={{ position: 'absolute', top: 10, right: 6, fontSize: 13, lineHeight: 1 }}
+                      >⚠️</span>
+                    )}
+                    <span style={{
+                      font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.65)',
+                      paddingRight: task.needs_input ? 20 : 0,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    }}>
+                      {task.needs_input && task.input_note
+                        ? task.input_note
+                        : (task.description || <span style={{ color: 'rgba(17,17,17,.3)' }}>—</span>)}
+                    </span>
+                  </div>
 
-                <div style={{ padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                  <FieldPopover
-                    trigger={<span style={{
-                      font: "600 12px 'Inter Tight', sans-serif",
-                      color: task.owner === 'ai' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
-                    }}>{ownerLabel(task.owner)}</span>}
-                    options={KNOWN_OWNERS.map((o) => ({
-                      label: ownerLabel(o), onSelect: () => d.updateOwner(task.id, o),
-                    }))}
-                  />
-                </div>
+                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                    <FieldPopover
+                      trigger={<span style={{
+                        font: "600 12px 'Inter Tight', sans-serif",
+                        color: task.category === 'business' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
+                      }}>{CATEGORY_LABELS[task.category]}</span>}
+                      options={[
+                        { label: 'Personal', onSelect: () => d.updateCategory(task.id, 'personal') },
+                        { label: 'Business', onSelect: () => d.updateCategory(task.id, 'business') },
+                      ]}
+                    />
+                  </div>
 
-                <div style={{ padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                  <FieldPopover
-                    trigger={
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: "600 12px 'Inter Tight', sans-serif", color: STATUS_TEXT[task.status] }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_DOT[task.status] }} />
-                        {STATUS_LABELS[task.status]}
-                      </span>
-                    }
-                    options={[
-                      { label: 'Not started', onSelect: () => d.updateStatus(task.id, 'not_started') },
-                      { label: 'In progress', onSelect: () => d.updateStatus(task.id, 'in_progress') },
-                      { label: 'Completed', onSelect: () => d.updateStatus(task.id, 'completed') },
-                      { label: 'Archived', onSelect: () => d.updateStatus(task.id, 'archived') },
-                    ]}
-                  />
-                </div>
+                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                    <FieldPopover
+                      trigger={<span style={{
+                        font: "600 12px 'Inter Tight', sans-serif",
+                        color: task.owner === 'ai' ? '#9a7a2e' : 'rgba(17,17,17,.55)',
+                      }}>{ownerLabel(task.owner)}</span>}
+                      options={KNOWN_OWNERS.map((o) => ({
+                        label: ownerLabel(o), onSelect: () => d.updateOwner(task.id, o),
+                      }))}
+                    />
+                  </div>
 
-                <div style={{ padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                  <FieldPopover
-                    trigger={
-                      task.key
-                        ? <span style={{ font: "700 11px 'Inter Tight', sans-serif", color: '#9a7a2e', background: 'rgba(198,161,91,.14)', padding: '4px 9px', borderRadius: 20, letterSpacing: '.03em' }}>TODAY</span>
-                        : <span style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.3)' }}>—</span>
-                    }
-                    options={[
-                      { label: 'Today', onSelect: () => d.updatePriority(task.id, true) },
-                      { label: '—', onSelect: () => d.updatePriority(task.id, false) },
-                    ]}
-                  />
-                </div>
+                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                    <FieldPopover
+                      trigger={
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: "600 12px 'Inter Tight', sans-serif", color: STATUS_TEXT[task.status] }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_DOT[task.status] }} />
+                          {STATUS_LABELS[task.status]}
+                        </span>
+                      }
+                      options={[
+                        { label: 'Not started', onSelect: () => d.updateStatus(task.id, 'not_started') },
+                        { label: 'In progress', onSelect: () => d.updateStatus(task.id, 'in_progress') },
+                        { label: 'Completed', onSelect: () => d.updateStatus(task.id, 'completed') },
+                        { label: 'Archived', onSelect: () => d.updateStatus(task.id, 'archived') },
+                      ]}
+                    />
+                  </div>
 
-                <div style={{ padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                  <ClockInput minutes={task.time_estimate_min ?? 0} onChange={(m) => d.updateExpected(task.id, m)} />
+                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                    <FieldPopover
+                      trigger={
+                        task.key
+                          ? <span style={{ font: "700 11px 'Inter Tight', sans-serif", color: '#9a7a2e', background: 'rgba(198,161,91,.14)', padding: '4px 9px', borderRadius: 20, letterSpacing: '.03em' }}>TODAY</span>
+                          : <span style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.3)' }}>—</span>
+                      }
+                      options={[
+                        { label: 'Today', onSelect: () => d.updatePriority(task.id, true) },
+                        { label: '—', onSelect: () => d.updatePriority(task.id, false) },
+                      ]}
+                    />
+                  </div>
+
+                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                    <ClockInput minutes={task.time_estimate_min ?? 0} onChange={(m) => d.updateExpected(task.id, m)} />
+                  </div>
+                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                    <ClockInput minutes={task.actual_time_min} onChange={(m) => d.updateActual(task.id, m)} />
+                  </div>
+                  <div style={{ ...rowVisual, padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
+                    <TimerCell task={task} onStart={() => d.startTimer(task.id)} onStop={() => d.stopTimer(task.id)} />
+                  </div>
                 </div>
-                <div style={{ padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                  <ClockInput minutes={task.actual_time_min} onChange={(m) => d.updateActual(task.id, m)} />
-                </div>
-                <div style={{ padding: '14px 0', marginLeft: -14, paddingLeft: 14, borderLeft: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center' }}>
-                  <TimerCell task={task} onStart={() => d.startTimer(task.id)} onStop={() => d.stopTimer(task.id)} />
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
         <div style={{ height: 32 }} />
       </div>
