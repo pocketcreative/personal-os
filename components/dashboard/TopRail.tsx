@@ -8,6 +8,7 @@ const TABS = [
   { href: '/reflections', label: 'Reflections' },
   { href: '/ideas', label: 'Ideas' },
   { href: '/media', label: 'Media' },
+  { href: '/data', label: 'Data' },
 ];
 
 export default function TopRail() {
@@ -30,6 +31,7 @@ export default function TopRail() {
   }, []);
   return (
     <nav
+      id="app-top-rail"
       className="flex items-center justify-between px-6 py-3"
       style={{ background: 'var(--ink-1)', borderBottom: '1px solid var(--ink-2)' }}
     >
