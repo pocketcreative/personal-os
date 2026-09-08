@@ -47,3 +47,84 @@ body {
     gap: 4px;
   }
 }
+
+/* Content piece detail modal -- a Frame.io-style review layout: a wide panel
+   with the video/metadata on the left and a comment thread pinned full-height
+   on the right, each side scrolling independently. Below 640px (same single
+   breakpoint the rest of the app uses) it collapses to one stacked column,
+   the whole panel scrolling as one, matching Frame.io's own mobile app. */
+.content-modal {
+  display: flex;
+  flex-direction: column;
+  width: 92vw;
+  max-width: 1360px;
+  height: 86vh;
+  max-height: 920px;
+  overflow: hidden;
+}
+.content-modal-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.content-modal-left {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+.content-modal-right {
+  flex: 0 0 380px;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid rgba(17, 17, 17, .08);
+}
+@media (max-width: 640px) {
+  .content-modal {
+    width: 100%;
+    height: 94vh;
+    max-height: none;
+    border-radius: 10px;
+  }
+  .content-modal-body {
+    flex-direction: column;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .content-modal-left {
+    overflow-y: visible;
+  }
+  .content-modal-right {
+    flex: 0 0 auto;
+    overflow: visible;
+    border-left: none;
+    border-top: 1px solid rgba(17, 17, 17, .08);
+  }
+}
+
+/* CommentsPanel's own internal layout: header pinned top, thread scrolls in
+   the middle, composer pinned bottom -- only actually pins on desktop, where
+   the parent .content-modal-right gives it a fixed height to fill. On mobile
+   the parent goes height:auto and this falls back to plain stacked flow. */
+.comments-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.comments-panel-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+@media (max-width: 640px) {
+  .comments-panel {
+    height: auto;
+  }
+  .comments-panel-list {
+    flex: 0 0 auto;
+    overflow-y: visible;
+  }
+}

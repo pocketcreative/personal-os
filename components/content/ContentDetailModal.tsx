@@ -89,8 +89,8 @@ function CommentsPanel({ pieceId, onCountsChange, labelStyle, fieldStyle }: {
   };
 
   return (
-    <div style={{ borderTop: '1px solid rgba(17,17,17,.08)', paddingTop: 20, marginBottom: 4 }}>
-      <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+    <div className="comments-panel" style={{ padding: 20 }}>
+      <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: '0 0 auto' }}>
         Comments
         <span style={{ color: 'rgba(17,17,17,.3)' }}>{comments.length}</span>
         {unresolved > 0 && (
@@ -98,48 +98,52 @@ function CommentsPanel({ pieceId, onCountsChange, labelStyle, fieldStyle }: {
         )}
       </div>
 
-      {loading ? (
-        <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', padding: '6px 0 12px' }}>
-          Loading…
-        </div>
-      ) : comments.length === 0 ? (
-        <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', padding: '6px 0 12px' }}>
-          No notes on this one yet.
-        </div>
-      ) : (
-        <div style={{ marginBottom: 12 }}>
-          {comments.map((c) => (
-            <CommentRow
-              key={c.id}
-              comment={c}
-              onToggleResolved={() => setResolved(c.id, !c.resolved)}
-              onDelete={() => deleteComment(c.id)}
-            />
-          ))}
-        </div>
-      )}
+      <div className="comments-panel-list" style={{ marginTop: 6 }}>
+        {loading ? (
+          <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', padding: '6px 0 12px' }}>
+            Loading…
+          </div>
+        ) : comments.length === 0 ? (
+          <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', padding: '6px 0 12px' }}>
+            No notes on this one yet.
+          </div>
+        ) : (
+          <div>
+            {comments.map((c) => (
+              <CommentRow
+                key={c.id}
+                comment={c}
+                onToggleResolved={() => setResolved(c.id, !c.resolved)}
+                onDelete={() => deleteComment(c.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
-      <textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder="What needs changing…"
-        style={{ ...fieldStyle, minHeight: 70, lineHeight: 1.45, resize: 'vertical', marginBottom: 8 }}
-      />
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <input
-          value={ts}
-          onChange={(e) => setTs(e.target.value)}
-          placeholder="0:42 (optional)"
-          style={{ ...fieldStyle, flex: '0 0 150px', width: 150 }}
+      <div style={{ flex: '0 0 auto', borderTop: '1px solid rgba(17,17,17,.08)', paddingTop: 14, marginTop: 8 }}>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="What needs changing…"
+          style={{ ...fieldStyle, minHeight: 70, lineHeight: 1.45, resize: 'vertical', marginBottom: 8 }}
         />
-        <span style={{ flex: 1 }} />
-        <button
-          onClick={submit}
-          style={{
-            font: "600 13px 'Inter Tight', sans-serif", color: '#fff', background: '#111',
-            border: 'none', borderRadius: 7, padding: '10px 18px', cursor: 'pointer',
-          }}
-        >Comment</button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input
+            value={ts}
+            onChange={(e) => setTs(e.target.value)}
+            placeholder="0:42 (optional)"
+            style={{ ...fieldStyle, flex: '0 0 120px', width: 120 }}
+          />
+          <span style={{ flex: 1 }} />
+          <button
+            onClick={submit}
+            style={{
+              font: "600 13px 'Inter Tight', sans-serif", color: '#fff', background: '#111',
+              border: 'none', borderRadius: 7, padding: '10px 18px', cursor: 'pointer',
+            }}
+          >Comment</button>
+        </div>
       </div>
     </div>
   );
@@ -209,12 +213,15 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        className="content-modal"
         style={{
-          background: '#fbfaf7', borderRadius: 12, width: 560, maxWidth: '100%',
-          maxHeight: '86vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.25)',
+          background: '#fbfaf7', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,.25)',
         }}
       >
-        <div style={{ padding: '32px 32px 8px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+        <div style={{
+          flex: '0 0 auto', padding: '24px 32px', display: 'flex', alignItems: 'flex-start',
+          justifyContent: 'space-between', gap: 16, borderBottom: '1px solid rgba(17,17,17,.08)',
+        }}>
           <textarea
             ref={titleRef}
             value={title} onChange={(e) => setTitle(e.target.value)}
@@ -228,7 +235,27 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
           <span onClick={done} style={{ cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 18, padding: 4 }}>✕</span>
         </div>
 
-        <div style={{ padding: '8px 32px 0' }}>
+        <div className="content-modal-body">
+        <div className="content-modal-left" style={{ padding: '24px 32px' }}>
+          {/* Player leads the left column, Frame.io-style -- the thing being
+              reviewed comes before the fields describing it. */}
+          {videoLink && (
+            /* A Google Drive /preview URL renders Drive's own player inside
+               the frame, controls included, so there's nothing to rebuild
+               here. Any other embeddable video URL behaves the same way. */
+            <iframe
+              src={videoLink}
+              allow="autoplay"
+              style={{
+                width: '100%', maxWidth: 360, aspectRatio: '9 / 16', border: 'none',
+                borderRadius: 8, background: '#111', marginBottom: 20, display: 'block',
+              }}
+            />
+          )}
+
+          <div style={labelStyle}>Video Link</div>
+          <input value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="https://drive.google.com/file/d/…/preview" style={{ ...fieldStyle, marginBottom: 20 }} />
+
           <div style={labelStyle}>Visual Hook</div>
           <input value={visualHook} onChange={(e) => setVisualHook(e.target.value)} placeholder="The opening shot / line…" style={{ ...fieldStyle, marginBottom: 20 }} />
 
@@ -255,22 +282,6 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
           <div style={labelStyle}>Platform</div>
           <input value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder="IG, TikTok, YouTube…" style={{ ...fieldStyle, marginBottom: 20 }} />
 
-          <div style={labelStyle}>Video Link</div>
-          <input value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="https://drive.google.com/file/d/…/preview" style={{ ...fieldStyle, marginBottom: videoLink ? 12 : 20 }} />
-          {videoLink && (
-            /* A Google Drive /preview URL renders Drive's own player inside
-               the frame, controls included, so there's nothing to rebuild
-               here. Any other embeddable video URL behaves the same way. */
-            <iframe
-              src={videoLink}
-              allow="autoplay"
-              style={{
-                width: '100%', aspectRatio: '9 / 16', border: 'none',
-                borderRadius: 8, background: '#111', marginBottom: 20, display: 'block',
-              }}
-            />
-          )}
-
           <div style={labelStyle}>Posted Link</div>
           <input value={postedLink} onChange={(e) => setPostedLink(e.target.value)} placeholder="https://instagram.com/… (once it's live)" style={{ ...fieldStyle, marginBottom: 20 }} />
 
@@ -288,9 +299,11 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
           <textarea
             value={transcript} onChange={(e) => setTranscript(e.target.value)}
             placeholder="What was actually said in the finished video…"
-            style={{ ...fieldStyle, minHeight: 140, lineHeight: 1.5, resize: 'vertical', marginBottom: 24 }}
+            style={{ ...fieldStyle, minHeight: 140, lineHeight: 1.5, resize: 'vertical' }}
           />
+        </div>
 
+        <div className="content-modal-right">
           <CommentsPanel
             pieceId={piece.id}
             onCountsChange={onCommentCountsChange}
@@ -298,8 +311,9 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
             fieldStyle={fieldStyle}
           />
         </div>
+        </div>
 
-        <div style={{ padding: '20px 32px', borderTop: '1px solid rgba(17,17,17,.08)', display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ flex: '0 0 auto', padding: '18px 32px', borderTop: '1px solid rgba(17,17,17,.08)', display: 'flex', justifyContent: 'space-between' }}>
           <button
             onClick={() => { if (confirm(`Delete "${piece.title}"? This can't be undone.`)) onDelete(); }}
             style={{
