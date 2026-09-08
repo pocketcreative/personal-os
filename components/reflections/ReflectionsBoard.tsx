@@ -208,10 +208,10 @@ export default function ReflectionsBoard() {
   const visibleEntries = data ? data.entries.filter((e) => matchesSearch(e, query)) : [];
 
   return (
-    <div style={{ maxWidth: 1220, margin: '0 auto', padding: 'clamp(24px, 6vw, 56px) clamp(12px, 2vw, 24px)', background: '#f3f1ec' }}>
+    <div style={{ maxWidth: 1220, margin: '0 auto', padding: 'clamp(24px, 6vw, 56px) clamp(18px, 2vw, 24px)', background: '#f3f1ec' }}>
       <div style={{
         background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
-        boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: 'clamp(20px, 5vw, 40px) clamp(12px, 3vw, 44px) 28px',
+        boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: 'clamp(20px, 5vw, 40px) clamp(18px, 3vw, 44px) 28px',
       }}>
         <div className="board-header">
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Reflections</div>
