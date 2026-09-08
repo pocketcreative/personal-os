@@ -429,6 +429,22 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
     border: 'none', borderRadius: 7, padding: '10px 16px', cursor: 'pointer',
   });
 
+  // LTS-format pieces (and possibly others) only ever have a transcript, never
+  // a written script -- so a piece with content in just one of the two only
+  // needs that one field on screen. Both render when both actually have
+  // content (a long-form piece can have a written script that was then
+  // recorded slightly differently). When neither has content yet, Script
+  // stays as the one empty field so there's still somewhere to type a draft.
+  const hasScript = script.trim().length > 0;
+  const hasTranscript = transcript.trim().length > 0;
+  const showScript = hasScript || !hasTranscript;
+  const showTranscript = hasTranscript;
+
+  // Raw Footage Link is only useful when it's an actual clickable URL --
+  // some pieces have a local Mac file path in this field instead, which is
+  // dead weight to show on a page someone's browsing from their phone.
+  const showRawFootageLink = /^https?:\/\//i.test(rawFootageLink.trim());
+
   return (
     <div
       onClick={done}
@@ -543,22 +559,34 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
             <div style={labelStyle}>Posted Link</div>
             <input value={postedLink} onChange={(e) => setPostedLink(e.target.value)} placeholder="https://instagram.com/… (once it's live)" style={{ ...fieldStyle, marginBottom: 20 }} />
 
-            <div style={labelStyle}>Raw Footage Link</div>
-            <input value={rawFootageLink} onChange={(e) => setRawFootageLink(e.target.value)} placeholder="https://…" style={{ ...fieldStyle, marginBottom: 20 }} />
+            {showRawFootageLink && (
+              <>
+                <div style={labelStyle}>Raw Footage Link</div>
+                <input value={rawFootageLink} onChange={(e) => setRawFootageLink(e.target.value)} placeholder="https://…" style={{ ...fieldStyle, marginBottom: 20 }} />
+              </>
+            )}
 
-            <div style={labelStyle}>Script</div>
-            <textarea
-              value={script} onChange={(e) => setScript(e.target.value)}
-              placeholder="Full script goes here…"
-              style={{ ...fieldStyle, minHeight: 200, lineHeight: 1.5, resize: 'vertical', marginBottom: 20 }}
-            />
+            {showScript && (
+              <>
+                <div style={labelStyle}>Script</div>
+                <textarea
+                  value={script} onChange={(e) => setScript(e.target.value)}
+                  placeholder="Full script goes here…"
+                  style={{ ...fieldStyle, minHeight: 200, lineHeight: 1.5, resize: 'vertical', marginBottom: 20 }}
+                />
+              </>
+            )}
 
-            <div style={labelStyle}>Transcript</div>
-            <textarea
-              value={transcript} onChange={(e) => setTranscript(e.target.value)}
-              placeholder="What was actually said in the finished video…"
-              style={{ ...fieldStyle, minHeight: 140, lineHeight: 1.5, resize: 'vertical' }}
-            />
+            {showTranscript && (
+              <>
+                <div style={labelStyle}>Transcript</div>
+                <textarea
+                  value={transcript} onChange={(e) => setTranscript(e.target.value)}
+                  placeholder="What was actually said in the finished video…"
+                  style={{ ...fieldStyle, minHeight: 140, lineHeight: 1.5, resize: 'vertical' }}
+                />
+              </>
+            )}
           </div>
         </div>
 
