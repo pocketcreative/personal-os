@@ -16,10 +16,25 @@ function parseTimestamp(raw: string): number | null {
   return Number.isFinite(seconds) ? seconds : null;
 }
 
+// mm:ss under an hour, h:mm:ss past it. Rounds to the nearest whole second
+// on the total first, then derives h/m/s from that integer -- rounding each
+// unit separately (the previous version rounded seconds against the raw
+// fractional input) could land on "0:60" for anything at 59.5s or later.
 function formatTimestamp(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
+  const total = Math.max(0, Math.round(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// Pulls the Drive file id out of a "/file/d/<id>/..." link (the shape both
+// the /preview embed and the plain "view" URL share). Null for anything else
+// -- a non-Drive URL Brendan pasted by hand, most likely.
+function driveFileId(link: string): string | null {
+  const match = link.match(/\/file\/d\/([^/]+)\//);
+  return match ? match[1] : null;
 }
 
 // The /preview embed URL only renders reliably when the viewing session is
@@ -28,12 +43,135 @@ function formatTimestamp(seconds: number): string {
 // plain Drive "view" URL as a fallback link so there's always a way to open
 // the file directly. Falls back to the raw link for any non-Drive URL.
 function driveViewUrl(link: string): string {
-  const match = link.match(/\/file\/d\/([^/]+)\//);
-  return match ? `https://drive.google.com/file/d/${match[1]}/view` : link;
+  const id = driveFileId(link);
+  return id ? `https://drive.google.com/file/d/${id}/view` : link;
 }
 
-function CommentRow({ comment, onToggleResolved, onDelete }: {
+// The real player src: our own streaming proxy (app/api/media/[fileId]/stream)
+// so the browser gets a native <video> element we fully control instead of
+// Drive's opaque iframe player, while the file itself stays hosted on Drive.
+// Falls back to using the raw link directly as a best-effort <video> src for
+// any non-Drive URL Brendan might have pasted by hand.
+function streamSrc(link: string): string {
+  const id = driveFileId(link);
+  return id ? `/api/media/${id}/stream` : link;
+}
+
+// Frame.io-style native player: real <video> element, a custom control bar
+// (play/pause, time readout, scrubber), and a marker on the scrubber for
+// every comment that has a timestamp. Owns the <video> element itself but
+// reports playback position up via onTimeUpdate so the comment composer
+// (rendered elsewhere in the tree) can read the current second without this
+// component needing to know anything about comments beyond their markers.
+function VideoPlayer({ src, videoRef, markers, onTimeUpdate, onMarkerClick }: {
+  src: string;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  markers: { id: string; timestamp: number }[];
+  onTimeUpdate: (seconds: number) => void;
+  onMarkerClick: (commentId: string) => void;
+}) {
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Guards the division-by-zero window before metadata has loaded (duration
+  // starts at 0, and some streamed sources briefly report Infinity).
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const progressPct = safeDuration > 0 ? Math.min(100, (currentTime / safeDuration) * 100) : 0;
+
+  function togglePlay() {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) video.play(); else video.pause();
+  }
+
+  function seekFromClientX(clientX: number, track: HTMLDivElement) {
+    const video = videoRef.current;
+    if (!video || safeDuration <= 0) return;
+    const rect = track.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    video.currentTime = frac * safeDuration;
+  }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 360, borderRadius: 8, overflow: 'hidden', background: '#111' }}>
+      <video
+        ref={videoRef}
+        src={src}
+        playsInline
+        onClick={togglePlay}
+        style={{ width: '100%', aspectRatio: '9 / 16', display: 'block', background: '#111', cursor: 'pointer' }}
+        onTimeUpdate={(e) => {
+          const t = e.currentTarget.currentTime;
+          setCurrentTime(t);
+          onTimeUpdate(t);
+        }}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        onDurationChange={(e) => setDuration(e.currentTarget.duration)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => setIsPlaying(false)}
+      />
+
+      <div style={{ padding: '10px 12px 12px' }}>
+        {/* Taller click target than the visible track so the scrubber is
+            easy to tap on mobile without the bar itself looking thick. */}
+        <div
+          onClick={(e) => seekFromClientX(e.clientX, e.currentTarget)}
+          style={{ position: 'relative', height: 14, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+        >
+          <div style={{ position: 'relative', width: '100%', height: 4, borderRadius: 999, background: 'rgba(255,255,255,.18)' }}>
+            <div style={{
+              position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 999,
+              width: `${progressPct}%`, background: '#024ADD',
+            }} />
+            {safeDuration > 0 && markers.map((m) => (
+              <div
+                key={m.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const video = videoRef.current;
+                  if (video) video.currentTime = m.timestamp;
+                  onMarkerClick(m.id);
+                }}
+                title={formatTimestamp(m.timestamp)}
+                style={{
+                  position: 'absolute', top: '50%',
+                  left: `${Math.min(100, Math.max(0, (m.timestamp / safeDuration) * 100))}%`,
+                  width: 9, height: 9, borderRadius: '50%', background: '#E2B246',
+                  border: '1.5px solid #111', transform: 'translate(-50%, -50%)',
+                  cursor: 'pointer', zIndex: 2,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
+          <button
+            type="button"
+            onClick={togglePlay}
+            style={{
+              flex: '0 0 auto', width: 28, height: 28, borderRadius: '50%', border: 'none',
+              background: 'rgba(255,255,255,.14)', color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11,
+            }}
+          >
+            {isPlaying ? '❚❚' : '▶'}
+          </button>
+          <span style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(255,255,255,.75)', letterSpacing: '.01em' }}>
+            {formatTimestamp(currentTime)} / {formatTimestamp(safeDuration)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CommentRow({ comment, highlighted, onToggleResolved, onDelete }: {
   comment: ContentComment;
+  highlighted: boolean;
   onToggleResolved: () => void;
   onDelete: () => void;
 }) {
@@ -41,10 +179,16 @@ function CommentRow({ comment, onToggleResolved, onDelete }: {
   // written by an agent reads the same way in both places.
   const isAgent = /agent|^ai$/i.test(comment.author);
   return (
-    <div style={{
-      padding: '10px 0', borderTop: '1px solid rgba(17,17,17,.07)',
-      opacity: comment.resolved ? 0.45 : 1,
-    }}>
+    <div
+      id={`comment-${comment.id}`}
+      style={{
+        padding: '10px 8px', margin: '0 -8px', borderRadius: 6,
+        borderTop: '1px solid rgba(17,17,17,.07)',
+        opacity: comment.resolved ? 0.45 : 1,
+        background: highlighted ? 'rgba(2,74,221,.08)' : 'transparent',
+        transition: 'background-color .5s ease',
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
         <span style={{
           font: "600 11px 'Inter Tight', sans-serif",
@@ -78,14 +222,23 @@ function CommentRow({ comment, onToggleResolved, onDelete }: {
 
 // The review loop. Notes left here are what the next reel-editor / reel-cutter
 // pass gets briefed from, and any unresolved one is what puts the "Needs
-// re-edit" badge on the card.
-function CommentsPanel({ pieceId, onCountsChange, labelStyle, fieldStyle }: {
-  pieceId: string;
-  onCountsChange?: (total: number, unresolved: number) => void;
+// re-edit" badge on the card. Comments themselves are owned one level up (in
+// ContentDetailModal) since the video player's scrubber markers need the
+// same list -- this component is the presentational thread + composer.
+function CommentsPanel({
+  comments, loading, addComment, setResolved, deleteComment,
+  labelStyle, fieldStyle, highlightedCommentId, currentSecondRef,
+}: {
+  comments: ContentComment[];
+  loading: boolean;
+  addComment: (body: string, videoTimestampSeconds: number | null) => void;
+  setResolved: (commentId: string, resolved: boolean) => void;
+  deleteComment: (commentId: string) => void;
   labelStyle: React.CSSProperties;
   fieldStyle: React.CSSProperties;
+  highlightedCommentId: string | null;
+  currentSecondRef: React.RefObject<number>;
 }) {
-  const { comments, loading, addComment, setResolved, deleteComment } = useContentComments(pieceId, onCountsChange);
   const [draft, setDraft] = useState('');
   const [ts, setTs] = useState('');
   const unresolved = comments.filter((c) => !c.resolved).length;
@@ -96,6 +249,14 @@ function CommentsPanel({ pieceId, onCountsChange, labelStyle, fieldStyle }: {
     addComment(body, parseTimestamp(ts));
     setDraft('');
     setTs('');
+  };
+
+  // Auto-fills the timecode with the video's current playback second the
+  // moment the user starts writing a note -- but only while the field is
+  // still untouched, so it never overwrites something they already typed.
+  const autofillTimestamp = () => {
+    if (ts.trim()) return;
+    setTs(formatTimestamp(Math.floor(currentSecondRef.current)));
   };
 
   return (
@@ -123,6 +284,7 @@ function CommentsPanel({ pieceId, onCountsChange, labelStyle, fieldStyle }: {
               <CommentRow
                 key={c.id}
                 comment={c}
+                highlighted={c.id === highlightedCommentId}
                 onToggleResolved={() => setResolved(c.id, !c.resolved)}
                 onDelete={() => deleteComment(c.id)}
               />
@@ -135,6 +297,7 @@ function CommentsPanel({ pieceId, onCountsChange, labelStyle, fieldStyle }: {
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onFocus={autofillTimestamp}
           placeholder="What needs changing…"
           style={{ ...fieldStyle, minHeight: 70, lineHeight: 1.45, resize: 'vertical', marginBottom: 8 }}
         />
@@ -142,6 +305,7 @@ function CommentsPanel({ pieceId, onCountsChange, labelStyle, fieldStyle }: {
           <input
             value={ts}
             onChange={(e) => setTs(e.target.value)}
+            onFocus={autofillTimestamp}
             placeholder="0:42 (optional)"
             style={{ ...fieldStyle, flex: '0 0 120px', width: 120 }}
           />
@@ -183,6 +347,47 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
   // See .content-modal-tabs / .content-modal-tab-hidden in globals.css.
   const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details');
   const [commentCounts, setCommentCounts] = useState({ total: 0, unresolved: 0 });
+
+  // Comments live here, not inside CommentsPanel, because the video player's
+  // scrubber markers need the same list. currentSecondRef is a ref rather
+  // than state deliberately: the <video> timeupdate event fires several
+  // times a second, and nothing outside the player itself needs to re-render
+  // on every tick -- the comment composer only reads the ref's current value
+  // once, at the moment the user focuses it.
+  const { comments, loading: commentsLoading, addComment, setResolved, deleteComment } = useContentComments(
+    piece.id,
+    (total, unresolved) => { setCommentCounts({ total, unresolved }); onCommentCountsChange?.(total, unresolved); },
+  );
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const currentSecondRef = useRef(0);
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const markerComments = comments
+    .filter((c): c is ContentComment & { video_timestamp_seconds: number } => c.video_timestamp_seconds != null)
+    .map((c) => ({ id: c.id, timestamp: c.video_timestamp_seconds }));
+
+  function handleMarkerClick(commentId: string) {
+    // Switching to the Comments tab is a no-op on desktop (both columns are
+    // already visible there) but on mobile it's the only way the highlighted
+    // row is actually on screen to scroll to.
+    setActiveTab('comments');
+    setHighlightedCommentId(commentId);
+    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    highlightTimeoutRef.current = setTimeout(() => setHighlightedCommentId(null), 1800);
+  }
+
+  useEffect(() => {
+    if (!highlightedCommentId) return;
+    // Runs after the tab-switch render above has committed, so the row is
+    // actually in the (visible) DOM by the time this looks for it.
+    const el = document.getElementById(`comment-${highlightedCommentId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightedCommentId]);
+
+  useEffect(() => () => {
+    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+  }, []);
 
   useEffect(() => {
     const el = titleRef.current;
@@ -264,24 +469,20 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               stays above the Details/Comments tabs below, always visible
               either way since it's the primary content. */}
           {videoLink && (
-            /* A Google Drive /preview URL renders Drive's own player inside
-               the frame, controls included, so there's nothing to rebuild
-               here. Any other embeddable video URL behaves the same way. */
-            <iframe
-              src={videoLink}
-              allow="autoplay"
-              style={{
-                width: '100%', maxWidth: 360, aspectRatio: '9 / 16', border: 'none',
-                borderRadius: 8, background: '#111', display: 'block',
-              }}
+            <VideoPlayer
+              src={streamSrc(videoLink)}
+              videoRef={videoRef}
+              markers={markerComments}
+              onTimeUpdate={(t) => { currentSecondRef.current = t; }}
+              onMarkerClick={handleMarkerClick}
             />
           )}
 
           {videoLink && (
-            // Resilience fallback, not the real fix: the /preview embed can
-            // hit a Google cookie-consent wall on mobile Safari when the
-            // file isn't shared "Anyone with the link" (a Drive sharing fix
-            // happening separately). This always gives a way to watch it.
+            // Resilience fallback, not the real fix: if the streaming proxy
+            // ever fails to load (auth hiccup, a file the service account
+            // hasn't been individually shared on yet, etc.) this always gives
+            // a way to watch it directly on Drive instead.
             <a
               href={driveViewUrl(videoLink)}
               target="_blank"
@@ -363,13 +564,15 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
 
         <div className={`content-modal-right${activeTab === 'details' ? ' content-modal-tab-hidden' : ''}`}>
           <CommentsPanel
-            pieceId={piece.id}
-            onCountsChange={(total, unresolved) => {
-              setCommentCounts({ total, unresolved });
-              onCommentCountsChange?.(total, unresolved);
-            }}
+            comments={comments}
+            loading={commentsLoading}
+            addComment={addComment}
+            setResolved={setResolved}
+            deleteComment={deleteComment}
             labelStyle={labelStyle}
             fieldStyle={fieldStyle}
+            highlightedCommentId={highlightedCommentId}
+            currentSecondRef={currentSecondRef}
           />
         </div>
         </div>
