@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { ContentComment, ContentFormat, ContentPiece } from '@/lib/types';
-import { CONTENT_FORMATS, CONTENT_FORMAT_LABELS } from '@/lib/types';
+import { CONTENT_FORMATS, CONTENT_FORMAT_LABELS, CONTENT_STATUSES, CONTENT_STATUS_LABELS } from '@/lib/types';
 import { useContentComments } from '@/lib/useContentComments';
 
 // Accepts either "1:42" or a plain "102". Returns null for blank or
@@ -331,6 +331,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
   onCommentCountsChange?: (total: number, unresolved: number) => void;
 }) {
   const [title, setTitle] = useState(piece.title);
+  const [status, setStatus] = useState<ContentPiece['status']>(piece.status);
   const [visualHook, setVisualHook] = useState(piece.visual_hook ?? '');
   const [script, setScript] = useState(piece.script ?? '');
   const [transcript, setTranscript] = useState(piece.transcript ?? '');
@@ -399,6 +400,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
   function done() {
     const patch: Partial<ContentPiece> = {};
     if (title !== piece.title) patch.title = title;
+    if (status !== piece.status) patch.status = status;
     if (visualHook !== (piece.visual_hook ?? '')) patch.visual_hook = visualHook || null;
     if (script !== (piece.script ?? '')) patch.script = script || null;
     if (transcript !== (piece.transcript ?? '')) patch.transcript = transcript || null;
@@ -527,6 +529,21 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
           </div>
 
           <div className={`content-modal-details${activeTab === 'comments' ? ' content-modal-tab-hidden' : ''}`}>
+            {/* Only way to change stage besides dragging a card between board
+                columns -- native HTML5 drag-and-drop doesn't work on mobile
+                touch browsers at all, so this select is the only path to
+                changing status from a phone. */}
+            <div style={labelStyle}>Status</div>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as ContentPiece['status'])}
+              style={{ ...fieldStyle, marginBottom: 20 }}
+            >
+              {CONTENT_STATUSES.map((s) => (
+                <option key={s} value={s}>{CONTENT_STATUS_LABELS[s]}</option>
+              ))}
+            </select>
+
             <div style={labelStyle}>Video Link</div>
             <input value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="https://drive.google.com/file/d/…/preview" style={{ ...fieldStyle, marginBottom: 20 }} />
 
