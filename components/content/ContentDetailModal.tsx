@@ -22,6 +22,16 @@ function formatTimestamp(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// The /preview embed URL only renders reliably when the viewing session is
+// authenticated as the file's owner -- on mobile Safari without that, it can
+// show Google's cookie-consent wall or just fail to load. This derives the
+// plain Drive "view" URL as a fallback link so there's always a way to open
+// the file directly. Falls back to the raw link for any non-Drive URL.
+function driveViewUrl(link: string): string {
+  const match = link.match(/\/file\/d\/([^/]+)\//);
+  return match ? `https://drive.google.com/file/d/${match[1]}/view` : link;
+}
+
 function CommentRow({ comment, onToggleResolved, onDelete }: {
   comment: ContentComment;
   onToggleResolved: () => void;
@@ -248,9 +258,27 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               allow="autoplay"
               style={{
                 width: '100%', maxWidth: 360, aspectRatio: '9 / 16', border: 'none',
-                borderRadius: 8, background: '#111', marginBottom: 20, display: 'block',
+                borderRadius: 8, background: '#111', display: 'block',
               }}
             />
+          )}
+
+          {videoLink && (
+            // Resilience fallback, not the real fix: the /preview embed can
+            // hit a Google cookie-consent wall on mobile Safari when the
+            // file isn't shared "Anyone with the link" (a Drive sharing fix
+            // happening separately). This always gives a way to watch it.
+            <a
+              href={driveViewUrl(videoLink)}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'block', font: "600 12px 'Inter Tight', sans-serif",
+                color: 'rgba(17,17,17,.45)', marginTop: 6, marginBottom: 20, textDecoration: 'none',
+              }}
+            >
+              Open in Google Drive ↗
+            </a>
           )}
 
           <div style={labelStyle}>Video Link</div>
