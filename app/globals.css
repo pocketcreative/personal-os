@@ -81,6 +81,11 @@ body {
   overflow: hidden;
   border-left: 1px solid rgba(17, 17, 17, .08);
 }
+/* Mobile Details/Comments tab switcher -- hidden on desktop, where both
+   columns already show side by side and there's nothing to switch between. */
+.content-modal-tabs {
+  display: none;
+}
 @media (max-width: 640px) {
   .content-modal {
     width: 100%;
@@ -101,6 +106,21 @@ body {
     overflow: visible;
     border-left: none;
     border-top: 1px solid rgba(17, 17, 17, .08);
+  }
+  .content-modal-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 4px 0 20px;
+  }
+  /* Video stays visible above the tabs regardless of which tab is active
+     (see ContentDetailModal) -- only the Details fields and the Comments
+     column get toggled by the active tab, each hidden with a specificity
+     bump so it beats the base rules above regardless of source order. */
+  .content-modal-details.content-modal-tab-hidden {
+    display: none;
+  }
+  .content-modal-right.content-modal-tab-hidden {
+    display: none;
   }
 }
 

@@ -178,6 +178,12 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
   const [postedLink, setPostedLink] = useState(piece.posted_link ?? '');
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
+  // Mobile-only tab switcher (Details / Comments), Frame.io mobile app
+  // style -- desktop ignores this entirely and always shows both columns.
+  // See .content-modal-tabs / .content-modal-tab-hidden in globals.css.
+  const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details');
+  const [commentCounts, setCommentCounts] = useState({ total: 0, unresolved: 0 });
+
   useEffect(() => {
     const el = titleRef.current;
     if (!el) return;
@@ -211,6 +217,12 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
     font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)',
     letterSpacing: '.06em', textTransform: 'uppercase' as const, marginBottom: 8,
   };
+  const tabButtonStyle = (active: boolean): React.CSSProperties => ({
+    flex: 1, font: "700 11px 'Archivo', sans-serif", letterSpacing: '.05em',
+    textTransform: 'uppercase', color: active ? '#fff' : 'rgba(17,17,17,.45)',
+    background: active ? '#111' : 'rgba(17,17,17,.06)',
+    border: 'none', borderRadius: 7, padding: '10px 16px', cursor: 'pointer',
+  });
 
   return (
     <div
@@ -248,7 +260,9 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
         <div className="content-modal-body">
         <div className="content-modal-left" style={{ padding: '24px 32px' }}>
           {/* Player leads the left column, Frame.io-style -- the thing being
-              reviewed comes before the fields describing it. */}
+              reviewed comes before the fields describing it. On mobile it
+              stays above the Details/Comments tabs below, always visible
+              either way since it's the primary content. */}
           {videoLink && (
             /* A Google Drive /preview URL renders Drive's own player inside
                the frame, controls included, so there's nothing to rebuild
@@ -281,60 +295,79 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
             </a>
           )}
 
-          <div style={labelStyle}>Video Link</div>
-          <input value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="https://drive.google.com/file/d/…/preview" style={{ ...fieldStyle, marginBottom: 20 }} />
-
-          <div style={labelStyle}>Visual Hook</div>
-          <input value={visualHook} onChange={(e) => setVisualHook(e.target.value)} placeholder="The opening shot / line…" style={{ ...fieldStyle, marginBottom: 20 }} />
-
-          <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={labelStyle}>Format</div>
-              <select
-                value={format}
-                onChange={(e) => setFormat(e.target.value as ContentFormat | '')}
-                style={fieldStyle}
-              >
-                <option value="">Uncategorised</option>
-                {CONTENT_FORMATS.map((f) => (
-                  <option key={f} value={f}>{CONTENT_FORMAT_LABELS[f]}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={labelStyle}>Target Post Date</div>
-              <input type="date" value={targetPostDate} onChange={(e) => setTargetPostDate(e.target.value)} style={fieldStyle} />
-            </div>
+          {/* Mobile-only: switches the Details fields / Comments column
+              below between tabs instead of one long scroll that buried
+              comments at the bottom. Desktop hides this and always shows
+              both (see .content-modal-tabs in globals.css). */}
+          <div className="content-modal-tabs">
+            <button type="button" onClick={() => setActiveTab('details')} style={tabButtonStyle(activeTab === 'details')}>
+              Details
+            </button>
+            <button type="button" onClick={() => setActiveTab('comments')} style={tabButtonStyle(activeTab === 'comments')}>
+              {`Comments${commentCounts.total > 0 ? ` (${commentCounts.total})` : ''}`}
+              {commentCounts.unresolved > 0 && ' ⚠️'}
+            </button>
           </div>
 
-          <div style={labelStyle}>Platform</div>
-          <input value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder="IG, TikTok, YouTube…" style={{ ...fieldStyle, marginBottom: 20 }} />
+          <div className={`content-modal-details${activeTab === 'comments' ? ' content-modal-tab-hidden' : ''}`}>
+            <div style={labelStyle}>Video Link</div>
+            <input value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="https://drive.google.com/file/d/…/preview" style={{ ...fieldStyle, marginBottom: 20 }} />
 
-          <div style={labelStyle}>Posted Link</div>
-          <input value={postedLink} onChange={(e) => setPostedLink(e.target.value)} placeholder="https://instagram.com/… (once it's live)" style={{ ...fieldStyle, marginBottom: 20 }} />
+            <div style={labelStyle}>Visual Hook</div>
+            <input value={visualHook} onChange={(e) => setVisualHook(e.target.value)} placeholder="The opening shot / line…" style={{ ...fieldStyle, marginBottom: 20 }} />
 
-          <div style={labelStyle}>Raw Footage Link</div>
-          <input value={rawFootageLink} onChange={(e) => setRawFootageLink(e.target.value)} placeholder="https://…" style={{ ...fieldStyle, marginBottom: 20 }} />
+            <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={labelStyle}>Format</div>
+                <select
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value as ContentFormat | '')}
+                  style={fieldStyle}
+                >
+                  <option value="">Uncategorised</option>
+                  {CONTENT_FORMATS.map((f) => (
+                    <option key={f} value={f}>{CONTENT_FORMAT_LABELS[f]}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={labelStyle}>Target Post Date</div>
+                <input type="date" value={targetPostDate} onChange={(e) => setTargetPostDate(e.target.value)} style={fieldStyle} />
+              </div>
+            </div>
 
-          <div style={labelStyle}>Script</div>
-          <textarea
-            value={script} onChange={(e) => setScript(e.target.value)}
-            placeholder="Full script goes here…"
-            style={{ ...fieldStyle, minHeight: 200, lineHeight: 1.5, resize: 'vertical', marginBottom: 20 }}
-          />
+            <div style={labelStyle}>Platform</div>
+            <input value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder="IG, TikTok, YouTube…" style={{ ...fieldStyle, marginBottom: 20 }} />
 
-          <div style={labelStyle}>Transcript</div>
-          <textarea
-            value={transcript} onChange={(e) => setTranscript(e.target.value)}
-            placeholder="What was actually said in the finished video…"
-            style={{ ...fieldStyle, minHeight: 140, lineHeight: 1.5, resize: 'vertical' }}
-          />
+            <div style={labelStyle}>Posted Link</div>
+            <input value={postedLink} onChange={(e) => setPostedLink(e.target.value)} placeholder="https://instagram.com/… (once it's live)" style={{ ...fieldStyle, marginBottom: 20 }} />
+
+            <div style={labelStyle}>Raw Footage Link</div>
+            <input value={rawFootageLink} onChange={(e) => setRawFootageLink(e.target.value)} placeholder="https://…" style={{ ...fieldStyle, marginBottom: 20 }} />
+
+            <div style={labelStyle}>Script</div>
+            <textarea
+              value={script} onChange={(e) => setScript(e.target.value)}
+              placeholder="Full script goes here…"
+              style={{ ...fieldStyle, minHeight: 200, lineHeight: 1.5, resize: 'vertical', marginBottom: 20 }}
+            />
+
+            <div style={labelStyle}>Transcript</div>
+            <textarea
+              value={transcript} onChange={(e) => setTranscript(e.target.value)}
+              placeholder="What was actually said in the finished video…"
+              style={{ ...fieldStyle, minHeight: 140, lineHeight: 1.5, resize: 'vertical' }}
+            />
+          </div>
         </div>
 
-        <div className="content-modal-right">
+        <div className={`content-modal-right${activeTab === 'details' ? ' content-modal-tab-hidden' : ''}`}>
           <CommentsPanel
             pieceId={piece.id}
-            onCountsChange={onCommentCountsChange}
+            onCountsChange={(total, unresolved) => {
+              setCommentCounts({ total, unresolved });
+              onCommentCountsChange?.(total, unresolved);
+            }}
             labelStyle={labelStyle}
             fieldStyle={fieldStyle}
           />
