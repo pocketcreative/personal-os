@@ -158,7 +158,7 @@ export default function TaskBoardMobile() {
       </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 'clamp(8px, 3vw, 16px) clamp(6px, 2vw, 16px) 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 'clamp(8px, 3vw, 16px) 16px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <AddTaskInput onAdd={d.addTask} />
 
         {d.tasks.map((task) => {
