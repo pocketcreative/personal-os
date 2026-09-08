@@ -75,9 +75,21 @@ export function useContentBoard() {
     dirtyRef.current = true;
     setPieces((cur) => cur.map((p) => (p.id === id ? { ...p, ...patch } : p)));
     const saved = await patchPiece(id, patch);
-    if (saved) setPieces((cur) => cur.map((p) => (p.id === id ? saved : p)));
+    // Merged rather than replaced: PATCH returns the raw content_pieces row,
+    // which carries no comment counts (those are derived on the pieces GET).
+    // Swapping the whole object in would blank the "needs re-edit" badge until
+    // the next full board reload.
+    if (saved) setPieces((cur) => cur.map((p) => (p.id === id ? { ...p, ...saved } : p)));
     else load();
   }, [load]);
+
+  // Local-only. The comment thread has already written to the server; this
+  // just keeps the card's badge honest without refetching the whole board.
+  const setCommentCounts = useCallback((id: string, total: number, unresolved: number) => {
+    setPieces((cur) => cur.map((p) => (
+      p.id === id ? { ...p, comment_count: total, unresolved_comment_count: unresolved } : p
+    )));
+  }, []);
 
   const deletePiece = useCallback(async (id: string) => {
     dirtyRef.current = true;
@@ -108,6 +120,6 @@ export function useContentBoard() {
     columns,
     activeId, setActiveId,
     activePiece: pieces.find((p) => p.id === activeId) ?? null,
-    addPiece, updatePiece, deletePiece, moveCard,
+    addPiece, updatePiece, deletePiece, moveCard, setCommentCounts,
   };
 }
