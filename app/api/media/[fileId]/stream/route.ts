@@ -63,17 +63,48 @@ export async function GET(
     const contentType = getDriveHeader(driveRes.headers, 'content-type') || 'video/mp4';
     const contentLength = getDriveHeader(driveRes.headers, 'content-length');
     const contentRange = getDriveHeader(driveRes.headers, 'content-range');
+    const etag = getDriveHeader(driveRes.headers, 'etag');
+    const lastModified = getDriveHeader(driveRes.headers, 'last-modified');
 
     const responseHeaders: Record<string, string> = {
       'Accept-Ranges': 'bytes',
       'Content-Type': contentType,
-      // Never let a browser or intermediary cache someone else's private video
-      // response under a shared cache key; each request is authenticated
-      // server-side per fileId, not per viewer.
-      'Cache-Control': 'private, no-store',
+      // Content at a given fileId is immutable by convention: a re-edit in
+      // this app always uploads a NEW Drive file (new fileId, new Supabase
+      // video_link), it never overwrites bytes under an existing fileId. So
+      // it's safe to cache this response hard, both in the browser (max-age
+      // + immutable, so it never even revalidates) and at Vercel's edge
+      // (s-maxage -- required in addition to max-age, Vercel's CDN ignores
+      // plain max-age).
+      //
+      // This route stays behind auth: Vercel's routing middleware runs on
+      // every request *before* any CDN cache lookup (docs: "Because it runs
+      // globally before the cache..."), so middleware.ts's session/
+      // x-api-secret check is never skipped for a cache hit -- caching the
+      // video body doesn't leak it to an unauthenticated caller.
+      //
+      // Two things this header can't do, both confirmed against Vercel's
+      // documented CDN cache-eligibility rules, not assumed:
+      // 1. It won't get range-request (206) responses cached at Vercel's
+      //    edge -- Vercel excludes any request carrying a `Range` header,
+      //    and any 206 response, from CDN caching by design. Real <video>
+      //    playback in Chrome/Safari sends Range on essentially every
+      //    request, so most plays won't hit the shared edge cache no matter
+      //    what header is set here.
+      //  2. Even a non-range 200 response only qualifies for Vercel's edge
+      //    cache under 20MB (streaming function limit); several of these
+      //    files (6-90MB) exceed that regardless of headers.
+      // The real win from this header is the *browser's own* HTTP cache --
+      // it does cache and reassemble 206/range responses locally (using the
+      // ETag/Last-Modified below), so a repeat open of the same video on the
+      // same device is served from disk with no round trip to Drive at all,
+      // which is the actual case Brendan hit (slow reload in the OS).
+      'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, immutable',
     };
     if (contentLength) responseHeaders['Content-Length'] = contentLength;
     if (contentRange) responseHeaders['Content-Range'] = contentRange;
+    if (etag) responseHeaders['ETag'] = etag;
+    if (lastModified) responseHeaders['Last-Modified'] = lastModified;
 
     // driveRes.data is a Node Readable when responseType is 'stream'. Convert
     // to a Web ReadableStream so it can be piped straight into the Response
