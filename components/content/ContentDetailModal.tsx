@@ -73,6 +73,21 @@ function VideoPlayer({ src, videoRef, markers, onTimeUpdate, onMarkerClick }: {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  // Defaults to the vertical-short shape every piece with a video attached
+  // today actually is, so there's no layout jump for the common case --
+  // updates to the file's real intrinsic ratio once metadata loads, so a
+  // landscape long-form/ad/VSL piece (all real, distinct formats in this
+  // tracker, just none with a video link attached yet) frames correctly
+  // instead of getting forced into a tall 9:16 box it was never shot in.
+  const [aspectRatio, setAspectRatio] = useState('9 / 16');
+  // True only between a pointerdown on the track and its matching pointerup
+  // -- gates pointermove so dragging actually scrubs (see onPointerMove
+  // below) without the bar also seeking on a plain, button-up hover.
+  const [scrubbing, setScrubbing] = useState(false);
+  // Drives the visible focus ring below -- the track is a real keyboard
+  // control (role="slider") now, and a div has no native :focus-visible
+  // styling of its own to fall back on.
+  const [trackFocused, setTrackFocused] = useState(false);
 
   // Guards the division-by-zero window before metadata has loaded (duration
   // starts at 0, and some streamed sources briefly report Infinity).
@@ -101,13 +116,17 @@ function VideoPlayer({ src, videoRef, markers, onTimeUpdate, onMarkerClick }: {
         src={src}
         playsInline
         onClick={togglePlay}
-        style={{ width: '100%', aspectRatio: '9 / 16', display: 'block', background: '#111', cursor: 'pointer' }}
+        style={{ width: '100%', aspectRatio, display: 'block', background: '#111', cursor: 'pointer' }}
         onTimeUpdate={(e) => {
           const t = e.currentTarget.currentTime;
           setCurrentTime(t);
           onTimeUpdate(t);
         }}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        onLoadedMetadata={(e) => {
+          const el = e.currentTarget;
+          setDuration(el.duration);
+          if (el.videoWidth > 0 && el.videoHeight > 0) setAspectRatio(`${el.videoWidth} / ${el.videoHeight}`);
+        }}
         onDurationChange={(e) => setDuration(e.currentTarget.duration)}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
@@ -115,11 +134,72 @@ function VideoPlayer({ src, videoRef, markers, onTimeUpdate, onMarkerClick }: {
       />
 
       <div style={{ padding: '10px 12px 12px' }}>
-        {/* Taller click target than the visible track so the scrubber is
-            easy to tap on mobile without the bar itself looking thick. */}
+        {/* Taller hit target than the visible track so the scrubber is easy
+            to grab on mobile without the bar itself looking thick.
+            Pointer (not click) events: a plain onClick only fires on a
+            precise tap with no movement in between down and up, so dragging
+            a thumb across the bar -- the natural "skip through the video"
+            gesture on a phone, which is how this is reviewed day to day --
+            did nothing at all mid-drag. Pointer events unify mouse + touch,
+            and setPointerCapture keeps the drag tracking correctly even if
+            the finger drifts outside this 14px-tall strip. scrubbing gates
+            onPointerMove so hovering with the mouse button up (which does
+            fire pointermove) never seeks on its own. */}
         <div
-          onClick={(e) => seekFromClientX(e.clientX, e.currentTarget)}
-          style={{ position: 'relative', height: 14, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setScrubbing(true);
+            seekFromClientX(e.clientX, e.currentTarget);
+          }}
+          onPointerMove={(e) => {
+            if (!scrubbing) return;
+            seekFromClientX(e.clientX, e.currentTarget);
+          }}
+          onPointerUp={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+            setScrubbing(false);
+          }}
+          onPointerCancel={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+            setScrubbing(false);
+          }}
+          // Pointer/touch covers mouse and thumb drags; this covers the
+          // keyboard path those don't -- a bare clickable div had no way to
+          // seek at all without a pointer before. Arrow keys nudge by a
+          // second (Shift+arrow by 10), Home/End jump to the ends, matching
+          // the native <input type="range"> conventions a slider role implies.
+          tabIndex={safeDuration > 0 ? 0 : -1}
+          role="slider"
+          aria-label="Seek video"
+          aria-valuemin={0}
+          aria-valuemax={safeDuration}
+          aria-valuenow={currentTime}
+          aria-valuetext={`${formatTimestamp(currentTime)} of ${formatTimestamp(safeDuration)}`}
+          onFocus={() => setTrackFocused(true)}
+          onBlur={() => setTrackFocused(false)}
+          onKeyDown={(e) => {
+            const video = videoRef.current;
+            if (!video || safeDuration <= 0) return;
+            const step = e.shiftKey ? 10 : 1;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              video.currentTime = Math.min(safeDuration, video.currentTime + step);
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+              e.preventDefault();
+              video.currentTime = Math.max(0, video.currentTime - step);
+            } else if (e.key === 'Home') {
+              e.preventDefault();
+              video.currentTime = 0;
+            } else if (e.key === 'End') {
+              e.preventDefault();
+              video.currentTime = safeDuration;
+            }
+          }}
+          style={{
+            position: 'relative', height: 14, display: 'flex', alignItems: 'center', cursor: 'pointer',
+            touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none', borderRadius: 4,
+            outline: trackFocused ? '2px solid #E2B246' : 'none', outlineOffset: 2,
+          }}
         >
           <div style={{ position: 'relative', width: '100%', height: 4, borderRadius: 999, background: 'rgba(255,255,255,.18)' }}>
             <div style={{
@@ -129,7 +209,14 @@ function VideoPlayer({ src, videoRef, markers, onTimeUpdate, onMarkerClick }: {
             {safeDuration > 0 && markers.map((m) => (
               <div
                 key={m.id}
-                onClick={(e) => {
+                // Own pointerdown + stopPropagation, same reason the old
+                // marker onClick did: a tap here should jump to this
+                // comment's exact timestamp, not get overridden by the
+                // track's own coordinate-based seek a frame later. Has to
+                // be pointerdown (not click) now that the track above
+                // switched off click -- a click's stopPropagation can't
+                // stop a pointerdown that already fired on the parent.
+                onPointerDown={(e) => {
                   e.stopPropagation();
                   const video = videoRef.current;
                   if (video) video.currentTime = m.timestamp;
@@ -141,7 +228,7 @@ function VideoPlayer({ src, videoRef, markers, onTimeUpdate, onMarkerClick }: {
                   left: `${Math.min(100, Math.max(0, (m.timestamp / safeDuration) * 100))}%`,
                   width: 9, height: 9, borderRadius: '50%', background: '#E2B246',
                   border: '1.5px solid #111', transform: 'translate(-50%, -50%)',
-                  cursor: 'pointer', zIndex: 2,
+                  cursor: 'pointer', zIndex: 2, touchAction: 'none',
                 }}
               />
             ))}
@@ -170,11 +257,12 @@ function VideoPlayer({ src, videoRef, markers, onTimeUpdate, onMarkerClick }: {
   );
 }
 
-function CommentRow({ comment, highlighted, onToggleResolved, onDelete }: {
+function CommentRow({ comment, highlighted, onToggleResolved, onDelete, onSeekTo }: {
   comment: ContentComment;
   highlighted: boolean;
   onToggleResolved: () => void;
   onDelete: () => void;
+  onSeekTo: (seconds: number) => void;
 }) {
   // Same gold-for-AI rule the task board uses on its owner column, so a note
   // written by an agent reads the same way in both places.
@@ -196,10 +284,21 @@ function CommentRow({ comment, highlighted, onToggleResolved, onDelete }: {
           color: isAgent ? '#9a7a2e' : 'rgba(17,17,17,.55)',
         }}>{comment.author}</span>
         {comment.video_timestamp_seconds != null && (
-          <span style={{
-            font: "600 10px 'Inter Tight', sans-serif", color: '#9a7a2e',
-            background: 'rgba(154,122,46,.1)', padding: '2px 7px', borderRadius: 20,
-          }}>{formatTimestamp(comment.video_timestamp_seconds)}</span>
+          // A real button, not a static label: clicking a comment's own
+          // timecode is the obvious way to jump the player there (same
+          // pattern as the gold dots on the scrubber, which this note also
+          // shows up as if it's on screen right now -- this is the same
+          // jump reachable from the comment thread instead).
+          <button
+            type="button"
+            onClick={() => onSeekTo(comment.video_timestamp_seconds!)}
+            title="Jump video to this moment"
+            style={{
+              font: "600 10px 'Inter Tight', sans-serif", color: '#9a7a2e',
+              background: 'rgba(154,122,46,.1)', padding: '2px 7px', borderRadius: 20,
+              border: 'none', cursor: 'pointer',
+            }}
+          >{formatTimestamp(comment.video_timestamp_seconds)}</button>
         )}
         <span style={{ font: "500 10px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.3)' }}>
           {new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -236,7 +335,7 @@ function CommentRow({ comment, highlighted, onToggleResolved, onDelete }: {
 // same list -- this component is the presentational thread + composer.
 function CommentsPanel({
   comments, loading, addComment, setResolved, deleteComment,
-  labelStyle, fieldStyle, highlightedCommentId, currentSecondRef,
+  labelStyle, fieldStyle, highlightedCommentId, currentSecondRef, onSeekTo,
 }: {
   comments: ContentComment[];
   loading: boolean;
@@ -247,6 +346,7 @@ function CommentsPanel({
   fieldStyle: React.CSSProperties;
   highlightedCommentId: string | null;
   currentSecondRef: React.RefObject<number>;
+  onSeekTo: (seconds: number) => void;
 }) {
   const [draft, setDraft] = useState('');
   const [ts, setTs] = useState('');
@@ -296,6 +396,7 @@ function CommentsPanel({
                 highlighted={c.id === highlightedCommentId}
                 onToggleResolved={() => setResolved(c.id, !c.resolved)}
                 onDelete={() => deleteComment(c.id)}
+                onSeekTo={onSeekTo}
               />
             ))}
           </div>
@@ -304,6 +405,7 @@ function CommentsPanel({
 
       <div style={{ flex: '0 0 auto', borderTop: '1px solid rgba(17,17,17,.08)', paddingTop: 14, marginTop: 8 }}>
         <textarea
+          aria-label="New comment"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onFocus={autofillTimestamp}
@@ -312,6 +414,7 @@ function CommentsPanel({
         />
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input
+            aria-label="Comment timestamp (optional)"
             value={ts}
             onChange={(e) => setTs(e.target.value)}
             onFocus={autofillTimestamp}
@@ -376,6 +479,13 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
   const markerComments = comments
     .filter((c): c is ContentComment & { video_timestamp_seconds: number } => c.video_timestamp_seconds != null)
     .map((c) => ({ id: c.id, timestamp: c.video_timestamp_seconds }));
+
+  // Shared by the comment thread's timestamp badges: jumps the already-
+  // mounted <video> straight there without touching play/pause state.
+  function seekVideoTo(seconds: number) {
+    const video = videoRef.current;
+    if (video) video.currentTime = seconds;
+  }
 
   function handleMarkerClick(commentId: string) {
     // Switching to the Comments tab is a no-op on desktop (both columns are
@@ -478,6 +588,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
         }}>
           <textarea
             ref={titleRef}
+            aria-label="Title"
             value={title} onChange={(e) => setTitle(e.target.value)}
             rows={1}
             style={{
@@ -551,8 +662,9 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
                 columns -- native HTML5 drag-and-drop doesn't work on mobile
                 touch browsers at all, so this select is the only path to
                 changing status from a phone. */}
-            <div style={labelStyle}>Status</div>
+            <label htmlFor="cm-status" style={labelStyle}>Status</label>
             <select
+              id="cm-status"
               value={status}
               onChange={(e) => setStatus(e.target.value as ContentPiece['status'])}
               style={{ ...fieldStyle, marginBottom: 20 }}
@@ -562,16 +674,17 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               ))}
             </select>
 
-            <div style={labelStyle}>Video Link</div>
-            <input value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="https://drive.google.com/file/d/…/preview" style={{ ...fieldStyle, marginBottom: 20 }} />
+            <label htmlFor="cm-video-link" style={labelStyle}>Video Link</label>
+            <input id="cm-video-link" value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="https://drive.google.com/file/d/…/preview" style={{ ...fieldStyle, marginBottom: 20 }} />
 
-            <div style={labelStyle}>Visual Hook</div>
-            <input value={visualHook} onChange={(e) => setVisualHook(e.target.value)} placeholder="The opening shot / line…" style={{ ...fieldStyle, marginBottom: 20 }} />
+            <label htmlFor="cm-visual-hook" style={labelStyle}>Visual Hook</label>
+            <input id="cm-visual-hook" value={visualHook} onChange={(e) => setVisualHook(e.target.value)} placeholder="The opening shot / line…" style={{ ...fieldStyle, marginBottom: 20 }} />
 
             <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={labelStyle}>Format</div>
+                <label htmlFor="cm-format" style={labelStyle}>Format</label>
                 <select
+                  id="cm-format"
                   value={format}
                   onChange={(e) => setFormat(e.target.value as ContentFormat | '')}
                   style={fieldStyle}
@@ -583,28 +696,29 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
                 </select>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={labelStyle}>Target Post Date</div>
-                <input type="date" value={targetPostDate} onChange={(e) => setTargetPostDate(e.target.value)} style={fieldStyle} />
+                <label htmlFor="cm-target-post-date" style={labelStyle}>Target Post Date</label>
+                <input id="cm-target-post-date" type="date" value={targetPostDate} onChange={(e) => setTargetPostDate(e.target.value)} style={fieldStyle} />
               </div>
             </div>
 
-            <div style={labelStyle}>Platform</div>
-            <input value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder="IG, TikTok, YouTube…" style={{ ...fieldStyle, marginBottom: 20 }} />
+            <label htmlFor="cm-platform" style={labelStyle}>Platform</label>
+            <input id="cm-platform" value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder="IG, TikTok, YouTube…" style={{ ...fieldStyle, marginBottom: 20 }} />
 
-            <div style={labelStyle}>Posted Link</div>
-            <input value={postedLink} onChange={(e) => setPostedLink(e.target.value)} placeholder="https://instagram.com/… (once it's live)" style={{ ...fieldStyle, marginBottom: 20 }} />
+            <label htmlFor="cm-posted-link" style={labelStyle}>Posted Link</label>
+            <input id="cm-posted-link" value={postedLink} onChange={(e) => setPostedLink(e.target.value)} placeholder="https://instagram.com/… (once it's live)" style={{ ...fieldStyle, marginBottom: 20 }} />
 
             {showRawFootageLink && (
               <>
-                <div style={labelStyle}>Raw Footage Link</div>
-                <input value={rawFootageLink} onChange={(e) => setRawFootageLink(e.target.value)} placeholder="https://…" style={{ ...fieldStyle, marginBottom: 20 }} />
+                <label htmlFor="cm-raw-footage-link" style={labelStyle}>Raw Footage Link</label>
+                <input id="cm-raw-footage-link" value={rawFootageLink} onChange={(e) => setRawFootageLink(e.target.value)} placeholder="https://…" style={{ ...fieldStyle, marginBottom: 20 }} />
               </>
             )}
 
             {showScript && (
               <>
-                <div style={labelStyle}>Script</div>
+                <label htmlFor="cm-script" style={labelStyle}>Script</label>
                 <textarea
+                  id="cm-script"
                   value={script} onChange={(e) => setScript(e.target.value)}
                   placeholder="Full script goes here…"
                   style={{ ...fieldStyle, minHeight: 200, lineHeight: 1.5, resize: 'vertical', marginBottom: 20 }}
@@ -614,8 +728,9 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
 
             {showTranscript && (
               <>
-                <div style={labelStyle}>Transcript</div>
+                <label htmlFor="cm-transcript" style={labelStyle}>Transcript</label>
                 <textarea
+                  id="cm-transcript"
                   value={transcript} onChange={(e) => setTranscript(e.target.value)}
                   placeholder="What was actually said in the finished video…"
                   style={{ ...fieldStyle, minHeight: 140, lineHeight: 1.5, resize: 'vertical' }}
@@ -636,6 +751,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
             fieldStyle={fieldStyle}
             highlightedCommentId={highlightedCommentId}
             currentSecondRef={currentSecondRef}
+            onSeekTo={seekVideoTo}
           />
         </div>
         </div>

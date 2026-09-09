@@ -29,9 +29,15 @@ function FormatFilterBar({ counts, active, onChange }: {
       {options.map(({ key, label }) => {
         const on = active === key;
         return (
-          <div
+          // A real <button> (was a plain div onClick) so the filter row is
+          // reachable and operable from a keyboard, not just a mouse/touch --
+          // aria-pressed reports the toggle state the same way the color
+          // swap already communicates it visually.
+          <button
             key={key}
+            type="button"
             onClick={() => onChange(key)}
+            aria-pressed={on}
             style={{
               font: "700 11px 'Archivo', sans-serif", letterSpacing: '.04em', textTransform: 'uppercase',
               color: on ? '#fbfaf7' : 'rgba(17,17,17,.5)',
@@ -45,7 +51,7 @@ function FormatFilterBar({ counts, active, onChange }: {
             <span style={{ color: on ? 'rgba(251,250,247,.55)' : 'rgba(17,17,17,.3)', fontWeight: 600 }}>
               {counts[key] ?? 0}
             </span>
-          </div>
+          </button>
         );
       })}
     </div>
@@ -60,11 +66,22 @@ function ContentCard({ piece, dragging, onOpen, onDragStart, onDragEnd }: {
   onDragEnd: () => void;
 }) {
   return (
+    // Stays a real <div> (not <button>) because it's also the HTML5
+    // drag-and-drop source for moving cards between columns -- role="button"
+    // + tabIndex + a matching onKeyDown is the standard substitute so
+    // opening a card (the board's single most-used interaction) is still
+    // reachable from a keyboard, not just a click or a touch tap.
     <div
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${piece.title}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); }
+      }}
       style={{
         background: '#fff', border: '1px solid rgba(17,17,17,.08)', borderRadius: 8,
         padding: '12px 14px', marginBottom: 10, cursor: 'pointer', opacity: dragging ? 0.4 : 1,
@@ -131,13 +148,15 @@ function AddCardInput({ onAdd }: { onAdd: (title: string) => void }) {
   };
   if (!open) {
     return (
-      <div
+      <button
+        type="button"
         onClick={() => setOpen(true)}
         style={{
           font: "600 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)',
-          cursor: 'pointer', padding: '8px 2px',
+          cursor: 'pointer', padding: '8px 2px', background: 'none', border: 'none',
+          display: 'block', textAlign: 'left',
         }}
-      >+ New</div>
+      >+ New</button>
     );
   }
   return (
