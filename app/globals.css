@@ -57,7 +57,17 @@ body {
   display: flex;
   flex-direction: column;
   width: 92vw;
-  max-width: 1360px;
+  /* 1360px let content-modal-left (flex:1) balloon far past what the 340px
+     video + form fields actually need, since content-modal-right is a fixed
+     380/420px sidebar -- the unused width just sat there as dead space next
+     to the video, with the comments column stranded at the far right edge
+     of an oversized panel. 1080px is sized to what the two columns below
+     actually add up to (left absorbs the remainder via flex:1, right is a
+     real fixed width), so nothing is left over at any of the 1280-1920px
+     desktop widths this modal is used at -- the extra viewport width beyond
+     1080px just becomes normal backdrop margin around the modal, not a gap
+     inside it. */
+  max-width: 1080px;
   height: 86vh;
   max-height: 920px;
   overflow: hidden;
@@ -73,7 +83,12 @@ body {
   overflow-y: auto;
 }
 .content-modal-right {
-  flex: 0 0 380px;
+  /* A real fixed width (not a min/max range) so the comment thread and
+     composer always render at a predictable, readable size -- left absorbs
+     whatever width is left via flex:1, so this and content-modal's own
+     max-width (above) are the two numbers that have to agree for the split
+     to add up with nothing left over. */
+  flex: 0 0 420px;
   min-width: 0;
   min-height: 0;
   display: flex;

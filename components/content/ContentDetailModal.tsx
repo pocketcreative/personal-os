@@ -95,7 +95,7 @@ function VideoPlayer({ src, videoRef, markers, onTimeUpdate, onMarkerClick }: {
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: 360, borderRadius: 8, overflow: 'hidden', background: '#111' }}>
+    <div style={{ width: '100%', maxWidth: 340, margin: '0 auto', borderRadius: 8, overflow: 'hidden', background: '#111' }}>
       <video
         ref={videoRef}
         src={src}
@@ -152,6 +152,7 @@ function VideoPlayer({ src, videoRef, markers, onTimeUpdate, onMarkerClick }: {
           <button
             type="button"
             onClick={togglePlay}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
             style={{
               flex: '0 0 auto', width: 28, height: 28, borderRadius: '50%', border: 'none',
               background: 'rgba(255,255,255,.14)', color: '#fff', cursor: 'pointer',
@@ -204,14 +205,22 @@ function CommentRow({ comment, highlighted, onToggleResolved, onDelete }: {
           {new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </span>
         <span style={{ flex: 1 }} />
-        <span
+        <button
+          type="button"
           onClick={onToggleResolved}
-          style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', cursor: 'pointer' }}
-        >{comment.resolved ? 'Reopen' : 'Resolve'}</span>
-        <span
+          style={{
+            font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', cursor: 'pointer',
+            background: 'none', border: 'none', padding: 0,
+          }}
+        >{comment.resolved ? 'Reopen' : 'Resolve'}</button>
+        <button
+          type="button"
           onClick={() => { if (confirm('Delete this comment?')) onDelete(); }}
-          style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(192,57,43,.55)', cursor: 'pointer' }}
-        >Delete</span>
+          style={{
+            font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(192,57,43,.55)', cursor: 'pointer',
+            background: 'none', border: 'none', padding: 0,
+          }}
+        >Delete</button>
       </div>
       <div style={{
         font: "500 14px 'Inter Tight', sans-serif", color: '#111', lineHeight: 1.45, whiteSpace: 'pre-wrap',
@@ -477,7 +486,15 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               resize: 'none', overflow: 'hidden',
             }}
           />
-          <span onClick={done} style={{ cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 18, padding: 4 }}>✕</span>
+          <button
+            type="button"
+            onClick={done}
+            aria-label="Close"
+            style={{
+              cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 18, padding: 4,
+              background: 'none', border: 'none', lineHeight: 1,
+            }}
+          >✕</button>
         </div>
 
         <div className="content-modal-body">
@@ -506,8 +523,9 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                display: 'block', font: "600 12px 'Inter Tight', sans-serif",
-                color: 'rgba(17,17,17,.45)', marginTop: 6, marginBottom: 20, textDecoration: 'none',
+                display: 'block', width: '100%', maxWidth: 340, margin: '6px auto 20px',
+                font: "600 12px 'Inter Tight', sans-serif",
+                color: 'rgba(17,17,17,.45)', textDecoration: 'none',
               }}
             >
               Open in Google Drive ↗
