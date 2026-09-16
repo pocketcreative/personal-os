@@ -446,7 +446,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
   const [status, setStatus] = useState<ContentPiece['status']>(piece.status);
   const [visualHook, setVisualHook] = useState(piece.visual_hook ?? '');
   const [script, setScript] = useState(piece.script ?? '');
-  const [transcript, setTranscript] = useState(piece.transcript ?? '');
+  const [caption, setCaption] = useState(piece.caption ?? '');
   const [format, setFormat] = useState<ContentFormat | ''>(piece.format ?? '');
   const [platform, setPlatform] = useState(piece.platform.join(', '));
   const [targetPostDate, setTargetPostDate] = useState(piece.target_post_date ?? '');
@@ -522,7 +522,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
     if (status !== piece.status) patch.status = status;
     if (visualHook !== (piece.visual_hook ?? '')) patch.visual_hook = visualHook || null;
     if (script !== (piece.script ?? '')) patch.script = script || null;
-    if (transcript !== (piece.transcript ?? '')) patch.transcript = transcript || null;
+    if (caption !== (piece.caption ?? '')) patch.caption = caption || null;
     if (format !== (piece.format ?? '')) patch.format = format || null;
     const nextPlatform = platform.split(',').map((p) => p.trim()).filter(Boolean);
     if (nextPlatform.join(',') !== piece.platform.join(',')) patch.platform = nextPlatform;
@@ -549,17 +549,6 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
     background: active ? '#111' : 'rgba(17,17,17,.06)',
     border: 'none', borderRadius: 7, padding: '10px 16px', cursor: 'pointer',
   });
-
-  // LTS-format pieces (and possibly others) only ever have a transcript, never
-  // a written script -- so a piece with content in just one of the two only
-  // needs that one field on screen. Both render when both actually have
-  // content (a long-form piece can have a written script that was then
-  // recorded slightly differently). When neither has content yet, Script
-  // stays as the one empty field so there's still somewhere to type a draft.
-  const hasScript = script.trim().length > 0;
-  const hasTranscript = transcript.trim().length > 0;
-  const showScript = hasScript || !hasTranscript;
-  const showTranscript = hasTranscript;
 
   // Raw Footage Link is only useful when it's an actual clickable URL --
   // some pieces have a local Mac file path in this field instead, which is
@@ -714,29 +703,29 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               </>
             )}
 
-            {showScript && (
-              <>
-                <label htmlFor="cm-script" style={labelStyle}>Script</label>
-                <textarea
-                  id="cm-script"
-                  value={script} onChange={(e) => setScript(e.target.value)}
-                  placeholder="Full script goes here…"
-                  style={{ ...fieldStyle, minHeight: 200, lineHeight: 1.5, resize: 'vertical', marginBottom: 20 }}
-                />
-              </>
-            )}
+            <label htmlFor="cm-script" style={labelStyle}>Script</label>
+            <textarea
+              id="cm-script"
+              value={script} onChange={(e) => setScript(e.target.value)}
+              placeholder="What's said/filmed goes here…"
+              style={{ ...fieldStyle, minHeight: 200, lineHeight: 1.5, resize: 'vertical', marginBottom: 20 }}
+            />
 
-            {showTranscript && (
-              <>
-                <label htmlFor="cm-transcript" style={labelStyle}>Transcript</label>
-                <textarea
-                  id="cm-transcript"
-                  value={transcript} onChange={(e) => setTranscript(e.target.value)}
-                  placeholder="What was actually said in the finished video…"
-                  style={{ ...fieldStyle, minHeight: 140, lineHeight: 1.5, resize: 'vertical' }}
-                />
-              </>
-            )}
+            {/* Visually distinct from Script -- a tinted panel, not just
+                another field in the same stack -- since this is the platform
+                post copy (what goes in the caption box), not what's said. */}
+            <div style={{
+              background: 'rgba(2,74,221,.05)', border: '1px solid rgba(2,74,221,.15)',
+              borderRadius: 8, padding: 16, marginBottom: 4,
+            }}>
+              <label htmlFor="cm-caption" style={labelStyle}>Caption</label>
+              <textarea
+                id="cm-caption"
+                value={caption} onChange={(e) => setCaption(e.target.value)}
+                placeholder="The post copy that goes with this piece…"
+                style={{ ...fieldStyle, minHeight: 100, lineHeight: 1.5, resize: 'vertical' }}
+              />
+            </div>
           </div>
         </div>
 

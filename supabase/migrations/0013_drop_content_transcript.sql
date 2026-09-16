@@ -1,0 +1,16 @@
+-- Collapses `script` and `transcript` back into one field. The edit screen
+-- showed both, and on 55 of 57 rows they held either the same text or one was
+-- just empty -- two fields doing one job. The 2 rows that genuinely differed
+-- were reconciled by hand before this ran: LTS 07 had an internal edit-log
+-- note (file paths, Drive file IDs) sitting in `script` by mistake, which got
+-- moved into a content_comments row (author 'migration') so it isn't lost,
+-- then `script` was overwritten with the real spoken content that was sitting
+-- in `transcript`. LTS 11's script and transcript were both real content
+-- (a minor re-cut), so `script` was left as-is. Every other row already had
+-- its real content in `script` (38 rows) or `transcript` was copied into an
+-- empty `script` first (9 rows) before this migration ran.
+--
+-- To apply: paste this file's contents into the Supabase SQL Editor and run
+-- it (same convention as prior migrations in this repo). Run only after the
+-- data reconciliation above -- dropping this column is destructive.
+alter table content_pieces drop column transcript;

@@ -62,8 +62,8 @@ export interface ContentPiece {
   id: string;
   title: string;
   visual_hook: string | null;
-  script: string | null; // what was written beforehand
-  transcript: string | null; // what was actually said in the finished video
+  script: string | null; // what's said/filmed -- written beforehand or transcribed after, whichever is real
+  caption: string | null; // the actual platform post copy (IG/TikTok/YouTube caption box), distinct from the script
   status: 'draft' | 'ready_to_record' | 'editing' | 'ready_to_post' | 'scheduled';
   format: ContentFormat | null; // null = not categorised yet (a freshly typed card)
   platform: string[];

@@ -10,10 +10,11 @@
 // in place rather than inserting a second copy. Nothing else on the board is
 // touched.
 //
-// `transcript` on each entry is the real delivered speech, reconstructed from
+// `script` on each entry is the real delivered speech, reconstructed from
 // the clip's cut plan (cuts/<slug>.json: raw_segments minus every splits
-// range) against full_recording_words_abs.json -- not the written script, and
-// not a summary.
+// range) against full_recording_words_abs.json -- not a written-beforehand
+// script, and not a summary. (Field renamed from `transcript` in migration
+// 0013, which merged script/transcript into one `script` column.)
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -43,7 +44,7 @@ async function main() {
   // Preflight: without 0012 the insert would fail column by column with a raw
   // Postgres error. Say what's actually missing instead.
   const { error: preflight } = await db.from('content_pieces')
-    .select('format,transcript,video_link,posted_link').limit(1);
+    .select('format,script,video_link,posted_link').limit(1);
   if (preflight) {
     console.error('content_pieces is missing the new columns. Paste supabase/migrations/0012_content_formats_and_comments.sql into the Supabase SQL Editor and run it first.');
     console.error('Postgres said:', preflight.message);
@@ -68,7 +69,7 @@ async function main() {
       // hasn't been decided, and guessing would put a wrong platform tag on
       // the card.
       platform: [],
-      transcript: clip.transcript,
+      script: clip.transcript, // seed-data key is still `transcript` (that's what it is); the column is `script`
       video_link: clip.video_link,
       // The finished file on this machine, so whoever picks up the next edit
       // pass knows which render the comments are against.

@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     title: body.title.trim(),
     visual_hook: body.visual_hook ?? null,
     script: body.script ?? null,
-    transcript: body.transcript ?? null,
+    caption: body.caption ?? null,
     status: body.status ?? 'draft',
     format: body.format ?? null,
     platform: body.platform ?? [],
