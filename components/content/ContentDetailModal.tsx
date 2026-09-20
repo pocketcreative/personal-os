@@ -690,8 +690,16 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               </div>
             </div>
 
-            <label htmlFor="cm-platform" style={labelStyle}>Platform</label>
-            <input id="cm-platform" value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder="IG, TikTok, YouTube…" style={{ ...fieldStyle, marginBottom: 20 }} />
+            {/* Long-form only ever posts to YouTube, so tagging a platform is
+                redundant work for that format -- Format already says it.
+                Hidden here for long-form; still shown (and still free text)
+                for every other format, where platform actually varies. */}
+            {format !== 'long_form' && (
+              <>
+                <label htmlFor="cm-platform" style={labelStyle}>Platform</label>
+                <input id="cm-platform" value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder="IG, TikTok, YouTube…" style={{ ...fieldStyle, marginBottom: 20 }} />
+              </>
+            )}
 
             <label htmlFor="cm-posted-link" style={labelStyle}>Posted Link</label>
             <input id="cm-posted-link" value={postedLink} onChange={(e) => setPostedLink(e.target.value)} placeholder="https://instagram.com/… (once it's live)" style={{ ...fieldStyle, marginBottom: 20 }} />
@@ -708,7 +716,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               id="cm-script"
               value={script} onChange={(e) => setScript(e.target.value)}
               placeholder="What's said/filmed goes here…"
-              style={{ ...fieldStyle, minHeight: 200, lineHeight: 1.5, resize: 'vertical', marginBottom: 20 }}
+              style={{ ...fieldStyle, minHeight: 420, lineHeight: 1.5, resize: 'vertical', marginBottom: 20 }}
             />
 
             {/* Visually distinct from Script -- a tinted panel, not just

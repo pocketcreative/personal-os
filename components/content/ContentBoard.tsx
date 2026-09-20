@@ -58,6 +58,12 @@ function FormatFilterBar({ counts, active, onChange }: {
   );
 }
 
+// Long-form content only ever posts to YouTube, so the platform tag adds no
+// information on a long-form card -- the Format pill already covers it.
+function visiblePlatforms(piece: ContentPiece): string[] {
+  return piece.format === 'long_form' ? [] : piece.platform;
+}
+
 function ContentCard({ piece, dragging, onOpen, onDragStart, onDragEnd }: {
   piece: ContentPiece;
   dragging: boolean;
@@ -88,7 +94,7 @@ function ContentCard({ piece, dragging, onOpen, onDragStart, onDragEnd }: {
         boxShadow: '0 1px 3px rgba(0,0,0,.04)',
       }}
     >
-      <div style={{ font: "600 14px 'Inter Tight', sans-serif", color: '#111', marginBottom: piece.visual_hook || piece.format || piece.platform.length ? 6 : 0 }}>
+      <div style={{ font: "600 14px 'Inter Tight', sans-serif", color: '#111', marginBottom: piece.visual_hook || piece.format || visiblePlatforms(piece).length ? 6 : 0 }}>
         {piece.title}
       </div>
       {piece.visual_hook && (
@@ -112,12 +118,16 @@ function ContentCard({ piece, dragging, onOpen, onDragStart, onDragEnd }: {
           <span style={{ color: 'rgba(154,122,46,.6)' }}>{piece.unresolved_comment_count}</span>
         </div>
       )}
-      {(piece.format || piece.platform.length > 0 || piece.target_post_date) && (
+      {/* Long-form is always YouTube in this system -- the Format pill
+          already says "Long-form", so a separate "youtube" platform pill
+          next to it would just repeat the same fact. Only shown for other
+          formats, where platform actually varies (IG, TikTok, Facebook…). */}
+      {(piece.format || visiblePlatforms(piece).length > 0 || piece.target_post_date) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {piece.format && (
             <span style={FORMAT_PILL}>{CONTENT_FORMAT_LABELS[piece.format]}</span>
           )}
-          {piece.platform.map((p) => (
+          {visiblePlatforms(piece).map((p) => (
             <span key={p} style={{
               font: "600 10px 'Inter Tight', sans-serif", color: '#9a7a2e', background: 'rgba(154,122,46,.1)',
               padding: '2px 7px', borderRadius: 20,
