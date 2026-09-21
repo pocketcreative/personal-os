@@ -281,7 +281,7 @@ function CommentRow({ comment, highlighted, onToggleResolved, onDelete, onSeekTo
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
         <span style={{
           font: "600 11px 'Inter Tight', sans-serif",
-          color: isAgent ? '#9a7a2e' : 'rgba(17,17,17,.55)',
+          color: isAgent ? '#9a7a2e' : 'var(--ink-3)',
         }}>{comment.author}</span>
         {comment.video_timestamp_seconds != null && (
           // A real button, not a static label: clicking a comment's own
@@ -300,7 +300,7 @@ function CommentRow({ comment, highlighted, onToggleResolved, onDelete, onSeekTo
             }}
           >{formatTimestamp(comment.video_timestamp_seconds)}</button>
         )}
-        <span style={{ font: "500 10px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.3)' }}>
+        <span style={{ font: "500 10px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>
           {new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </span>
         <span style={{ flex: 1 }} />
@@ -308,7 +308,7 @@ function CommentRow({ comment, highlighted, onToggleResolved, onDelete, onSeekTo
           type="button"
           onClick={onToggleResolved}
           style={{
-            font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', cursor: 'pointer',
+            font: "600 11px 'Inter Tight', sans-serif", color: 'var(--ink-3)', cursor: 'pointer',
             background: 'none', border: 'none', padding: 0,
           }}
         >{comment.resolved ? 'Reopen' : 'Resolve'}</button>
@@ -381,7 +381,7 @@ function CommentsPanel({
     <div className="comments-panel" style={{ padding: 20 }}>
       <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: '0 0 auto' }}>
         Comments
-        <span style={{ color: 'rgba(17,17,17,.3)' }}>{comments.length}</span>
+        <span style={{ color: 'var(--ink-3)' }}>{comments.length}</span>
         {unresolved > 0 && (
           <span style={{ color: '#9a7a2e' }}>{`⚠️ ${unresolved} needs re-edit`}</span>
         )}
@@ -389,11 +389,11 @@ function CommentsPanel({
 
       <div className="comments-panel-list" style={{ marginTop: 6 }}>
         {loading ? (
-          <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', padding: '6px 0 12px' }}>
+          <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)', padding: '6px 0 12px' }}>
             Loading…
           </div>
         ) : comments.length === 0 ? (
-          <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', padding: '6px 0 12px' }}>
+          <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)', padding: '6px 0 12px' }}>
             No notes on this one yet.
           </div>
         ) : (
@@ -597,12 +597,12 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
     fontFamily: "'Inter Tight', sans-serif", fontSize: 16, color: '#111', outline: 'none',
   };
   const labelStyle = {
-    font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)',
+    font: "700 10.5px 'Archivo', sans-serif", color: 'var(--ink-3)',
     letterSpacing: '.06em', textTransform: 'uppercase' as const, marginBottom: 8,
   };
   const tabButtonStyle = (active: boolean): React.CSSProperties => ({
     flex: 1, font: "700 11px 'Archivo', sans-serif", letterSpacing: '.05em',
-    textTransform: 'uppercase', color: active ? '#fff' : 'rgba(17,17,17,.45)',
+    textTransform: 'uppercase', color: active ? '#fff' : 'var(--ink-3)',
     background: active ? '#111' : 'rgba(17,17,17,.06)',
     border: 'none', borderRadius: 7, padding: '10px 16px', cursor: 'pointer',
   });
@@ -648,7 +648,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
             onClick={done}
             aria-label="Close"
             style={{
-              cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 18, padding: 4,
+              cursor: 'pointer', color: 'var(--ink-3)', fontSize: 18, padding: 4,
               background: 'none', border: 'none', lineHeight: 1,
             }}
           >✕</button>
@@ -682,7 +682,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               style={{
                 display: 'block', width: '100%', maxWidth: 340, margin: '6px auto 20px',
                 font: "600 12px 'Inter Tight', sans-serif",
-                color: 'rgba(17,17,17,.45)', textDecoration: 'none',
+                color: 'var(--ink-3)', textDecoration: 'none',
               }}
             >
               Open in Google Drive ↗

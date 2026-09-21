@@ -4,7 +4,7 @@ import { serviceClient, USER_ID } from '@/lib/supabase';
 const PATCHABLE = new Set([
   'title', 'visual_hook', 'script', 'caption', 'status', 'format', 'platform',
   'target_post_date', 'raw_footage_link', 'thumbnail_link', 'video_link', 'posted_link',
-  'additional_footage', 'sort_order',
+  'sort_order',
 ]);
 
 // Mirrors the check constraint in 0012_content_formats_and_comments.sql, so a

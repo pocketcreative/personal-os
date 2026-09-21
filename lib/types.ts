@@ -72,7 +72,6 @@ export interface ContentPiece {
   thumbnail_link: string | null;
   video_link: string | null; // the working video file (a Drive /preview URL embeds as a player)
   posted_link: string | null; // the live public post, once it's out
-  additional_footage: string | null;
   sort_order: number | null; // null = never manually dragged; falls back to created_at order
   created_at: string;
   updated_at: string;

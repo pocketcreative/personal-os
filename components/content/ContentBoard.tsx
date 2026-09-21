@@ -10,7 +10,7 @@ const COLUMN_WIDTH = 280;
 // Format sits in ink, platform keeps the existing gold, so the two pill rows
 // read as two different kinds of label instead of one blurred stripe.
 const FORMAT_PILL = {
-  font: "600 10px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.62)',
+  font: "600 10px 'Inter Tight', sans-serif", color: 'var(--ink-3)',
   background: 'rgba(17,17,17,.06)', padding: '2px 7px', borderRadius: 20,
   letterSpacing: '.04em', textTransform: 'uppercase' as const,
 };
@@ -40,7 +40,7 @@ function FormatFilterBar({ counts, active, onChange }: {
             aria-pressed={on}
             style={{
               font: "700 11px 'Archivo', sans-serif", letterSpacing: '.04em', textTransform: 'uppercase',
-              color: on ? '#fbfaf7' : 'rgba(17,17,17,.5)',
+              color: on ? '#fbfaf7' : 'var(--ink-3)',
               background: on ? '#111' : 'transparent',
               border: `1px solid ${on ? '#111' : 'rgba(17,17,17,.12)'}`,
               borderRadius: 20, padding: '8px 14px', cursor: 'pointer',
@@ -48,7 +48,7 @@ function FormatFilterBar({ counts, active, onChange }: {
             }}
           >
             {label}
-            <span style={{ color: on ? 'rgba(251,250,247,.55)' : 'rgba(17,17,17,.3)', fontWeight: 600 }}>
+            <span style={{ color: on ? 'rgba(251,250,247,.55)' : 'var(--ink-3)', fontWeight: 600 }}>
               {counts[key] ?? 0}
             </span>
           </button>
@@ -98,7 +98,7 @@ function ContentCard({ piece, dragging, onOpen, onDragStart, onDragEnd }: {
         {piece.title}
       </div>
       {piece.visual_hook && (
-        <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)', marginBottom: 6 }}>
+        <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'var(--ink-3)', marginBottom: 6 }}>
           {piece.visual_hook}
         </div>
       )}
@@ -134,13 +134,13 @@ function ContentCard({ piece, dragging, onOpen, onDragStart, onDragEnd }: {
             }}>{p}</span>
           ))}
           {piece.target_post_date && (
-            <span style={{ font: "600 10px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>
+            <span style={{ font: "600 10px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>
               {new Date(piece.target_post_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           )}
         </div>
       )}
-      <div style={{ font: "600 10px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.3)', marginTop: 6 }}>
+      <div style={{ font: "600 10px 'Inter Tight', sans-serif", color: 'var(--ink-3)', marginTop: 6 }}>
         Added {new Date(piece.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
       </div>
     </div>
@@ -175,7 +175,7 @@ function AddCardInput({ onAdd }: { onAdd: (title: string) => Promise<boolean> })
         type="button"
         onClick={() => setOpen(true)}
         style={{
-          font: "600 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)',
+          font: "600 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)',
           cursor: 'pointer', padding: '8px 2px', background: 'none', border: 'none',
           display: 'block', textAlign: 'left',
         }}
@@ -239,7 +239,7 @@ export default function ContentBoard() {
         <div className="board-header" style={{ marginBottom: 28 }}>
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Media Tracker</div>
           <div style={{
-            font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)',
+            font: "500 12px 'Inter Tight', sans-serif", color: 'var(--ink-3)',
             letterSpacing: '.04em', textTransform: 'uppercase',
           }}>
             {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -251,7 +251,7 @@ export default function ContentBoard() {
           // a beat before the first fetch resolves -- reads as "you have no
           // content yet" rather than "still loading," which is a lie about
           // real data disappearing, not the truth about a request in flight.
-          <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', padding: '4px 0 24px' }}>
+          <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)', padding: '4px 0 24px' }}>
             Loading…
           </div>
         ) : (
@@ -274,11 +274,11 @@ export default function ContentBoard() {
               }}
             >
               <div style={{
-                font: "700 11px 'Archivo', sans-serif", color: 'rgba(17,17,17,.5)', letterSpacing: '.04em',
+                font: "700 11px 'Archivo', sans-serif", color: 'var(--ink-3)', letterSpacing: '.04em',
                 textTransform: 'uppercase', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6,
               }}>
                 {CONTENT_STATUS_LABELS[col.status]}
-                <span style={{ color: 'rgba(17,17,17,.3)', fontWeight: 600 }}>{visible.length}</span>
+                <span style={{ color: 'var(--ink-3)', fontWeight: 600 }}>{visible.length}</span>
               </div>
 
               {visible.map((piece) => (

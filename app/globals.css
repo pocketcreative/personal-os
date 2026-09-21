@@ -4,7 +4,10 @@
   --ink-0: #f3f1ec; /* page background */
   --ink-1: #fbfaf7; /* card background */
   --ink-2: rgba(17, 17, 17, .12); /* borders */
-  --ink-3: rgba(17, 17, 17, .45); /* muted text */
+  /* muted text -- was rgba(17,17,17,.45), ~3.0:1 contrast on the ink-0/1
+     backgrounds (fails WCAG AA's 4.5:1 minimum for normal text). .62 measures
+     ~5.1-5.3:1 against both backgrounds, genuinely legible. */
+  --ink-3: rgba(17, 17, 17, .62); /* muted text */
   --ink-4: #111111; /* primary text */
   --accent: #9a7a2e;
   --ok: #4b7a4f;

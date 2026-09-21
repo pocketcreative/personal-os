@@ -61,7 +61,6 @@ export async function POST(req: NextRequest) {
     thumbnail_link: body.thumbnail_link ?? null,
     video_link: body.video_link ?? null,
     posted_link: body.posted_link ?? null,
-    additional_footage: body.additional_footage ?? null,
   }).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   // A brand new piece has no comments yet, so the counts are known without a
