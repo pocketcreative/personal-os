@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ContentPiece } from '@/lib/types';
+import type { ContentFormat, ContentPiece } from '@/lib/types';
 import { CONTENT_STATUSES } from '@/lib/types';
 
 async function fetchAll(): Promise<ContentPiece[]> {
@@ -9,9 +9,9 @@ async function fetchAll(): Promise<ContentPiece[]> {
   return res.json();
 }
 
-async function createPiece(title: string, status: ContentPiece['status']): Promise<ContentPiece | null> {
+async function createPiece(title: string, status: ContentPiece['status'], format?: ContentFormat): Promise<ContentPiece | null> {
   const res = await fetch('/api/content', {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title, status }),
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title, status, format }),
   });
   if (!res.ok) { console.error('createContent failed', res.status, await res.text()); return null; }
   return res.json();
@@ -66,8 +66,8 @@ export function useContentBoard() {
     pieces: sortColumn(pieces.filter((p) => p.status === status)),
   }));
 
-  const addPiece = useCallback(async (title: string, status: ContentPiece['status'] = 'draft') => {
-    const created = await createPiece(title, status);
+  const addPiece = useCallback(async (title: string, status: ContentPiece['status'] = 'draft', format?: ContentFormat) => {
+    const created = await createPiece(title, status, format);
     if (created) setPieces((cur) => [created, ...cur]);
   }, []);
 

@@ -267,7 +267,12 @@ export default function ContentBoard() {
                 </div>
               ))}
 
-              <AddCardInput onAdd={(title) => board.addPiece(title, col.status)} />
+              {/* Creating a card while a specific format tab is active tags the
+                  new piece with that format right away, since typing it there
+                  already declared which format it belongs to -- no manual
+                  format edit needed after. "All" has no single format to
+                  default to, so it's left uncategorised as before. */}
+              <AddCardInput onAdd={(title) => board.addPiece(title, col.status, formatFilter === 'all' ? undefined : formatFilter)} />
             </div>
             );
           })}
