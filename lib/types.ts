@@ -69,6 +69,7 @@ export interface ContentPiece {
   platform: string[];
   target_post_date: string | null;
   raw_footage_link: string | null;
+  thumbnail_link: string | null;
   video_link: string | null; // the working video file (a Drive /preview URL embeds as a player)
   posted_link: string | null; // the live public post, once it's out
   additional_footage: string | null;

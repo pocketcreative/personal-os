@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
     platform: body.platform ?? [],
     target_post_date: body.target_post_date ?? null,
     raw_footage_link: body.raw_footage_link ?? null,
+    thumbnail_link: body.thumbnail_link ?? null,
     video_link: body.video_link ?? null,
     posted_link: body.posted_link ?? null,
     additional_footage: body.additional_footage ?? null,

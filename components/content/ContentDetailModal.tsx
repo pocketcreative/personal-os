@@ -451,6 +451,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
   const [platform, setPlatform] = useState(piece.platform.join(', '));
   const [targetPostDate, setTargetPostDate] = useState(piece.target_post_date ?? '');
   const [rawFootageLink, setRawFootageLink] = useState(piece.raw_footage_link ?? '');
+  const [thumbnailLink, setThumbnailLink] = useState(piece.thumbnail_link ?? '');
   const [videoLink, setVideoLink] = useState(piece.video_link ?? '');
   const [postedLink, setPostedLink] = useState(piece.posted_link ?? '');
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -528,6 +529,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
     if (nextPlatform.join(',') !== piece.platform.join(',')) patch.platform = nextPlatform;
     if (targetPostDate !== (piece.target_post_date ?? '')) patch.target_post_date = targetPostDate || null;
     if (rawFootageLink !== (piece.raw_footage_link ?? '')) patch.raw_footage_link = rawFootageLink || null;
+    if (thumbnailLink !== (piece.thumbnail_link ?? '')) patch.thumbnail_link = thumbnailLink || null;
     if (videoLink !== (piece.video_link ?? '')) patch.video_link = videoLink || null;
     if (postedLink !== (piece.posted_link ?? '')) patch.posted_link = postedLink || null;
     if (Object.keys(patch).length > 0) onSave(patch);
@@ -710,6 +712,9 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
                 <input id="cm-raw-footage-link" value={rawFootageLink} onChange={(e) => setRawFootageLink(e.target.value)} placeholder="https://…" style={{ ...fieldStyle, marginBottom: 20 }} />
               </>
             )}
+
+            <label htmlFor="cm-thumbnail-link" style={labelStyle}>Thumbnail Link</label>
+            <input id="cm-thumbnail-link" value={thumbnailLink} onChange={(e) => setThumbnailLink(e.target.value)} placeholder="https://…" style={{ ...fieldStyle, marginBottom: 20 }} />
 
             <label htmlFor="cm-script" style={labelStyle}>Script</label>
             <textarea
