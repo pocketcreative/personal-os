@@ -67,6 +67,12 @@ export function useContentBoard() {
   }));
 
   const addPiece = useCallback(async (title: string, status: ContentPiece['status'] = 'draft', format?: ContentFormat) => {
+    // Same guard as update/delete/move below: without this, a still-in-flight
+    // initial load() (very likely, since adding a card is often the first
+    // thing done on landing on the page) resolves with the pre-creation
+    // snapshot and overwrites the card we just added into local state, so it
+    // silently disappears until a manual refresh re-fetches it from the server.
+    dirtyRef.current = true;
     const created = await createPiece(title, status, format);
     if (created) setPieces((cur) => [created, ...cur]);
   }, []);
