@@ -52,11 +52,15 @@ function sortColumn(pieces: ContentPiece[]): ContentPiece[] {
 export function useContentBoard() {
   const [pieces, setPieces] = useState<ContentPiece[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Only covers the very first fetch -- lets the board show "Loading…"
+  // instead of a misleading empty/zero-count board while that's in flight.
+  const [loading, setLoading] = useState(true);
   const dirtyRef = useRef(false);
 
   const load = useCallback(async () => {
     const data = await fetchAll();
     if (!dirtyRef.current) setPieces(data);
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -75,6 +79,10 @@ export function useContentBoard() {
     dirtyRef.current = true;
     const created = await createPiece(title, status, format);
     if (created) setPieces((cur) => [created, ...cur]);
+    // Boolean result lets the input that called this decide whether it's safe
+    // to clear the typed title -- previously it always cleared, so a failed
+    // create silently threw away what was typed with no sign anything went wrong.
+    return created !== null;
   }, []);
 
   const updatePiece = useCallback(async (id: string, patch: Partial<ContentPiece>) => {
@@ -87,6 +95,9 @@ export function useContentBoard() {
     // the next full board reload.
     if (saved) setPieces((cur) => cur.map((p) => (p.id === id ? { ...p, ...saved } : p)));
     else load();
+    // Boolean result lets the detail modal know a save actually failed instead
+    // of just closing and quietly reverting the fields on the next load().
+    return saved !== null;
   }, [load]);
 
   // Local-only. The comment thread has already written to the server; this
@@ -124,6 +135,7 @@ export function useContentBoard() {
 
   return {
     columns,
+    loading,
     activeId, setActiveId,
     activePiece: pieces.find((p) => p.id === activeId) ?? null,
     addPiece, updatePiece, deletePiece, moveCard, setCommentCounts,

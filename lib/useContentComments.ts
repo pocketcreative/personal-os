@@ -56,9 +56,13 @@ export function useContentComments(pieceId: string, onCountsChange?: (total: num
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ body, video_timestamp_seconds: videoTimestampSeconds }),
     });
-    if (!res.ok) { console.error('addComment failed', res.status, await res.text()); return; }
+    // Boolean result lets the composer decide whether it's safe to clear what
+    // was typed -- previously it always cleared, so a failed post silently
+    // dropped the note with no sign anything went wrong.
+    if (!res.ok) { console.error('addComment failed', res.status, await res.text()); return false; }
     const created: ContentComment = await res.json();
     setComments((cur) => { const next = [...cur, created]; report(next); return next; });
+    return true;
   }, [pieceId, report]);
 
   const setResolved = useCallback(async (commentId: string, resolved: boolean) => {

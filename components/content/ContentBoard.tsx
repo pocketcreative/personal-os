@@ -43,7 +43,7 @@ function FormatFilterBar({ counts, active, onChange }: {
               color: on ? '#fbfaf7' : 'rgba(17,17,17,.5)',
               background: on ? '#111' : 'transparent',
               border: `1px solid ${on ? '#111' : 'rgba(17,17,17,.12)'}`,
-              borderRadius: 20, padding: '6px 12px', cursor: 'pointer',
+              borderRadius: 20, padding: '8px 14px', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 6, userSelect: 'none',
             }}
           >
@@ -147,14 +147,27 @@ function ContentCard({ piece, dragging, onOpen, onDragStart, onDragEnd }: {
   );
 }
 
-function AddCardInput({ onAdd }: { onAdd: (title: string) => void }) {
+function AddCardInput({ onAdd }: { onAdd: (title: string) => Promise<boolean> }) {
   const [draft, setDraft] = useState('');
   const [open, setOpen] = useState(false);
-  const submit = () => {
+  const [submitting, setSubmitting] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  // Async now: the draft only clears (and the input closes) once the create
+  // actually succeeds. Previously this cleared unconditionally on blur/Enter,
+  // so a failed request silently threw away whatever title was typed with no
+  // sign anything went wrong -- onBlur made that worse, since clicking
+  // anywhere else to dismiss looked identical to a successful add.
+  const submit = async () => {
+    if (submitting) return; // guards the re-entrant onBlur that disabling the input below can trigger
     const t = draft.trim();
-    if (t) onAdd(t);
-    setDraft('');
-    setOpen(false);
+    if (!t) { setOpen(false); return; }
+    setSubmitting(true);
+    setFailed(false);
+    const ok = await onAdd(t);
+    setSubmitting(false);
+    if (ok) { setDraft(''); setOpen(false); }
+    else setFailed(true);
   };
   if (!open) {
     return (
@@ -170,18 +183,27 @@ function AddCardInput({ onAdd }: { onAdd: (title: string) => void }) {
     );
   }
   return (
-    <input
-      autoFocus
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={submit}
-      onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { setDraft(''); setOpen(false); } }}
-      placeholder="Title…"
-      style={{
-        width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(17,17,17,.15)',
-        font: "500 16px 'Inter Tight', sans-serif", color: '#111', background: '#fff', boxSizing: 'border-box',
-      }}
-    />
+    <div>
+      <input
+        autoFocus
+        value={draft}
+        disabled={submitting}
+        onChange={(e) => { setDraft(e.target.value); setFailed(false); }}
+        onBlur={submit}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { setDraft(''); setFailed(false); setOpen(false); } }}
+        placeholder="Title…"
+        style={{
+          width: '100%', padding: '8px 10px', borderRadius: 6,
+          border: `1px solid ${failed ? 'rgba(179,38,30,.5)' : 'rgba(17,17,17,.15)'}`,
+          font: "500 16px 'Inter Tight', sans-serif", color: '#111', background: '#fff', boxSizing: 'border-box',
+        }}
+      />
+      {failed && (
+        <div style={{ font: "600 11px 'Inter Tight', sans-serif", color: '#b3261e', marginTop: 4 }}>
+          Couldn&rsquo;t add, check connection and try again.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -224,6 +246,16 @@ export default function ContentBoard() {
           </div>
         </div>
 
+        {board.loading ? (
+          // Without this, the board renders its real (empty) column state for
+          // a beat before the first fetch resolves -- reads as "you have no
+          // content yet" rather than "still loading," which is a lie about
+          // real data disappearing, not the truth about a request in flight.
+          <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', padding: '4px 0 24px' }}>
+            Loading…
+          </div>
+        ) : (
+          <>
         <FormatFilterBar counts={formatCounts} active={formatFilter} onChange={setFormatFilter} />
 
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
@@ -277,6 +309,8 @@ export default function ContentBoard() {
             );
           })}
         </div>
+          </>
+        )}
       </div>
 
       {board.activePiece && (

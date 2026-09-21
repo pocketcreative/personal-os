@@ -339,7 +339,7 @@ function CommentsPanel({
 }: {
   comments: ContentComment[];
   loading: boolean;
-  addComment: (body: string, videoTimestampSeconds: number | null) => void;
+  addComment: (body: string, videoTimestampSeconds: number | null) => Promise<boolean>;
   setResolved: (commentId: string, resolved: boolean) => void;
   deleteComment: (commentId: string) => void;
   labelStyle: React.CSSProperties;
@@ -350,14 +350,23 @@ function CommentsPanel({
 }) {
   const [draft, setDraft] = useState('');
   const [ts, setTs] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [failed, setFailed] = useState(false);
   const unresolved = comments.filter((c) => !c.resolved).length;
 
-  const submit = () => {
+  // Async now: the draft only clears once the post actually succeeds.
+  // Previously this cleared unconditionally, so a failed request silently
+  // threw away whatever note was typed with no sign anything went wrong.
+  const submit = async () => {
+    if (submitting) return;
     const body = draft.trim();
     if (!body) return;
-    addComment(body, parseTimestamp(ts));
-    setDraft('');
-    setTs('');
+    setSubmitting(true);
+    setFailed(false);
+    const ok = await addComment(body, parseTimestamp(ts));
+    setSubmitting(false);
+    if (ok) { setDraft(''); setTs(''); }
+    else setFailed(true);
   };
 
   // Auto-fills the timecode with the video's current playback second the
@@ -424,12 +433,19 @@ function CommentsPanel({
           <span style={{ flex: 1 }} />
           <button
             onClick={submit}
+            disabled={submitting}
             style={{
               font: "600 13px 'Inter Tight', sans-serif", color: '#fff', background: '#111',
-              border: 'none', borderRadius: 7, padding: '10px 18px', cursor: 'pointer',
+              border: 'none', borderRadius: 7, padding: '10px 18px', cursor: submitting ? 'default' : 'pointer',
+              opacity: submitting ? 0.6 : 1,
             }}
-          >Comment</button>
+          >{submitting ? 'Posting…' : 'Comment'}</button>
         </div>
+        {failed && (
+          <div style={{ font: "600 11px 'Inter Tight', sans-serif", color: '#b3261e', marginTop: 8 }}>
+            Couldn&rsquo;t post, check connection and try again.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -438,7 +454,7 @@ function CommentsPanel({
 export default function ContentDetailModal({ piece, onClose, onSave, onDelete, onCommentCountsChange }: {
   piece: ContentPiece;
   onClose: () => void;
-  onSave: (patch: Partial<ContentPiece>) => void;
+  onSave: (patch: Partial<ContentPiece>) => Promise<boolean>;
   onDelete: () => void;
   onCommentCountsChange?: (total: number, unresolved: number) => void;
 }) {
@@ -454,7 +470,11 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
   const [thumbnailLink, setThumbnailLink] = useState(piece.thumbnail_link ?? '');
   const [videoLink, setVideoLink] = useState(piece.video_link ?? '');
   const [postedLink, setPostedLink] = useState(piece.posted_link ?? '');
+  const [thumbnailBroken, setThumbnailBroken] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle');
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const scriptRef = useRef<HTMLTextAreaElement>(null);
+  const captionRef = useRef<HTMLTextAreaElement>(null);
 
   // Mobile-only tab switcher (Details / Comments), Frame.io mobile app
   // style -- desktop ignores this entirely and always shows both columns.
@@ -517,7 +537,33 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
     el.style.height = `${el.scrollHeight}px`;
   }, [title]);
 
-  function done() {
+  // Same auto-grow as the title above, applied to Script and Caption: the box
+  // grows to fit whatever's typed instead of a fixed height that forces an
+  // inner scrollbar for anything longer than a short script. The 420/100px
+  // floors below just keep the empty box from looking cramped before anything
+  // is typed -- Math.max never shrinks the box below content height once
+  // there's real content.
+  useEffect(() => {
+    const el = scriptRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(el.scrollHeight, 420)}px`;
+  }, [script]);
+
+  useEffect(() => {
+    const el = captionRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(el.scrollHeight, 100)}px`;
+  }, [caption]);
+
+  // A thumbnail link that just failed to load stays failed until it changes
+  // -- otherwise switching tabs or any unrelated re-render would keep
+  // retrying (and re-showing) a link that's already known to be broken.
+  useEffect(() => { setThumbnailBroken(false); }, [thumbnailLink]);
+
+  async function done() {
+    if (saveState === 'saving') return; // guards a second close attempt (backdrop click, ✕, Done) while one is already in flight
     const patch: Partial<ContentPiece> = {};
     if (title !== piece.title) patch.title = title;
     if (status !== piece.status) patch.status = status;
@@ -532,8 +578,17 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
     if (thumbnailLink !== (piece.thumbnail_link ?? '')) patch.thumbnail_link = thumbnailLink || null;
     if (videoLink !== (piece.video_link ?? '')) patch.video_link = videoLink || null;
     if (postedLink !== (piece.posted_link ?? '')) patch.posted_link = postedLink || null;
-    if (Object.keys(patch).length > 0) onSave(patch);
-    onClose();
+    if (Object.keys(patch).length === 0) { onClose(); return; }
+    // Waits for the real save result before closing -- previously this closed
+    // immediately regardless of what happened on the server, so a failed
+    // PATCH silently reverted every edit on the next board reload with no
+    // sign to Brendan that anything had gone wrong. On failure the modal
+    // stays open (with everything still typed in) so nothing typed is lost
+    // and he can just hit Done again.
+    setSaveState('saving');
+    const ok = await onSave(patch);
+    if (ok) { onClose(); return; }
+    setSaveState('error');
   }
 
   const fieldStyle = {
@@ -665,11 +720,47 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               ))}
             </select>
 
-            <label htmlFor="cm-video-link" style={labelStyle}>Video Link</label>
-            <input id="cm-video-link" value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="https://drive.google.com/file/d/…/preview" style={{ ...fieldStyle, marginBottom: 20 }} />
-
             <label htmlFor="cm-visual-hook" style={labelStyle}>Visual Hook</label>
             <input id="cm-visual-hook" value={visualHook} onChange={(e) => setVisualHook(e.target.value)} placeholder="The opening shot / line…" style={{ ...fieldStyle, marginBottom: 20 }} />
+
+            {/* Script and Caption promoted up here, right after the Visual
+                Hook -- this is the actual content of the piece and the field
+                used most, but it used to sit after 6 other metadata fields
+                (Video Link, Format, Platform, Posted/Raw Footage/Thumbnail
+                links), meaning every open of a card meant scrolling past all
+                of that just to reach the script. Auto-grows to fit whatever's
+                typed (see the useEffect above) instead of a fixed height that
+                forced an inner scrollbar on anything longer than a short
+                script -- the panel itself already scrolls, so there's no
+                reason the box couldn't just show the whole thing. */}
+            <label htmlFor="cm-script" style={labelStyle}>Script</label>
+            <textarea
+              ref={scriptRef}
+              id="cm-script"
+              value={script} onChange={(e) => setScript(e.target.value)}
+              placeholder="What's said/filmed goes here…"
+              style={{ ...fieldStyle, minHeight: 420, lineHeight: 1.5, resize: 'none', overflow: 'hidden', marginBottom: 20 }}
+            />
+
+            {/* Visually distinct from Script -- a tinted panel, not just
+                another field in the same stack -- since this is the platform
+                post copy (what goes in the caption box), not what's said. */}
+            <div style={{
+              background: 'rgba(2,74,221,.05)', border: '1px solid rgba(2,74,221,.15)',
+              borderRadius: 8, padding: 16, marginBottom: 20,
+            }}>
+              <label htmlFor="cm-caption" style={labelStyle}>Caption</label>
+              <textarea
+                ref={captionRef}
+                id="cm-caption"
+                value={caption} onChange={(e) => setCaption(e.target.value)}
+                placeholder="The post copy that goes with this piece…"
+                style={{ ...fieldStyle, minHeight: 100, lineHeight: 1.5, resize: 'none', overflow: 'hidden' }}
+              />
+            </div>
+
+            <label htmlFor="cm-video-link" style={labelStyle}>Video Link</label>
+            <input id="cm-video-link" value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="https://drive.google.com/file/d/…/preview" style={{ ...fieldStyle, marginBottom: 20 }} />
 
             <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -703,8 +794,23 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               </>
             )}
 
-            <label htmlFor="cm-posted-link" style={labelStyle}>Posted Link</label>
-            <input id="cm-posted-link" value={postedLink} onChange={(e) => setPostedLink(e.target.value)} placeholder="https://instagram.com/… (once it's live)" style={{ ...fieldStyle, marginBottom: 20 }} />
+            <label htmlFor="cm-thumbnail-link" style={labelStyle}>Thumbnail Link</label>
+            {/* The field existed with no way to see what it pointed to --
+                pasting a link gave no confirmation it was the right image, or
+                even a valid image URL at all. A broken/non-image link just
+                quietly shows no preview (onError) rather than a broken-image icon. */}
+            {thumbnailLink.trim() && !thumbnailBroken && (
+              <img
+                src={thumbnailLink}
+                alt="Thumbnail preview"
+                onError={() => setThumbnailBroken(true)}
+                style={{
+                  display: 'block', width: '100%', maxWidth: 240, maxHeight: 140, objectFit: 'contain',
+                  borderRadius: 6, border: '1px solid rgba(17,17,17,.1)', marginBottom: 8, background: '#fff',
+                }}
+              />
+            )}
+            <input id="cm-thumbnail-link" value={thumbnailLink} onChange={(e) => setThumbnailLink(e.target.value)} placeholder="https://…" style={{ ...fieldStyle, marginBottom: 20 }} />
 
             {showRawFootageLink && (
               <>
@@ -713,32 +819,8 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
               </>
             )}
 
-            <label htmlFor="cm-thumbnail-link" style={labelStyle}>Thumbnail Link</label>
-            <input id="cm-thumbnail-link" value={thumbnailLink} onChange={(e) => setThumbnailLink(e.target.value)} placeholder="https://…" style={{ ...fieldStyle, marginBottom: 20 }} />
-
-            <label htmlFor="cm-script" style={labelStyle}>Script</label>
-            <textarea
-              id="cm-script"
-              value={script} onChange={(e) => setScript(e.target.value)}
-              placeholder="What's said/filmed goes here…"
-              style={{ ...fieldStyle, minHeight: 420, lineHeight: 1.5, resize: 'vertical', marginBottom: 20 }}
-            />
-
-            {/* Visually distinct from Script -- a tinted panel, not just
-                another field in the same stack -- since this is the platform
-                post copy (what goes in the caption box), not what's said. */}
-            <div style={{
-              background: 'rgba(2,74,221,.05)', border: '1px solid rgba(2,74,221,.15)',
-              borderRadius: 8, padding: 16, marginBottom: 4,
-            }}>
-              <label htmlFor="cm-caption" style={labelStyle}>Caption</label>
-              <textarea
-                id="cm-caption"
-                value={caption} onChange={(e) => setCaption(e.target.value)}
-                placeholder="The post copy that goes with this piece…"
-                style={{ ...fieldStyle, minHeight: 100, lineHeight: 1.5, resize: 'vertical' }}
-              />
-            </div>
+            <label htmlFor="cm-posted-link" style={labelStyle}>Posted Link</label>
+            <input id="cm-posted-link" value={postedLink} onChange={(e) => setPostedLink(e.target.value)} placeholder="https://instagram.com/… (once it's live)" style={fieldStyle} />
           </div>
         </div>
 
@@ -758,7 +840,7 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
         </div>
         </div>
 
-        <div style={{ flex: '0 0 auto', padding: '18px 32px', borderTop: '1px solid rgba(17,17,17,.08)', display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ flex: '0 0 auto', padding: '18px 32px', borderTop: '1px solid rgba(17,17,17,.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <button
             onClick={() => { if (confirm(`Delete "${piece.title}"? This can't be undone.`)) onDelete(); }}
             style={{
@@ -768,14 +850,21 @@ export default function ContentDetailModal({ piece, onClose, onSave, onDelete, o
           >
             Delete
           </button>
+          {saveState === 'error' && (
+            <div style={{ flex: 1, font: "600 12px 'Inter Tight', sans-serif", color: '#b3261e', textAlign: 'right' }}>
+              Couldn&rsquo;t save, check connection and hit Done again.
+            </div>
+          )}
           <button
             onClick={done}
+            disabled={saveState === 'saving'}
             style={{
               font: "600 13px 'Inter Tight', sans-serif", color: '#fff', background: '#111',
-              border: 'none', borderRadius: 7, padding: '10px 22px', cursor: 'pointer',
+              border: 'none', borderRadius: 7, padding: '10px 22px',
+              cursor: saveState === 'saving' ? 'default' : 'pointer', opacity: saveState === 'saving' ? 0.6 : 1,
             }}
           >
-            Done
+            {saveState === 'saving' ? 'Saving…' : 'Done'}
           </button>
         </div>
       </div>
