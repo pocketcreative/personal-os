@@ -6,7 +6,7 @@ const PATCHABLE = new Set([
   'title', 'description', 'urgency', 'key', 'priority_score', 'rank_pinned',
   'time_estimate_min', 'actual_time_min', 'tags', 'due_date', 'completed_at',
   'category', 'status', 'owner', 'needs_input', 'input_note',
-  'agent_tags', 'task_type',
+  'agent_tags', 'task_type', 'decisions_log',
 ]);
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -58,7 +58,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { data, error } = await db.from('tasks').update(patch)
     .eq('id', id).eq('user_id', USER_ID).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ...data, agent_tags: data.agent_tags ?? [], task_type: data.task_type ?? 'single' });
+  return NextResponse.json({
+    ...data, agent_tags: data.agent_tags ?? [], task_type: data.task_type ?? 'single',
+    decisions_log: data.decisions_log ?? null,
+  });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

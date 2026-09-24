@@ -39,10 +39,9 @@ function useBoardSensors() {
   );
 }
 
-function DraggableTaskCard({ task, onOpen, onChangeStatus }: {
+function DraggableTaskCard({ task, onOpen }: {
   task: Task;
   onOpen: () => void;
-  onChangeStatus: (status: Task['status']) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
   return (
@@ -56,7 +55,7 @@ function DraggableTaskCard({ task, onOpen, onChangeStatus }: {
         touchAction: 'manipulation',
       }}
     >
-      <TaskCard task={task} onOpen={onOpen} onChangeStatus={onChangeStatus} />
+      <TaskCard task={task} onOpen={onOpen} />
     </div>
   );
 }
@@ -209,7 +208,6 @@ export default function TaskKanbanBoard() {
                         key={task.id}
                         task={task}
                         onOpen={() => d.setActiveTaskId(task.id)}
-                        onChangeStatus={(status) => d.updateStatus(task.id, status)}
                       />
                     ))}
                   </DroppableColumn>
@@ -223,7 +221,7 @@ export default function TaskKanbanBoard() {
                   width: COLUMN_MIN_WIDTH - 24, boxShadow: '0 14px 30px rgba(0,0,0,.2)', borderRadius: 10,
                   transform: 'rotate(1.5deg)', cursor: 'grabbing',
                 }}>
-                  <TaskCard task={draggingTask} onOpen={() => {}} onChangeStatus={() => {}} />
+                  <TaskCard task={draggingTask} onOpen={() => {}} />
                 </div>
               )}
             </DragOverlay>
@@ -245,6 +243,7 @@ export default function TaskKanbanBoard() {
             if (patch.task_type !== undefined) d.updateTaskType(d.activeTask!.id, patch.task_type);
             if (patch.urgency !== undefined) d.updateUrgency(d.activeTask!.id, patch.urgency);
             if (patch.due_date !== undefined) d.updateDueDate(d.activeTask!.id, patch.due_date);
+            if (patch.decisions_log !== undefined) d.updateDecisionsLog(d.activeTask!.id, patch.decisions_log);
           }}
           onDelete={() => { d.deleteTask(d.activeTask!.id); d.setActiveTaskId(null); }}
         />

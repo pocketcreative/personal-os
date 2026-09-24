@@ -27,6 +27,10 @@ export interface Task {
   input_note: string | null; // what's needed from Brendan when needs_input is true
   agent_tags: string[]; // which agent role(s) this task is assigned to -- separate from `owner` (a single identity); a task can carry more than one
   task_type: 'single' | 'scheduled'; // 'scheduled' = a recurring automation; each firing is its own new row, not one row cycling forever
+  // Running problem -> options considered -> recommended solution log, same
+  // pattern used in Telegram when working through open decisions on a task.
+  // Nullable markdown text, distinct from `description` (migration 0021).
+  decisions_log: string | null;
 }
 
 // Seed list shown in the Agents Assigned picker -- free text is still

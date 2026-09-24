@@ -4,6 +4,7 @@ import type { Task } from '@/lib/types';
 import {
   AGENT_TAGS, STAGE_LABELS, TASK_TYPES, TASK_TYPE_LABELS, URGENCIES, URGENCY_LABELS, taskStage,
 } from '@/lib/types';
+import { formatGoalSteps, parseGoalSteps } from '@/lib/taskDescription';
 
 export interface TaskDetailPatch {
   title?: string;
@@ -15,7 +16,21 @@ export interface TaskDetailPatch {
   task_type?: Task['task_type'];
   urgency?: Task['urgency'];
   due_date?: string | null;
+  decisions_log?: string | null;
 }
+
+// Shared look for the small uppercase section labels used throughout this
+// modal (Description, Goal, Steps, Agents Assigned, Type, Urgency, …).
+const SECTION_LABEL_STYLE: React.CSSProperties = {
+  font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)',
+  letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 10,
+};
+const TEXTAREA_STYLE: React.CSSProperties = {
+  width: '100%', minHeight: 140, fontSize: 16, lineHeight: 1.5, color: '#111',
+  resize: 'vertical', padding: '12px 14px', border: '1px solid rgba(17,17,17,.1)',
+  borderRadius: 6, background: '#fff', boxSizing: 'border-box',
+  fontFamily: "'Inter Tight', sans-serif", outline: 'none',
+};
 
 const STAGE_DOT: Record<string, string> = {
   not_started: 'rgba(17,17,17,.3)', in_progress: '#eab308', needs_review: '#9a7a2e',
@@ -29,7 +44,16 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
   onDelete: () => void;
 }) {
   const [name, setName] = useState(task.title);
+  // If the description already follows a `## Goal` / `## Steps` structure,
+  // edit it as two separate labeled fields instead of one blob — computed
+  // once from the task as loaded, not re-checked on every keystroke, so
+  // typing a fresh description doesn't cause the layout to jump mid-edit.
+  const [initialParsed] = useState(() => parseGoalSteps(task.description ?? ''));
   const [description, setDescription] = useState(task.description ?? '');
+  const [goalText, setGoalText] = useState(initialParsed?.goal ?? '');
+  const [stepsText, setStepsText] = useState(initialParsed?.steps ?? '');
+  const [decisionsLog, setDecisionsLog] = useState(task.decisions_log ?? '');
+  const [decisionsOpen, setDecisionsOpen] = useState(!!task.decisions_log);
   const [owner, setOwner] = useState(task.owner ?? '');
   const [needsInput, setNeedsInput] = useState(!!task.needs_input);
   const [inputNote, setInputNote] = useState(task.input_note ?? '');
@@ -52,7 +76,10 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
 
   function done() {
     if (name !== task.title) onSave({ title: name });
-    if (description !== (task.description ?? '')) onSave({ description });
+    const newDescription = initialParsed ? formatGoalSteps(goalText, stepsText) : description;
+    if (newDescription !== (task.description ?? '')) onSave({ description: newDescription });
+    const trimmedDecisions = decisionsLog.trim() || null;
+    if (trimmedDecisions !== (task.decisions_log ?? null)) onSave({ decisions_log: trimmedDecisions });
     if (owner !== task.owner) onSave({ owner });
     const trimmedNote = inputNote.trim() || null;
     if (needsInput !== task.needs_input || trimmedNote !== task.input_note) {
@@ -118,19 +145,60 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
           </span>
         </div>
         <div style={{ padding: '8px 32px 32px' }}>
-          <div style={{ font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 10 }}>
-            Description
-          </div>
-          <textarea
-            value={description} onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add notes about this task…"
-            style={{
-              width: '100%', minHeight: 140, fontSize: 16, lineHeight: 1.5, color: '#111',
-              resize: 'vertical', padding: '12px 14px', border: '1px solid rgba(17,17,17,.1)',
-              borderRadius: 6, background: '#fff', boxSizing: 'border-box',
-              fontFamily: "'Inter Tight', sans-serif", outline: 'none',
-            }}
-          />
+          {initialParsed ? (
+            <>
+              <div style={SECTION_LABEL_STYLE}>Goal</div>
+              <textarea
+                value={goalText} onChange={(e) => setGoalText(e.target.value)}
+                placeholder="What this task is actually trying to achieve…"
+                style={{ ...TEXTAREA_STYLE, minHeight: 80 }}
+              />
+              <div style={{ ...SECTION_LABEL_STYLE, marginTop: 20 }}>Steps</div>
+              <textarea
+                value={stepsText} onChange={(e) => setStepsText(e.target.value)}
+                placeholder="The steps to get there…"
+                style={{ ...TEXTAREA_STYLE, minHeight: 140 }}
+              />
+            </>
+          ) : (
+            <>
+              <div style={SECTION_LABEL_STYLE}>Description</div>
+              <textarea
+                value={description} onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add notes about this task…"
+                style={TEXTAREA_STYLE}
+              />
+            </>
+          )}
+
+          {/* Thin left border + faint tint is a deliberate, brief-specified
+              gold accent (CLAUDE.md: "a left border ... not a solid gold
+              block"), not the thick side-tab AI-slop pattern — 3px, 7%
+              background opacity, used once on the page. */}
+          {decisionsOpen ? (
+            <div style={{
+              marginTop: 20, borderLeft: '3px solid #E2B246', background: 'rgba(226,178,70,.07)',
+              borderRadius: '0 6px 6px 0', padding: '14px 16px',
+            }}>
+              <div style={{ ...SECTION_LABEL_STYLE, color: '#9a7526', marginBottom: 10 }}>
+                Problems, Solutions &amp; Recommendation
+              </div>
+              <textarea
+                value={decisionsLog} onChange={(e) => setDecisionsLog(e.target.value)}
+                placeholder="Problem → options considered → recommendation…"
+                style={{ ...TEXTAREA_STYLE, minHeight: 100, border: '1px solid rgba(226,178,70,.35)' }}
+              />
+            </div>
+          ) : (
+            <div
+              onClick={() => setDecisionsOpen(true)}
+              style={{
+                marginTop: 16, cursor: 'pointer', font: "600 12px 'Inter Tight', sans-serif", color: '#9a7526',
+              }}
+            >
+              + Add problems / solutions / recommendation
+            </div>
+          )}
 
           <div style={{ font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)', letterSpacing: '.06em', textTransform: 'uppercase', margin: '20px 0 10px' }}>
             Agents Assigned

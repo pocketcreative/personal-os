@@ -27,6 +27,8 @@ export async function GET(req: NextRequest) {
       // migration 0017 is applied on the live DB, real values after.
       agent_tags: t.agent_tags ?? [],
       task_type: t.task_type ?? 'single',
+      // Same defensive fallback for decisions_log until migration 0021 lands.
+      decisions_log: t.decisions_log ?? null,
     };
   });
   return NextResponse.json(withFlattenedTimer, { headers: { 'cache-control': 'no-store' } });
@@ -60,7 +62,11 @@ export async function POST(req: NextRequest) {
   // migration 0017 (agent_tags/task_type) has landed on the live DB yet.
   if (body.agent_tags !== undefined) insertRow.agent_tags = body.agent_tags;
   if (body.task_type !== undefined) insertRow.task_type = body.task_type;
+  if (body.decisions_log !== undefined) insertRow.decisions_log = body.decisions_log;
   const { data, error } = await db.from('tasks').insert(insertRow).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ...data, agent_tags: data.agent_tags ?? [], task_type: data.task_type ?? 'single' }, { status: 201 });
+  return NextResponse.json({
+    ...data, agent_tags: data.agent_tags ?? [], task_type: data.task_type ?? 'single',
+    decisions_log: data.decisions_log ?? null,
+  }, { status: 201 });
 }

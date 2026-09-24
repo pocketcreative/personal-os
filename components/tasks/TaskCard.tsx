@@ -1,15 +1,19 @@
 'use client';
 import type { Task } from '@/lib/types';
 import { URGENCY_LABELS } from '@/lib/types';
-import FieldPopover from './FieldPopover';
-import { STATUS_LABELS } from '@/lib/types';
+import { ownerCellLabel } from './OwnerCell';
 
-const STATUS_DOT: Record<Task['status'], string> = {
-  not_started: 'rgba(17,17,17,.3)', in_progress: '#eab308', completed: '#2f9e44', archived: 'rgba(154,122,46,.4)',
-};
-const STATUS_TEXT: Record<Task['status'], string> = {
-  not_started: 'rgba(17,17,17,.45)', in_progress: '#a16207', completed: '#227a37', archived: 'rgba(154,122,46,.65)',
-};
+// Short "Sep 24" style formatting for the card face — the due_date column is
+// a plain YYYY-MM-DD date with no time component, so it's parsed as local
+// midnight (not UTC) to avoid shifting a day in negative-UTC-offset zones.
+function formatDueDate(dueDate: string): string {
+  return new Date(`${dueDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function todayLocalISO(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
 
 // Small deterministic color per agent tag so the same role always reads the
 // same way across cards, without a fixed enum-to-color map that'd break the
@@ -33,13 +37,15 @@ function AgentBadge({ tag }: { tag: string }) {
   );
 }
 
-export default function TaskCard({ task, onOpen, onChangeStatus }: {
+export default function TaskCard({ task, onOpen }: {
   task: Task;
   onOpen: () => void;
-  onChangeStatus: (status: Task['status']) => void;
 }) {
   const isCompleted = task.status === 'completed';
   const preview = task.needs_input && task.input_note ? task.input_note : task.description;
+  const ownerLabel = ownerCellLabel(task.owner);
+  const isOverdue = !!task.due_date && task.due_date < todayLocalISO()
+    && task.status !== 'completed' && task.status !== 'archived';
 
   return (
     <div
@@ -79,38 +85,50 @@ export default function TaskCard({ task, onOpen, onChangeStatus }: {
         </div>
       )}
 
+      {/* Column header already says the stage, so the card face doesn't
+          repeat it — instead: owner (who's responsible) flush left, due
+          date (when it's due) flush right, same reading order as any
+          kanban assignee/due-date row. minWidth:0 on the left cluster lets
+          a long owner name ellipsis instead of pushing the right cluster
+          off the edge; flexShrink:0 on the right cluster keeps it pinned
+          flush right rather than wrapping or overflowing. */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={(e) => e.stopPropagation()}>
-          <FieldPopover
-            trigger={
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, font: "600 11px 'Inter Tight', sans-serif", color: STATUS_TEXT[task.status] }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_DOT[task.status] }} />
-                {STATUS_LABELS[task.status]}
-              </span>
-            }
-            options={[
-              { label: 'Not started', onSelect: () => onChangeStatus('not_started') },
-              { label: 'In progress', onSelect: () => onChangeStatus('in_progress') },
-              { label: 'Completed', onSelect: () => onChangeStatus('completed') },
-              { label: 'Archived', onSelect: () => onChangeStatus('archived') },
-            ]}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+          {ownerLabel && (
+            <span style={{
+              font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {ownerLabel}
+            </span>
+          )}
           {task.task_type === 'scheduled' && (
-            <span title="Scheduled (recurring)" style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>
+            <span title="Scheduled (recurring)" style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', flexShrink: 0 }}>
               ↻
             </span>
           )}
         </div>
-        {(task.urgency === 'today' || task.urgency === 'this_week') && (
-          <span style={{
-            font: "700 10px 'Inter Tight', sans-serif",
-            color: task.urgency === 'today' ? '#b3261e' : '#9a7a2e',
-            background: task.urgency === 'today' ? 'rgba(179,38,30,.08)' : 'rgba(198,161,91,.12)',
-            borderRadius: 20, padding: '3px 8px',
-          }}>
-            {URGENCY_LABELS[task.urgency]}
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {(task.urgency === 'today' || task.urgency === 'this_week') && (
+            <span style={{
+              font: "700 10px 'Inter Tight', sans-serif",
+              color: task.urgency === 'today' ? '#b3261e' : '#9a7a2e',
+              background: task.urgency === 'today' ? 'rgba(179,38,30,.08)' : 'rgba(198,161,91,.12)',
+              borderRadius: 20, padding: '3px 8px', whiteSpace: 'nowrap',
+            }}>
+              {URGENCY_LABELS[task.urgency]}
+            </span>
+          )}
+          {task.due_date && (
+            <span style={{
+              font: "600 11px 'Inter Tight', sans-serif",
+              color: isOverdue ? '#b3261e' : 'rgba(17,17,17,.45)',
+              whiteSpace: 'nowrap',
+            }}>
+              {formatDueDate(task.due_date)}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

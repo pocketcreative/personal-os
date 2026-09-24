@@ -178,6 +178,7 @@ export function useTaskDashboard() {
     updateTaskType: (id: string, task_type: Task['task_type']) => applyPatch(id, { task_type }),
     updateUrgency: (id: string, urgency: Task['urgency']) => applyPatch(id, { urgency }),
     updateDueDate: (id: string, due_date: string | null) => applyPatch(id, { due_date }),
+    updateDecisionsLog: (id: string, decisions_log: string | null) => applyPatch(id, { decisions_log }),
     deleteTask,
     startTimer, stopTimer,
     reorderTasks,
