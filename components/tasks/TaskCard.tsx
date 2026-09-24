@@ -1,6 +1,6 @@
 'use client';
 import type { Task } from '@/lib/types';
-import { URGENCY_LABELS } from '@/lib/types';
+import { needsPrioritise } from '@/lib/types';
 import { ownerCellLabel } from './OwnerCell';
 
 // Short "Sep 24" style formatting for the card face — the due_date column is
@@ -47,11 +47,19 @@ export default function TaskCard({ task, onOpen }: {
   const isOverdue = !!task.due_date && task.due_date < todayLocalISO()
     && task.status !== 'completed' && task.status !== 'archived';
 
+  // Scheduled (recurring automation) cards get a genuinely different
+  // background/border, not just the small ↻ icon -- blue tint since blue is
+  // a primary brand color and reads as "different kind of task", not an
+  // error/warning state the way red or a bare icon alone didn't stand out.
+  const isScheduled = task.task_type === 'scheduled';
+
   return (
     <div
       onClick={onOpen}
       style={{
-        background: '#fff', border: '1px solid rgba(17,17,17,.08)', borderRadius: 10,
+        background: isScheduled ? 'rgba(2,74,221,.05)' : '#fff',
+        border: `1px solid ${isScheduled ? 'rgba(2,74,221,.25)' : 'rgba(17,17,17,.08)'}`,
+        borderRadius: 10,
         padding: '13px 14px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8,
         boxShadow: '0 1px 2px rgba(0,0,0,.03)',
       }}
@@ -109,14 +117,14 @@ export default function TaskCard({ task, onOpen }: {
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {(task.urgency === 'today' || task.urgency === 'this_week') && (
+          {needsPrioritise(task) && (
             <span style={{
               font: "700 10px 'Inter Tight', sans-serif",
-              color: task.urgency === 'today' ? '#b3261e' : '#9a7a2e',
-              background: task.urgency === 'today' ? 'rgba(179,38,30,.08)' : 'rgba(198,161,91,.12)',
+              color: '#b3261e',
+              background: 'rgba(179,38,30,.08)',
               borderRadius: 20, padding: '3px 8px', whiteSpace: 'nowrap',
             }}>
-              {URGENCY_LABELS[task.urgency]}
+              Prioritise
             </span>
           )}
           {task.due_date && (

@@ -112,6 +112,32 @@ export const URGENCY_LABELS: Record<Task['urgency'], string> = {
   today: 'Today', this_week: 'This Week', this_month: 'This Month', someday: 'Someday',
 };
 
+// Local (not UTC) "today" as YYYY-MM-DD, matching due_date's own plain-date
+// column (no time component) -- shared so every "due soon" check agrees on
+// what day it is regardless of timezone offset.
+export function todayLocalISO(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+// The single "needs attention soon" rule, shared by the Prioritise badge
+// (kanban cards + detail modal) and the Needs Attention Soon widget so both
+// always agree: urgency flagged 'today', or due today through 3 days out.
+// Collapses the old 4-value urgency display down to this one binary signal
+// -- urgency itself is untouched on the record, this only governs what
+// gets shown. A completed/archived task never needs attention, regardless
+// of its due date.
+export function needsPrioritise(t: Pick<Task, 'urgency' | 'due_date' | 'status'>): boolean {
+  if (t.status === 'completed' || t.status === 'archived') return false;
+  if (t.urgency === 'today') return true;
+  if (!t.due_date) return false;
+  const today = todayLocalISO();
+  const cutoff = new Date(`${today}T00:00:00`);
+  cutoff.setDate(cutoff.getDate() + 3);
+  const cutoffISO = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+  return t.due_date >= today && t.due_date <= cutoffISO;
+}
+
 // One row per agent ROLE (the Agents Registry, `/agents`) -- distinct from
 // AgentRun (a live log of individual sub-agent invocations, `agent_runs`)
 // and from Task.agent_tags (which roles a given task is assigned to).

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Task } from '@/lib/types';
 import {
-  AGENT_TAGS, STAGE_LABELS, TASK_TYPES, TASK_TYPE_LABELS, URGENCIES, URGENCY_LABELS, taskStage,
+  AGENT_TAGS, STAGE_LABELS, TASK_TYPES, TASK_TYPE_LABELS, URGENCIES, URGENCY_LABELS, needsPrioritise, taskStage,
 } from '@/lib/types';
 import { formatGoalSteps, parseGoalSteps } from '@/lib/taskDescription';
 
@@ -146,7 +146,7 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete, onSen
           />
           <span onClick={done} style={{ cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 18, padding: 4 }}>✕</span>
         </div>
-        <div style={{ padding: '0 32px 8px' }}>
+        <div style={{ padding: '0 32px 8px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, font: "600 12px 'Inter Tight', sans-serif",
             color: 'rgba(17,17,17,.6)', background: 'rgba(17,17,17,.05)', borderRadius: 20, padding: '5px 12px',
@@ -154,6 +154,18 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete, onSen
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: STAGE_DOT[stage] }} />
             {STAGE_LABELS[stage]}
           </span>
+          {/* Collapsed urgency display, same rule and same red as the card
+              badge and the Needs Attention Soon widget -- the underlying
+              4-value urgency field is still set below via the Urgency
+              select, this is just the read-only signal. */}
+          {needsPrioritise(task) && (
+            <span style={{
+              font: "700 11px 'Inter Tight', sans-serif", color: '#b3261e',
+              background: 'rgba(179,38,30,.08)', borderRadius: 20, padding: '5px 12px',
+            }}>
+              Prioritise
+            </span>
+          )}
         </div>
         {stage === 'needs_review' && onSendBack && (
           <div style={{ padding: '0 32px 8px' }}>

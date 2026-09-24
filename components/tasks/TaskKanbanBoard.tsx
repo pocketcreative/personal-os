@@ -8,6 +8,7 @@ import { useTaskDashboard } from '@/lib/useTaskDashboard';
 import TaskCard from './TaskCard';
 import TaskDetailModal from './TaskDetailModal';
 import GoalBanner from './GoalBanner';
+import NeedsAttentionSoon from './NeedsAttentionSoon';
 import AddTaskInput from './AddTaskInput';
 import FieldPopover from './FieldPopover';
 import type { KanbanColumn, Task } from '@/lib/types';
@@ -125,6 +126,7 @@ export default function TaskKanbanBoard() {
           </div>
 
           <GoalBanner />
+          <NeedsAttentionSoon tasks={d.tasks} onSelect={d.setActiveTaskId} />
 
           <div style={{ marginBottom: 16 }}>
             <AddTaskInput onAdd={d.addTask} />
