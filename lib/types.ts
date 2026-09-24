@@ -233,6 +233,34 @@ export const SKILL_SOURCE_LABELS: Record<SkillSource, string> = {
   brendan: 'Your skill', claude_ai: 'Owned by claude.ai', vendor: 'Library',
 };
 
+// SOPs (`/skills/sops`), Phase 2 Part B. Human-facing process documents --
+// distinct from Skills (agent files, stored verbatim). Written to the
+// 7-section template: Title / Date & Version / Goal / Principles / Steps /
+// Example / Checklist. `example` is nullable -- the UI shows it blank as a
+// placeholder, the downloaded MD omits the heading entirely when blank (Q9).
+export const SOP_SYSTEMS = [
+  'Strategy', 'Differentiation', 'Interest', 'Trust', 'Pre Frame', 'Revival', 'Data', 'Team',
+] as const;
+export type SopSystem = (typeof SOP_SYSTEMS)[number];
+
+export interface Sop {
+  id: string;
+  user_id: string;
+  title: string;
+  version: string;
+  version_date: string;
+  goal: string;
+  principles: string;
+  steps: string;
+  example: string | null;
+  checklist: string;
+  systems: SopSystem[];
+  skill_id: string | null;
+  status: 'active' | 'archived';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface OutreachLead {
   id: string;
   rank: number | null;

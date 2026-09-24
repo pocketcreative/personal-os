@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useSkills } from '@/lib/useSkills';
 import { readTrigger } from '@/lib/skillFile';
 import type { Skill } from '@/lib/types';
+import SkillsAreaNav from '@/components/skills/SkillsAreaNav';
 
 // Sync badge for a Tier A ("brendan") skill card -- everything it needs is
 // already on the row, no filesystem access required (see 0020's comment on
@@ -77,17 +78,9 @@ export default function SkillsBoard({ variant }: { variant: 'own' | 'library' })
         background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
         boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: 'clamp(20px, 5vw, 40px) clamp(18px, 3vw, 44px) 32px',
       }}>
+        <SkillsAreaNav />
         <div className="board-header" style={{ marginBottom: 8 }}>
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>{title}</div>
-          <Link
-            href={variant === 'own' ? '/skills/library' : '/skills'}
-            style={{
-              font: "600 12px 'Inter Tight', sans-serif", color: '#9a7a2e', textDecoration: 'none',
-              letterSpacing: '.02em',
-            }}
-          >
-            {variant === 'own' ? `View full library →` : `← Back to your Skills`}
-          </Link>
         </div>
         <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)', marginBottom: 20, maxWidth: 720 }}>
           {subtitle}
