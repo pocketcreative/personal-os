@@ -196,6 +196,39 @@ export const AGENT_RUN_STATUS_LABELS: Record<AgentRun['status'], string> = {
   running: 'Running', blocked: 'Needs Input', done: 'Done', failed: 'Failed',
 };
 
+// Skills library (`/skills`, `/skills/library`), Phase 2 Part A. Stored
+// VERBATIM -- `content` is the exact bytes of the local SKILL.md
+// (frontmatter included). No template, no extracted fields; the trigger
+// text is read out of the frontmatter at display time (lib/skillFile.ts
+// readTrigger), not duplicated into its own column.
+export type SkillSource = 'brendan' | 'claude_ai' | 'vendor';
+
+export interface Skill {
+  id: string;
+  user_id: string;
+  slug: string;
+  content: string;
+  version: string;
+  version_date: string;
+  // true only for Brendan's own "Tier A" skills -- these sync bidirectionally
+  // with ~/.claude/skills/<slug>/SKILL.md via scripts/sync-skills.mjs.
+  sync_to_local: boolean;
+  // Who owns the canonical copy: 'brendan' (Tier A, editable + synced here),
+  // 'claude_ai' (owned by claude.ai, library-only), 'vendor' (every other
+  // installed skill -- addyosmani pack, hyperframes, remotion, humanizer,
+  // etc. -- library-only).
+  source: SkillSource;
+  synced_hash: string | null;
+  last_synced_at: string | null;
+  status: 'active' | 'archived';
+  created_at: string;
+  updated_at: string;
+}
+
+export const SKILL_SOURCE_LABELS: Record<SkillSource, string> = {
+  brendan: 'Your skill', claude_ai: 'Owned by claude.ai', vendor: 'Library',
+};
+
 export interface OutreachLead {
   id: string;
   rank: number | null;
