@@ -1,8 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AgentProfile } from '@/lib/types';
+import type { AgentProfile, AgentSkillLink } from '@/lib/types';
 
-export type AgentWithCount = AgentProfile & { task_count: number };
+export type AgentWithCount = AgentProfile & {
+  task_count: number;
+  total_redos: number;
+  skills: AgentSkillLink[];
+};
 
 // try/catch inside a useCallback that an effect calls trips up the
 // react-hooks/set-state-in-effect analyzer (confirmed by isolated repro —
@@ -67,5 +71,5 @@ export function useAgentsRegistry() {
     if (!res.ok) load(); // revert to server truth on failure
   }, [load]);
 
-  return { agents: state.agents, loading: state.loading, error: state.error, updateGoal };
+  return { agents: state.agents, loading: state.loading, error: state.error, updateGoal, reload: load };
 }

@@ -246,6 +246,7 @@ export default function TaskKanbanBoard() {
             if (patch.decisions_log !== undefined) d.updateDecisionsLog(d.activeTask!.id, patch.decisions_log);
           }}
           onDelete={() => { d.deleteTask(d.activeTask!.id); d.setActiveTaskId(null); }}
+          onSendBack={(reason) => { d.sendBack(d.activeTask!.id, reason); d.setActiveTaskId(null); }}
         />
       )}
     </div>

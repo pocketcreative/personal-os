@@ -1,6 +1,17 @@
 'use client';
+import Link from 'next/link';
 import { useState } from 'react';
 import { useAgentsRegistry, type AgentWithCount } from '@/lib/useAgentsRegistry';
+
+const CHIP_STYLE: React.CSSProperties = {
+  font: "600 11px 'Inter Tight', sans-serif", color: '#9a7a2e',
+  background: 'rgba(198,161,91,.12)', border: '1px solid rgba(198,161,91,.3)',
+  borderRadius: 20, padding: '4px 10px', textDecoration: 'none', display: 'inline-block',
+};
+const TOOL_CHIP_STYLE: React.CSSProperties = {
+  font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.6)',
+  background: 'rgba(17,17,17,.05)', borderRadius: 20, padding: '4px 10px', display: 'inline-block',
+};
 
 // Simple edit-in-place for `goal` — same click-to-edit convention used by
 // OwnerCell/AddTaskInput elsewhere in this app: a plain block until clicked,
@@ -58,23 +69,43 @@ function AgentCard({ agent, onSaveGoal }: { agent: AgentWithCount; onSaveGoal: (
       padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)',
       display: 'flex', flexDirection: 'column', gap: 10,
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ font: "700 15.5px 'Inter Tight', sans-serif", color: '#111', letterSpacing: '-0.01em' }}>
-          {agent.name}
+      <Link href={`/agents/${agent.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ font: "700 15.5px 'Inter Tight', sans-serif", color: '#111', letterSpacing: '-0.01em' }}>
+            {agent.name}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+            <span style={{
+              font: "700 11px 'Archivo', sans-serif", color: '#9a7a2e',
+              background: 'rgba(198,161,91,.14)', borderRadius: 20, padding: '4px 10px', whiteSpace: 'nowrap',
+            }}>
+              {agent.task_count} {agent.task_count === 1 ? 'task' : 'tasks'}
+            </span>
+            {agent.total_redos > 0 && (
+              <span style={{
+                font: "700 10px 'Archivo', sans-serif", color: '#c0392b',
+                background: 'rgba(192,57,43,.1)', borderRadius: 20, padding: '3px 9px', whiteSpace: 'nowrap',
+              }}>
+                {agent.total_redos} {agent.total_redos === 1 ? 'redo' : 'redos'}
+              </span>
+            )}
+          </div>
         </div>
-        <span style={{
-          flexShrink: 0, font: "700 11px 'Archivo', sans-serif", color: '#9a7a2e',
-          background: 'rgba(198,161,91,.14)', borderRadius: 20, padding: '4px 10px',
-        }}>
-          {agent.task_count} {agent.task_count === 1 ? 'task' : 'tasks'}
-        </span>
-      </div>
-      <div style={{
-        font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)',
-        letterSpacing: '.02em',
-      }}>
-        {agent.skill_name || '—'}
-      </div>
+      </Link>
+
+      {agent.skills.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {agent.skills.map((s) => (
+            <Link key={s.id} href={`/skills/${s.slug}`} style={CHIP_STYLE}>{s.slug}</Link>
+          ))}
+        </div>
+      )}
+      {agent.tools.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {agent.tools.map((t) => <span key={t} style={TOOL_CHIP_STYLE}>{t}</span>)}
+        </div>
+      )}
+
       <div style={{
         font: "700 10px 'Archivo', sans-serif", color: 'rgba(17,17,17,.35)', letterSpacing: '.06em',
         textTransform: 'uppercase', marginTop: 4,

@@ -37,11 +37,14 @@ const STAGE_DOT: Record<string, string> = {
   completed: '#2f9e44', archived: 'rgba(154,122,46,.4)',
 };
 
-export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
+export default function TaskDetailModal({ task, onClose, onSave, onDelete, onSendBack }: {
   task: Task;
   onClose: () => void;
   onSave: (patch: TaskDetailPatch) => void;
   onDelete: () => void;
+  // Needs Review -> In Progress with a one-line redo reason (M8). Optional
+  // so this modal still works anywhere it's reused without the flow wired.
+  onSendBack?: (reason: string) => void;
 }) {
   const [name, setName] = useState(task.title);
   // If the description already follows a `## Goal` / `## Steps` structure,
@@ -62,8 +65,16 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
   const [taskType, setTaskType] = useState<Task['task_type']>(task.task_type ?? 'single');
   const [urgency, setUrgency] = useState<Task['urgency']>(task.urgency);
   const [dueDate, setDueDate] = useState(task.due_date ?? '');
+  const [sendBackOpen, setSendBackOpen] = useState(false);
+  const [sendBackReason, setSendBackReason] = useState('');
   const nameRef = useRef<HTMLTextAreaElement>(null);
   const stage = taskStage(task);
+
+  function submitSendBack() {
+    const reason = sendBackReason.trim();
+    if (!reason || !onSendBack) return;
+    onSendBack(reason);
+  }
 
   // Auto-grow the title field so a long title wraps and stays fully
   // visible/editable instead of scrolling sideways inside a single line.
@@ -144,6 +155,50 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
             {STAGE_LABELS[stage]}
           </span>
         </div>
+        {stage === 'needs_review' && onSendBack && (
+          <div style={{ padding: '0 32px 8px' }}>
+            {sendBackOpen ? (
+              <div style={{
+                display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap',
+                border: '1px solid rgba(192,57,43,.25)', background: 'rgba(192,57,43,.05)',
+                borderRadius: 8, padding: '10px 12px', marginTop: 4,
+              }}>
+                <input
+                  autoFocus
+                  value={sendBackReason} onChange={(e) => setSendBackReason(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitSendBack(); } }}
+                  placeholder="Why is this being sent back?"
+                  style={{
+                    flex: '1 1 200px', fontSize: 13, color: '#111', padding: '8px 10px',
+                    border: '1px solid rgba(17,17,17,.15)', borderRadius: 6, background: '#fff',
+                    boxSizing: 'border-box', fontFamily: "'Inter Tight', sans-serif", outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={submitSendBack}
+                  disabled={!sendBackReason.trim()}
+                  style={{
+                    font: "600 12.5px 'Inter Tight', sans-serif", color: '#fff', background: '#c0392b',
+                    border: 'none', borderRadius: 6, padding: '8px 14px', cursor: 'pointer',
+                    opacity: sendBackReason.trim() ? 1 : 0.5,
+                  }}
+                >
+                  Send back
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setSendBackOpen(true)}
+                style={{
+                  font: "600 12.5px 'Inter Tight', sans-serif", color: '#c0392b', background: 'transparent',
+                  border: '1px solid rgba(192,57,43,.3)', borderRadius: 20, padding: '6px 14px', cursor: 'pointer',
+                }}
+              >
+                Send back to In Progress
+              </button>
+            )}
+          </div>
+        )}
         <div style={{ padding: '8px 32px 32px' }}>
           {initialParsed ? (
             <>

@@ -29,6 +29,8 @@ export async function GET(req: NextRequest) {
       task_type: t.task_type ?? 'single',
       // Same defensive fallback for decisions_log until migration 0021 lands.
       decisions_log: t.decisions_log ?? null,
+      // Same defensive fallback for restart_count until migration 0023 lands.
+      restart_count: t.restart_count ?? 0,
     };
   });
   return NextResponse.json(withFlattenedTimer, { headers: { 'cache-control': 'no-store' } });
@@ -67,6 +69,6 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({
     ...data, agent_tags: data.agent_tags ?? [], task_type: data.task_type ?? 'single',
-    decisions_log: data.decisions_log ?? null,
+    decisions_log: data.decisions_log ?? null, restart_count: data.restart_count ?? 0,
   }, { status: 201 });
 }

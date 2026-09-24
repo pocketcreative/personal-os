@@ -48,6 +48,14 @@ async function stopTimerApi(taskId: string): Promise<boolean> {
   return res.ok;
 }
 
+async function sendBackApi(id: string, reason: string): Promise<Task | null> {
+  const res = await fetch(`/api/tasks/${id}/send-back`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) { console.error('sendBack failed', res.status, await res.text()); return null; }
+  return res.json();
+}
+
 async function reorderTasksApi(orderedIds: string[]): Promise<boolean> {
   const res = await fetch('/api/tasks/reorder', {
     method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderedIds }),
@@ -182,5 +190,16 @@ export function useTaskDashboard() {
     deleteTask,
     startTimer, stopTimer,
     reorderTasks,
+    // Needs Review -> back to In Progress with a redo reason recorded (M8).
+    // Returns the updated task on success (so the modal can update in
+    // place), null on failure -- same fetch pattern as the rest of this
+    // hook, no optimistic update since the modal is about to close anyway.
+    sendBack: async (id: string, reason: string) => {
+      dirtyRef.current = true;
+      const saved = await sendBackApi(id, reason);
+      if (saved) setTasks((cur) => cur.map((t) => (t.id === id ? { ...saved, active_timer: t.active_timer } : t)));
+      else load();
+      return saved;
+    },
   };
 }

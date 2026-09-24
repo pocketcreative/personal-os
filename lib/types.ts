@@ -31,6 +31,10 @@ export interface Task {
   // pattern used in Telegram when working through open decisions on a task.
   // Nullable markdown text, distinct from `description` (migration 0021).
   decisions_log: string | null;
+  // How many times this task has been sent back from Needs Review (migration
+  // 0023). Incremented by POST /api/tasks/[id]/send-back, the mechanism for
+  // tracking when an agent's work gets rejected/redone (M8).
+  restart_count: number;
 }
 
 // Seed list shown in the Agents Assigned picker -- free text is still
@@ -111,15 +115,49 @@ export const URGENCY_LABELS: Record<Task['urgency'], string> = {
 // One row per agent ROLE (the Agents Registry, `/agents`) -- distinct from
 // AgentRun (a live log of individual sub-agent invocations, `agent_runs`)
 // and from Task.agent_tags (which roles a given task is assigned to).
-// task_count is derived client-side from tasks whose agent_tags includes
-// this agent's name, never stored on the row.
+// task_count is derived server-side from OPEN tasks (not completed/archived)
+// whose agent_tags includes this agent's name, never stored on the row.
 export interface AgentProfile {
   id: string;
   name: string;
   skill_name: string;
   goal: string;
+  tools: string[];
   created_at: string;
   updated_at: string;
+}
+
+// A Skill linked to an agent, shown as a chip on the card/detail page and
+// linking to /skills/[slug]. Deliberately just the fields the chip needs,
+// not the full Skill row (content, etc.).
+export interface AgentSkillLink {
+  id: string;
+  slug: string;
+  version: string;
+}
+
+// Extra fields the /agents/[id] detail page needs beyond the list card.
+// Deliberately simple per the "no over-engineering" rule: numbers and a
+// list, not a scoring dashboard -- no charts, no uptime indicators.
+export interface AgentTaskHistoryItem {
+  id: string;
+  title: string;
+  status: Task['status'];
+  completed_at: string | null;
+  actual_time_min: number; // this agent's own tracked time on this task (0 = not tracked), see agents/[id] route for the attribution rule
+  restart_count: number;
+}
+
+export interface Retrospective {
+  id: string;
+  task_id: string | null;
+  agent_names: string[];
+  skill_id: string | null;
+  went_wrong: string | null;
+  went_well: string | null;
+  applied_to: 'skill' | 'memory' | 'claude_md' | 'none' | null;
+  applied_ref: string | null;
+  created_at: string;
 }
 
 export const STATUSES = ['not_started', 'in_progress', 'completed', 'archived'] as const;

@@ -6,7 +6,7 @@ const PATCHABLE = new Set([
   'title', 'description', 'urgency', 'key', 'priority_score', 'rank_pinned',
   'time_estimate_min', 'actual_time_min', 'tags', 'due_date', 'completed_at',
   'category', 'status', 'owner', 'needs_input', 'input_note',
-  'agent_tags', 'task_type', 'decisions_log',
+  'agent_tags', 'task_type', 'decisions_log', 'restart_count',
 ]);
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({
     ...data, agent_tags: data.agent_tags ?? [], task_type: data.task_type ?? 'single',
-    decisions_log: data.decisions_log ?? null,
+    decisions_log: data.decisions_log ?? null, restart_count: data.restart_count ?? 0,
   });
 }
 
