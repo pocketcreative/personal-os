@@ -4,24 +4,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { fetchSop, saveSop } from '@/lib/useSops';
 import { useSkills } from '@/lib/useSkills';
 import { renderSopExport, sopEmDashWarning, sopFileName } from '@/lib/sopMarkdown';
-import { SOP_SYSTEMS, type Sop, type SopSystem } from '@/lib/types';
+import { SOP_PROGRESS, SOP_PROGRESS_COLORS, SOP_PROGRESS_LABELS, SOP_SYSTEMS, type Sop, type SopProgress, type SopSystem } from '@/lib/types';
+import MarkdownContent from './MarkdownContent';
 
 type Draft = {
-  title: string; goal: string; principles: string; steps: string;
-  example: string; checklist: string; systems: SopSystem[]; skill_id: string | null;
+  title: string; content: string; systems: SopSystem[]; skill_id: string | null; progress: SopProgress;
 };
 
 function toDraft(sop: Sop): Draft {
-  return {
-    title: sop.title, goal: sop.goal, principles: sop.principles, steps: sop.steps,
-    example: sop.example ?? '', checklist: sop.checklist, systems: sop.systems, skill_id: sop.skill_id,
-  };
+  return { title: sop.title, content: sop.content, systems: sop.systems, skill_id: sop.skill_id, progress: sop.progress };
 }
 
 function isDirty(draft: Draft, sop: Sop): boolean {
-  return draft.title !== sop.title || draft.goal !== sop.goal || draft.principles !== sop.principles
-    || draft.steps !== sop.steps || draft.example !== (sop.example ?? '') || draft.checklist !== sop.checklist
-    || JSON.stringify(draft.systems) !== JSON.stringify(sop.systems) || draft.skill_id !== sop.skill_id;
+  return draft.title !== sop.title || draft.content !== sop.content
+    || JSON.stringify(draft.systems) !== JSON.stringify(sop.systems) || draft.skill_id !== sop.skill_id
+    || draft.progress !== sop.progress;
 }
 
 function downloadSop(sop: Sop) {
@@ -39,11 +36,6 @@ function downloadSop(sop: Sop) {
 const sectionLabel: React.CSSProperties = {
   font: "700 12.5px 'Inter Tight', sans-serif", color: '#111', marginBottom: 6, marginTop: 18,
 };
-const textareaStyle: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', minHeight: 100, resize: 'vertical',
-  font: "500 13.5px 'Inter Tight', sans-serif", lineHeight: 1.6, color: '#111',
-  padding: '12px 14px', border: '1px solid rgba(17,17,17,.14)', borderRadius: 8, background: '#fff', outline: 'none',
-};
 const btnBase: React.CSSProperties = {
   font: "700 12.5px 'Inter Tight', sans-serif", borderRadius: 8, padding: '9px 16px', cursor: 'pointer', border: '1px solid transparent',
 };
@@ -58,6 +50,12 @@ export default function SopDetail({ id }: { id: string }) {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  // Same read/edit toggle as SkillDetail: read (rendered markdown) is the
+  // default, edit (raw textarea) is an explicit switch. Only governs the
+  // content box -- title/progress/systems/linked skill stay always-editable
+  // the way they already were, per Brendan's instruction to leave those
+  // fields exactly as they are.
+  const [mode, setMode] = useState<'read' | 'edit'>('read');
   const { skills } = useSkills();
 
   useEffect(() => {
@@ -95,13 +93,12 @@ export default function SopDetail({ id }: { id: string }) {
     setSaveMsg(null);
     try {
       const updated = await saveSop(sop.id, {
-        title: draft.title, goal: draft.goal, principles: draft.principles, steps: draft.steps,
-        example: draft.example.trim() ? draft.example : null, checklist: draft.checklist,
-        systems: draft.systems, skill_id: draft.skill_id,
+        title: draft.title, content: draft.content,
+        systems: draft.systems, skill_id: draft.skill_id, progress: draft.progress,
       }, sop.updated_at);
       setSop(updated);
       setDraft(toDraft(updated));
-      setWarning(sopEmDashWarning(draft));
+      setWarning(sopEmDashWarning({ title: draft.title, content: draft.content }));
       setSaveMsg(`Saved as v${updated.version}.`);
       window.dispatchEvent(new Event('sops:refresh'));
     } catch (e) {
@@ -136,6 +133,12 @@ export default function SopDetail({ id }: { id: string }) {
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => downloadSop(sop)} style={btnSecondary}>Download as MD</button>
+        {mode === 'read' && (
+          <button onClick={() => setMode('edit')} style={btnSecondary}>Edit</button>
+        )}
+        {mode === 'edit' && (
+          <button onClick={() => setMode('read')} style={btnSecondary}>Done editing</button>
+        )}
         <button onClick={save} disabled={!dirty || saving} style={{ ...btnPrimary, opacity: !dirty || saving ? 0.5 : 1 }}>
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -150,6 +153,33 @@ export default function SopDetail({ id }: { id: string }) {
           {warning}
         </div>
       )}
+
+      <div style={sectionLabel}>Progress</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {SOP_PROGRESS.map((p) => {
+          const active = draft.progress === p;
+          const color = SOP_PROGRESS_COLORS[p];
+          return (
+            <button
+              key={p}
+              onClick={() => set('progress', p)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                font: "700 11.5px 'Inter Tight', sans-serif", borderRadius: 20, padding: '5px 12px', cursor: 'pointer',
+                border: active ? `1px solid ${color}` : '1px solid rgba(17,17,17,.15)',
+                background: active ? `${color}18` : '#fff',
+                color: active ? color : 'rgba(17,17,17,.6)',
+              }}
+            >
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+              {SOP_PROGRESS_LABELS[p]}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ font: "500 11.5px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', marginTop: 6 }}>
+        Active = you run this day to day. In Progress = content&apos;s here but not yet something you run. Not Started = nothing here yet.
+      </div>
 
       <div style={sectionLabel}>System</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -193,20 +223,35 @@ export default function SopDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <div style={sectionLabel}>Goal</div>
-      <textarea value={draft.goal} onChange={(e) => set('goal', e.target.value)} style={textareaStyle} placeholder="What this process is for." />
-
-      <div style={sectionLabel}>Principles</div>
-      <textarea value={draft.principles} onChange={(e) => set('principles', e.target.value)} style={textareaStyle} placeholder="The rules/judgment calls behind the steps." />
-
-      <div style={sectionLabel}>Steps</div>
-      <textarea value={draft.steps} onChange={(e) => set('steps', e.target.value)} style={{ ...textareaStyle, minHeight: 160 }} placeholder="The actual step-by-step process." />
-
-      <div style={sectionLabel}>Example</div>
-      <textarea value={draft.example} onChange={(e) => set('example', e.target.value)} style={textareaStyle} placeholder="A real worked example. Left blank until you fill it in -- the downloaded file leaves this heading out entirely while it's empty." />
-
-      <div style={sectionLabel}>Checklist</div>
-      <textarea value={draft.checklist} onChange={(e) => set('checklist', e.target.value)} style={textareaStyle} placeholder={'- [ ] First check\n- [ ] Second check'} />
+      <div style={sectionLabel}>Content</div>
+      {mode === 'edit' ? (
+        <textarea
+          value={draft.content}
+          onChange={(e) => set('content', e.target.value)}
+          spellCheck={false}
+          placeholder={'## Goal\nWhat this process is for.\n\n## Principles\nThe rules/judgment calls behind the steps.\n\n## Steps\nThe actual step-by-step process.\n\n## Example\nA real worked example.\n\n## Checklist\n- [ ] First check\n- [ ] Second check'}
+          style={{
+            width: '100%', boxSizing: 'border-box', minHeight: '60vh', resize: 'vertical',
+            fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, lineHeight: 1.6, color: '#111',
+            padding: '16px 18px', border: '1px solid rgba(17,17,17,.14)', borderRadius: 8, background: '#fff',
+            outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          }}
+        />
+      ) : (
+        <div style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '20px 24px', border: '1px solid rgba(17,17,17,.1)', borderRadius: 8, background: '#fff',
+        }}>
+          {/* Reads from `draft`, not `sop.content`: if there are unsaved
+              edits (dirty), the read view reflects them instead of silently
+              discarding what hasn't been saved yet when toggling modes. */}
+          {draft.content.trim() ? (
+            <MarkdownContent content={draft.content} />
+          ) : (
+            <div style={muted}>Nothing written yet. Click Edit to add Goal / Principles / Steps / Example / Checklist.</div>
+          )}
+        </div>
+      )}
     </Wrap>
   );
 }

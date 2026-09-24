@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
-import { SOP_SYSTEMS } from '@/lib/types';
+import { SOP_PROGRESS, SOP_SYSTEMS } from '@/lib/types';
 
 // Same pattern as app/api/skills/[slug]/route.ts: every content save bumps
 // the minor version and sets today's date (Q7). A hand-typed version (any
@@ -11,7 +11,7 @@ function bumpVersion(v: string): string {
   return `${m[1]}.${Number(m[2]) + 1}`;
 }
 
-const CONTENT_FIELDS = ['goal', 'principles', 'steps', 'example', 'checklist'] as const;
+const CONTENT_FIELDS = ['content'] as const;
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,11 +22,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json(data);
 }
 
-// Patchable: title, goal/principles/steps/example/checklist (any change
-// bumps version + writes audit_log), systems, skill_id, status, and a hand
-// override of version. `id` is the routing key -- no slug column (kept out
-// on purpose, see 0022's comment: fewer moving parts, id-based routes are
-// enough for SOPs).
+// Patchable: title, content (any change bumps version + writes audit_log,
+// same as Skills), systems, skill_id, status, and a hand override of
+// version. `id` is the routing key -- no slug column (kept out on purpose,
+// see 0022's comment: fewer moving parts, id-based routes are enough for
+// SOPs).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
@@ -46,12 +46,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'systems must only contain the 8 known values' }, { status: 400 });
     }
   }
+  if (body.progress !== undefined && !SOP_PROGRESS.includes(body.progress as never)) {
+    return NextResponse.json({ error: 'progress must be one of active, in_progress, not_started' }, { status: 400 });
+  }
 
   const patch: Record<string, unknown> = {};
   if (typeof body.title === 'string' && body.title.trim()) patch.title = body.title.trim();
   if (Array.isArray(body.systems)) patch.systems = body.systems;
   if (body.skill_id === null || typeof body.skill_id === 'string') patch.skill_id = body.skill_id;
   if (typeof body.status === 'string') patch.status = body.status;
+  if (typeof body.progress === 'string') patch.progress = body.progress;
 
   const contentPatch: Record<string, unknown> = {};
   let contentChanged = false;
@@ -72,10 +76,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       user_id: USER_ID, action: 'sop_content_update', resource_type: 'sops', resource_id: current.id,
       metadata: {
         title: current.title, previous_version: current.version,
-        previous: {
-          goal: current.goal, principles: current.principles, steps: current.steps,
-          example: current.example, checklist: current.checklist,
-        },
+        previous: { content: current.content },
       },
     });
     if (auditErr) return NextResponse.json({ error: auditErr.message }, { status: 500 });

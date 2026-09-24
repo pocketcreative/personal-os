@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useSops, createSop } from '@/lib/useSops';
 import { useSkills } from '@/lib/useSkills';
-import { SOP_SYSTEMS, type Sop, type SopSystem } from '@/lib/types';
+import { SOP_PROGRESS_COLORS, SOP_PROGRESS_LABELS, SOP_SYSTEMS, type Sop, type SopSystem } from '@/lib/types';
 import SkillsAreaNav from '@/components/skills/SkillsAreaNav';
 
 const chip: React.CSSProperties = {
@@ -23,8 +23,14 @@ function SopCard({ sop, skillSlug }: { sop: Sop; skillSlug: string | null }) {
         padding: '16px 18px', boxShadow: '0 1px 3px rgba(0,0,0,.04)',
       }}
     >
-      <div style={{ font: "700 15px 'Inter Tight', sans-serif", color: '#111', letterSpacing: '-0.01em' }}>
-        {sop.title}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span
+          title={SOP_PROGRESS_LABELS[sop.progress]}
+          style={{ width: 8, height: 8, borderRadius: '50%', background: SOP_PROGRESS_COLORS[sop.progress], flexShrink: 0 }}
+        />
+        <div style={{ font: "700 15px 'Inter Tight', sans-serif", color: '#111', letterSpacing: '-0.01em' }}>
+          {sop.title}
+        </div>
       </div>
       {sop.systems.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

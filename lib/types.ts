@@ -307,14 +307,30 @@ export const SKILL_SOURCE_LABELS: Record<SkillSource, string> = {
 export type SkillListItem = Omit<Skill, 'content'> & { trigger_description: string | null };
 
 // SOPs (`/skills/sops`), Phase 2 Part B. Human-facing process documents --
-// distinct from Skills (agent files, stored verbatim). Written to the
-// 7-section template: Title / Date & Version / Goal / Principles / Steps /
-// Example / Checklist. `example` is nullable -- the UI shows it blank as a
-// placeholder, the downloaded MD omits the heading entirely when blank (Q9).
+// distinct from Skills (agent files, stored verbatim). `content` holds the
+// whole body (Goal / Principles / Steps / Example / Checklist) as one raw
+// markdown blob, same as skills.content (migration 0025 -- was originally 5
+// separate structured fields, collapsed into one box to match the Skill
+// editor, per Brendan's own instruction). title/systems/skill_id/progress
+// stay their own columns.
 export const SOP_SYSTEMS = [
-  'Strategy', 'Differentiation', 'Interest', 'Trust', 'Pre Frame', 'Revival', 'Data', 'Team',
+  'Strategy', 'Differentiation', 'Trust', 'Interest', 'Pre Frame', 'Sales', 'Revival', 'Tracking',
 ] as const;
 export type SopSystem = (typeof SOP_SYSTEMS)[number];
+
+// Migration 0024. Distinct from `status` (active/archived, the record's own
+// archival state) -- `progress` is Brendan's real-world read of the process
+// itself: is he actually running this day to day (active), does the content
+// exist but isn't yet something he's running (in_progress), or is there
+// nothing there yet (not_started). Green / yellow / neutral badge.
+export const SOP_PROGRESS = ['active', 'in_progress', 'not_started'] as const;
+export type SopProgress = (typeof SOP_PROGRESS)[number];
+export const SOP_PROGRESS_LABELS: Record<SopProgress, string> = {
+  active: 'Active', in_progress: 'In Progress', not_started: 'Not Started',
+};
+export const SOP_PROGRESS_COLORS: Record<SopProgress, string> = {
+  active: '#3a9d5d', in_progress: '#c9a227', not_started: '#9aa0a6',
+};
 
 export interface Sop {
   id: string;
@@ -322,14 +338,11 @@ export interface Sop {
   title: string;
   version: string;
   version_date: string;
-  goal: string;
-  principles: string;
-  steps: string;
-  example: string | null;
-  checklist: string;
+  content: string;
   systems: SopSystem[];
   skill_id: string | null;
   status: 'active' | 'archived';
+  progress: SopProgress;
   created_at: string;
   updated_at: string;
 }
