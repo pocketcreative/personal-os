@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Task } from '@/lib/types';
 import {
-  AGENT_TAGS, STAGE_LABELS, TASK_TYPES, TASK_TYPE_LABELS, URGENCIES, URGENCY_LABELS, needsPrioritise, taskStage,
+  AGENT_TAGS, STAGE_LABELS, TASK_TYPES, TASK_TYPE_LABELS, needsPrioritise, taskStage,
 } from '@/lib/types';
 import { formatGoalSteps, parseGoalSteps } from '@/lib/taskDescription';
 
@@ -333,14 +333,24 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete, onSen
                 Urgency
               </div>
               <select
-                value={urgency} onChange={(e) => setUrgency(e.target.value as Task['urgency'])}
+                // Only 'today' drives the Prioritise badge (needsPrioritise()
+                // in lib/types.ts), so the edit control collapses to 2
+                // choices: Prioritise ('today') or '-' (anything else).
+                // Legacy values already on a task (this_week/this_month/
+                // someday) all display as '-' here without being rewritten
+                // until the field is actually touched and saved -- picking
+                // '-' normalizes them to 'someday', the existing "no
+                // urgency" value, no schema change needed.
+                value={urgency === 'today' ? 'today' : 'none'}
+                onChange={(e) => setUrgency(e.target.value === 'today' ? 'today' : 'someday')}
                 style={{
                   width: '100%', fontSize: 14, color: '#111', padding: '9px 12px',
                   border: '1px solid rgba(17,17,17,.1)', borderRadius: 6, background: '#fff',
                   boxSizing: 'border-box', fontFamily: "'Inter Tight', sans-serif", outline: 'none',
                 }}
               >
-                {URGENCIES.map((u) => <option key={u} value={u}>{URGENCY_LABELS[u]}</option>)}
+                <option value="today">Prioritise</option>
+                <option value="none">-</option>
               </select>
             </div>
           </div>
