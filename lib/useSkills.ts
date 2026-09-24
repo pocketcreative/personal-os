@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Skill, SkillListItem } from '@/lib/types';
+import type { Skill, SkillListItem, SopSystem } from '@/lib/types';
 
 async function fetchSkills(): Promise<{ skills: SkillListItem[]; error: string | null }> {
   const res = await fetch('/api/skills');
@@ -58,11 +58,11 @@ export async function fetchSkill(slug: string): Promise<Skill> {
 }
 
 export async function saveSkillContent(
-  slug: string, content: string, updated_at: string,
+  slug: string, content: string, updated_at: string, systems?: SopSystem[],
 ): Promise<Skill & { warning: string | null }> {
   const res = await fetch(`/api/skills/${encodeURIComponent(slug)}`, {
     method: 'PATCH', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ content, updated_at }),
+    body: JSON.stringify({ content, updated_at, systems }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');

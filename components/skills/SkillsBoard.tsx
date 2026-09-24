@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSkills, searchSkills } from '@/lib/useSkills';
-import type { SkillListItem, SkillSource } from '@/lib/types';
+import { SOP_SYSTEMS, type SkillListItem, type SkillSource, type SopSystem } from '@/lib/types';
 import SkillsAreaNav from '@/components/skills/SkillsAreaNav';
 
 // Fix 1: Skills and the old Skills Library are one page now, split by a
@@ -30,6 +30,11 @@ function syncBadge(s: SkillListItem): { text: string; color: string } {
   }
   return { text: 'Synced', color: '#4b7a4f' };
 }
+
+const chip: React.CSSProperties = {
+  font: "700 10.5px 'Archivo', sans-serif", color: '#024ADD',
+  background: 'rgba(2,74,221,.08)', borderRadius: 20, padding: '3px 9px', whiteSpace: 'nowrap',
+};
 
 function SkillCard({ skill }: { skill: SkillListItem }) {
   const badge = skill.source === 'brendan' ? syncBadge(skill) : null;
@@ -59,6 +64,11 @@ function SkillCard({ skill }: { skill: SkillListItem }) {
       }}>
         {skill.trigger_description ?? <span style={{ color: 'rgba(17,17,17,.35)', fontStyle: 'italic' }}>No trigger description in frontmatter</span>}
       </div>
+      {(skill.systems ?? []).length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {skill.systems.map((s) => <span key={s} style={chip}>{s}</span>)}
+        </div>
+      )}
       <div style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>
         v{skill.version} &middot; {skill.version_date}
       </div>
@@ -74,6 +84,7 @@ export default function SkillsBoard() {
 
   const { skills, loading, error } = useSkills();
   const [q, setQ] = useState('');
+  const [systemFilter, setSystemFilter] = useState<SopSystem[]>([]);
   const [debouncedQ, setDebouncedQ] = useState('');
   const [searchResults, setSearchResults] = useState<SkillListItem[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -111,8 +122,16 @@ export default function SkillsBoard() {
 
   const filtered = useMemo(() => {
     const source = debouncedQ ? (searchResults ?? []) : skills;
-    return filter === 'all' ? source : source.filter((s) => s.source === filter);
-  }, [debouncedQ, searchResults, skills, filter]);
+    return source.filter((s) => {
+      if (filter !== 'all' && s.source !== filter) return false;
+      if (systemFilter.length > 0 && !systemFilter.some((f) => (s.systems ?? []).includes(f))) return false;
+      return true;
+    });
+  }, [debouncedQ, searchResults, skills, filter, systemFilter]);
+
+  const toggleSystem = (sys: SopSystem) => {
+    setSystemFilter((prev) => (prev.includes(sys) ? prev.filter((s) => s !== sys) : [...prev, sys]));
+  };
 
   const isLoading = debouncedQ ? searching : loading;
   const activeError = debouncedQ ? searchError : error;
@@ -159,9 +178,29 @@ export default function SkillsBoard() {
           style={{
             width: '100%', boxSizing: 'border-box', font: "500 13.5px 'Inter Tight', sans-serif", color: '#111',
             padding: '10px 14px', border: '1px solid rgba(17,17,17,.12)', borderRadius: 8, background: '#fff',
-            outline: 'none', marginBottom: 24,
+            outline: 'none', marginBottom: 16,
           }}
         />
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+          {SOP_SYSTEMS.map((sys) => {
+            const active = systemFilter.includes(sys);
+            return (
+              <button
+                key={sys}
+                onClick={() => toggleSystem(sys)}
+                style={{
+                  font: "700 11.5px 'Inter Tight', sans-serif", borderRadius: 20, padding: '5px 12px', cursor: 'pointer',
+                  border: active ? '1px solid #024ADD' : '1px solid rgba(17,17,17,.15)',
+                  background: active ? 'rgba(2,74,221,.08)' : '#fff',
+                  color: active ? '#024ADD' : 'rgba(17,17,17,.6)',
+                }}
+              >
+                {sys}
+              </button>
+            );
+          })}
+        </div>
 
         {isLoading && <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Loading&hellip;</div>}
 
@@ -177,7 +216,7 @@ export default function SkillsBoard() {
 
         {!isLoading && !activeError && filtered.length === 0 && (
           <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>
-            {q ? 'No skills match that search.' : 'No skills imported yet.'}
+            {q || systemFilter.length > 0 ? 'No skills match that search/filter.' : 'No skills imported yet.'}
           </div>
         )}
 

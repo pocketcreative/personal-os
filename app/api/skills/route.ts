@@ -2,12 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
 import { readTrigger } from '@/lib/skillFile';
 
-// Columns a list card actually needs -- everything except `content`. Fix 2:
-// the old `select('*')` pulled the full verbatim content for all ~86 skills
-// (1.26MB) just to render a list of cards.
-const LIST_COLUMNS =
-  'id,user_id,slug,version,version_date,sync_to_local,source,synced_hash,last_synced_at,status,created_at,updated_at,content';
-
 type ListRow = { content: string; [key: string]: unknown };
 
 // Active by default; ?status=archived to see archived rows. Skills are
@@ -15,6 +9,10 @@ type ListRow = { content: string; [key: string]: unknown };
 // directly via the service-role client, not through this route) -- POST
 // exists for completeness/testing, not because the UI has a "New Skill"
 // button in v1 (2.3.6).
+//
+// The select is '*' (not a named column list) so a missing `systems` column
+// (migration 0026 not applied yet) can't 500 this route; it's defaulted to []
+// below instead.
 //
 // GET returns the lightweight list shape (SkillListItem: no `content`).
 // `content` is still fetched from Supabase server-side (needed to extract
@@ -34,7 +32,7 @@ export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get('status') ?? 'active';
   const q = req.nextUrl.searchParams.get('q')?.trim() ?? '';
 
-  const base = () => db.from('skills').select(LIST_COLUMNS)
+  const base = () => db.from('skills').select('*')
     .eq('user_id', USER_ID).eq('status', status);
 
   let rows: ListRow[];
@@ -55,7 +53,7 @@ export async function GET(req: NextRequest) {
     rows = (data ?? []) as ListRow[];
   }
 
-  const list = rows.map(({ content, ...rest }) => ({ ...rest, trigger_description: readTrigger(content) }));
+  const list = rows.map(({ content, ...rest }) => ({ ...rest, systems: rest.systems ?? [], trigger_description: readTrigger(content) }));
   return NextResponse.json(list, { headers: { 'cache-control': 'no-store' } });
 }
 

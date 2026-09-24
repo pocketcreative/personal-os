@@ -290,6 +290,9 @@ export interface Skill {
   synced_hash: string | null;
   last_synced_at: string | null;
   status: 'active' | 'archived';
+  // Migration 0026. Same 8-section tag as Sop.systems. The API always returns
+  // an array (defaults to [] if the migration isn't applied yet).
+  systems: SopSystem[];
   created_at: string;
   updated_at: string;
 }

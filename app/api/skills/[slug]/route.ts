@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
 import { codeBlockSmartCharWarning } from '@/lib/skillFile';
+import { SOP_SYSTEMS } from '@/lib/types';
 
 // Skills are stored verbatim, so the only "smart" edit behaviour is version
 // bookkeeping (Q7): every content save bumps the minor version and sets
@@ -18,11 +19,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   const { data, error } = await db.from('skills').select('*')
     .eq('user_id', USER_ID).eq('slug', slug).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json(data);
+  return NextResponse.json({ ...data, systems: data.systems ?? [] });
 }
 
 // Patchable: content (triggers version bump + audit_log write), status
-// (archive/restore), version (hand override), sync_to_local, source.
+// (archive/restore), version (hand override), sync_to_local, source, systems
+// (any source, including vendor, since it's a tag not content).
 // `slug` is never patchable -- sync-skills.mjs and the import script both
 // key off it, and the local folder name it maps to doesn't rename itself.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
@@ -42,7 +44,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
     return NextResponse.json({ error: 'changed elsewhere, reload' }, { status: 409 });
   }
 
+  if (body.systems !== undefined) {
+    if (!Array.isArray(body.systems) || body.systems.some((s: unknown) => !SOP_SYSTEMS.includes(s as never))) {
+      return NextResponse.json({ error: 'systems must only contain the 8 known values' }, { status: 400 });
+    }
+  }
+
   const patch: Record<string, unknown> = {};
+  if (Array.isArray(body.systems)) patch.systems = body.systems;
   if (typeof body.status === 'string') patch.status = body.status;
   if (typeof body.sync_to_local === 'boolean') patch.sync_to_local = body.sync_to_local;
 
@@ -77,5 +86,5 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
 
   const { data, error } = await db.from('skills').update(patch).eq('id', current.id).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ...data, warning });
+  return NextResponse.json({ ...data, systems: data.systems ?? [], warning });
 }

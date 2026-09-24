@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchSkill, saveSkillContent } from '@/lib/useSkills';
 import { readTrigger, stripFrontmatter } from '@/lib/skillFile';
-import { SKILL_SOURCE_LABELS, type Skill } from '@/lib/types';
+import { SKILL_SOURCE_LABELS, SOP_SYSTEMS, type Skill, type SopSystem } from '@/lib/types';
 import MarkdownContent from './MarkdownContent';
 
 function downloadSkill(skill: Skill) {
@@ -23,6 +23,7 @@ function downloadSkill(skill: Skill) {
 export default function SkillDetail({ slug }: { slug: string }) {
   const [skill, setSkill] = useState<Skill | null>(null);
   const [draft, setDraft] = useState('');
+  const [systemsDraft, setSystemsDraft] = useState<SopSystem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -38,7 +39,7 @@ export default function SkillDetail({ slug }: { slug: string }) {
   useEffect(() => {
     let live = true;
     fetchSkill(slug)
-      .then((s) => { if (live) { setSkill(s); setDraft(s.content); setLoading(false); } })
+      .then((s) => { if (live) { setSkill(s); setDraft(s.content); setSystemsDraft(s.systems ?? []); setLoading(false); } })
       .catch((e) => { if (live) { setError(e.message); setLoading(false); } });
     return () => { live = false; };
   }, [slug]);
@@ -51,16 +52,22 @@ export default function SkillDetail({ slug }: { slug: string }) {
   // Vendor skills stay read-only -- see the inline note below and the
   // server-side guard in app/api/skills/[slug]/route.ts.
   const editable = skill.source === 'brendan' || skill.source === 'claude_ai';
-  const dirty = editable && draft !== skill.content;
+  const contentDirty = editable && draft !== skill.content;
+  const systemsDirty = JSON.stringify(systemsDraft) !== JSON.stringify(skill.systems ?? []);
+  const dirty = contentDirty || systemsDirty;
+  const toggleSystem = (sys: SopSystem) => {
+    setSystemsDraft((prev) => (prev.includes(sys) ? prev.filter((s) => s !== sys) : [...prev, sys]));
+  };
   const trigger = readTrigger(skill.content);
 
   const save = async () => {
     setSaving(true);
     setSaveMsg(null);
     try {
-      const updated = await saveSkillContent(skill.slug, draft, skill.updated_at);
+      const updated = await saveSkillContent(skill.slug, draft, skill.updated_at, systemsDirty ? systemsDraft : undefined);
       setSkill(updated);
       setDraft(updated.content);
+      setSystemsDraft(updated.systems ?? []);
       setWarning(updated.warning);
       setSaveMsg(`Saved as v${updated.version}.`);
       window.dispatchEvent(new Event('skills:refresh'));
@@ -117,14 +124,40 @@ export default function SkillDetail({ slug }: { slug: string }) {
           <button onClick={() => setMode('edit')} style={btnSecondary}>Edit</button>
         )}
         {editable && mode === 'edit' && (
+          <button onClick={() => setMode('read')} style={btnSecondary}>Done editing</button>
+        )}
+        {((editable && mode === 'edit') || systemsDirty) && (
           <>
-            <button onClick={() => setMode('read')} style={btnSecondary}>Done editing</button>
             <button onClick={save} disabled={!dirty || saving} style={{ ...btnPrimary, opacity: !dirty || saving ? 0.5 : 1 }}>
               {saving ? 'Saving…' : 'Save'}
             </button>
           </>
         )}
         {saveMsg && <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: saveMsg.startsWith('Saved') ? '#4b7a4f' : '#b3261e' }}>{saveMsg}</span>}
+      </div>
+
+      <div style={sectionLabel}>System</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {SOP_SYSTEMS.map((sys) => {
+          const active = systemsDraft.includes(sys);
+          return (
+            <button
+              key={sys}
+              onClick={() => toggleSystem(sys)}
+              style={{
+                font: "700 11.5px 'Inter Tight', sans-serif", borderRadius: 20, padding: '5px 12px', cursor: 'pointer',
+                border: active ? '1px solid #024ADD' : '1px solid rgba(17,17,17,.15)',
+                background: active ? 'rgba(2,74,221,.08)' : '#fff',
+                color: active ? '#024ADD' : 'rgba(17,17,17,.6)',
+              }}
+            >
+              {sys}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ font: "500 11.5px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', marginTop: 6, marginBottom: 14 }}>
+        Optional. Leave blank if this skill doesn&apos;t map to one of the 8 systems.
       </div>
 
       {skill.source === 'claude_ai' && (
@@ -189,6 +222,9 @@ const muted: React.CSSProperties = { font: "500 13px 'Inter Tight', sans-serif",
 const errStyle: React.CSSProperties = {
   background: 'rgba(179,38,30,.06)', border: '1px solid rgba(179,38,30,.25)', borderRadius: 8,
   padding: '14px 16px', font: "500 13px 'Inter Tight', sans-serif", color: '#8a2a22',
+};
+const sectionLabel: React.CSSProperties = {
+  font: "700 12.5px 'Inter Tight', sans-serif", color: '#111', marginBottom: 6, marginTop: 4,
 };
 const btnBase: React.CSSProperties = {
   font: "700 12.5px 'Inter Tight', sans-serif", borderRadius: 8, padding: '9px 16px', cursor: 'pointer', border: '1px solid transparent',
