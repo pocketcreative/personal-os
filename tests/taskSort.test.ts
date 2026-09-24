@@ -5,7 +5,8 @@ const t = (
   id: string,
   status: SortableTask['status'],
   sort_order: number | null = null,
-): SortableTask => ({ id, status, sort_order });
+  urgency: SortableTask['urgency'] = 'someday',
+): SortableTask => ({ id, status, sort_order, urgency });
 
 describe('sortTasks', () => {
   it('ranks in_progress first, then not_started, completed always last, archived last of all', () => {
@@ -38,6 +39,37 @@ describe('sortTasks', () => {
     // Stable sort: original relative order preserved within each status,
     // since nothing (today or otherwise) is left to break the tie.
     expect(sorted).toEqual(['in-progress-b', 'in-progress-a', 'not-started-b', 'not-started-a']);
+  });
+
+  it('urgency === "today" sorts to the top, then the rest follow the existing rank()/sort_order rules within each group', () => {
+    const tasks = [
+      t('not-started-b', 'not_started', null, 'someday'),
+      t('not-started-today', 'not_started', null, 'today'),
+      t('in-progress-b', 'in_progress', null, 'someday'),
+      t('in-progress-today', 'in_progress', null, 'today'),
+    ];
+    // "today" tasks all sort above non-today tasks; within each of those two
+    // groups the existing rank() rule still applies (in_progress before
+    // not_started), it's just applied separately per group now.
+    expect(sortTasks(tasks).map((x) => x.id)).toEqual([
+      'in-progress-today',
+      'not-started-today',
+      'in-progress-b',
+      'not-started-b',
+    ]);
+  });
+
+  it('urgency === "today" wins even over a manually-dragged sort_order', () => {
+    const tasks = [
+      t('ordered-first', 'not_started', 0, 'someday'),
+      t('today-unordered', 'not_started', null, 'today'),
+      t('ordered-second', 'not_started', 1, 'someday'),
+    ];
+    expect(sortTasks(tasks).map((x) => x.id)).toEqual([
+      'today-unordered',
+      'ordered-first',
+      'ordered-second',
+    ]);
   });
 
   it('completed sorts last regardless of status ordering among active tasks', () => {

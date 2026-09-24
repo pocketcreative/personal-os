@@ -2,6 +2,7 @@ export interface SortableTask {
   id: string;
   status: 'not_started' | 'in_progress' | 'completed' | 'archived';
   sort_order: number | null; // null = never manually dragged; use the fixed rank() rule
+  urgency: 'today' | 'this_week' | 'this_month' | 'someday';
 }
 
 /**
@@ -27,6 +28,10 @@ function isDone(t: SortableTask): boolean {
   return t.status === 'completed' || t.status === 'archived';
 }
 
+function isToday(t: SortableTask): boolean {
+  return t.urgency === 'today';
+}
+
 /**
  * Manual drag-to-reorder: among ACTIVE (non-completed, non-archived) tasks,
  * a task the user has dragged (non-null sort_order) sorts ahead of every
@@ -41,9 +46,21 @@ function isDone(t: SortableTask): boolean {
  * holds even defensively if a stray sort_order value somehow ends up on a
  * completed/archived row (shouldn't happen in practice — they're never
  * exposed to the drag UI).
+ *
+ * urgency === 'today' is checked first, ahead of everything below, so a
+ * "today" task always sorts to the top of whatever kanban column it's
+ * currently in, regardless of status/manual order. This is a different
+ * field from the `key` "today" priority flag noted above (which
+ * deliberately stays out of rank() to avoid fighting manual drag order) --
+ * `urgency` is a separate, explicit field on the task and this is a
+ * distinct, requested behavior for it.
  */
 export function sortTasks<T extends SortableTask>(tasks: T[]): T[] {
   return [...tasks].sort((a, b) => {
+    const aToday = isToday(a);
+    const bToday = isToday(b);
+    if (aToday !== bToday) return aToday ? -1 : 1;
+
     const aDone = isDone(a);
     const bDone = isDone(b);
     if (aDone !== bDone) return aDone ? 1 : -1;
