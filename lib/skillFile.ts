@@ -35,6 +35,17 @@ export function readTrigger(content: string): string | null {
 }
 
 /**
+ * Strips the leading YAML frontmatter block (`---\n...\n---`) for display,
+ * so the read-only markdown-rendered view doesn't re-show `name:`/
+ * `description:` as a stray paragraph -- that content is already surfaced
+ * above via readTrigger(). Returns the content unchanged if there's no
+ * frontmatter block.
+ */
+export function stripFrontmatter(content: string): string {
+  return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trimStart();
+}
+
+/**
  * 2.5.8: a skill with no trigger description in its frontmatter is still
  * imported, but flagged, and sync-skills.mjs refuses to write it back to
  * disk until it has one.

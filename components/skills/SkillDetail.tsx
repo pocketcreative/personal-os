@@ -2,8 +2,9 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchSkill, saveSkillContent } from '@/lib/useSkills';
-import { readTrigger } from '@/lib/skillFile';
+import { readTrigger, stripFrontmatter } from '@/lib/skillFile';
 import { SKILL_SOURCE_LABELS, type Skill } from '@/lib/types';
+import MarkdownContent from './MarkdownContent';
 
 function downloadSkill(skill: Skill) {
   // Skills are stored verbatim, so the download IS the stored content --
@@ -132,14 +133,12 @@ export default function SkillDetail({ slug }: { slug: string }) {
           }}
         />
       ) : (
-        <pre style={{
-          width: '100%', boxSizing: 'border-box', margin: 0, overflowX: 'auto',
-          fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, lineHeight: 1.6, color: '#111',
-          padding: '16px 18px', border: '1px solid rgba(17,17,17,.1)', borderRadius: 8, background: '#fff',
-          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        <div style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '20px 24px', border: '1px solid rgba(17,17,17,.1)', borderRadius: 8, background: '#fff',
         }}>
-          {skill.content}
-        </pre>
+          <MarkdownContent content={stripFrontmatter(skill.content)} />
+        </div>
       )}
     </Wrap>
   );
