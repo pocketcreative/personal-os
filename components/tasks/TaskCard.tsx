@@ -38,7 +38,6 @@ export default function TaskCard({ task, onOpen, onChangeStatus }: {
   onOpen: () => void;
   onChangeStatus: (status: Task['status']) => void;
 }) {
-  const isNotStarted = task.status === 'not_started';
   const isCompleted = task.status === 'completed';
   const preview = task.needs_input && task.input_note ? task.input_note : task.description;
 
@@ -48,7 +47,6 @@ export default function TaskCard({ task, onOpen, onChangeStatus }: {
       style={{
         background: '#fff', border: '1px solid rgba(17,17,17,.08)', borderRadius: 10,
         padding: '13px 14px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8,
-        opacity: isNotStarted ? 0.72 : 1,
         boxShadow: '0 1px 2px rgba(0,0,0,.03)',
       }}
     >
@@ -64,16 +62,6 @@ export default function TaskCard({ task, onOpen, onChangeStatus }: {
         </span>
         {task.needs_input && <span title={task.input_note ?? 'Needs your input'} style={{ fontSize: 13, flexShrink: 0 }}>⚠️</span>}
       </div>
-
-      {isNotStarted && (
-        <span style={{
-          alignSelf: 'flex-start', font: "700 9.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)',
-          background: 'rgba(17,17,17,.06)', borderRadius: 20, padding: '2px 8px', letterSpacing: '.04em',
-          textTransform: 'uppercase',
-        }}>
-          Not started
-        </span>
-      )}
 
       {preview && (
         <div style={{

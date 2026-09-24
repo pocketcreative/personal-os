@@ -3,7 +3,6 @@ import { useTaskDashboard } from '@/lib/useTaskDashboard';
 import TaskCard from './TaskCard';
 import TaskDetailModal from './TaskDetailModal';
 import GoalBanner from './GoalBanner';
-import NeedsInputBanner from './NeedsInputBanner';
 import AddTaskInput from './AddTaskInput';
 import FieldPopover from './FieldPopover';
 import type { Task } from '@/lib/types';
@@ -28,7 +27,7 @@ export default function TaskKanbanBoard() {
     ...d.tasks.flatMap((t) => t.agent_tags ?? []),
   ]));
 
-  const columns: Record<string, Task[]> = { in_progress: [], needs_review: [], completed: [], archived: [] };
+  const columns: Record<string, Task[]> = { not_started: [], in_progress: [], needs_review: [], completed: [], archived: [] };
   for (const t of d.tasks) columns[kanbanColumn(t)].push(t);
 
   return (
@@ -46,7 +45,6 @@ export default function TaskKanbanBoard() {
           </div>
 
           <GoalBanner />
-          <NeedsInputBanner tasks={d.tasks} onSelect={d.setActiveTaskId} />
 
           <div style={{ marginBottom: 16 }}>
             <AddTaskInput onAdd={d.addTask} />

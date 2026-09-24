@@ -47,12 +47,10 @@ export const TASK_TYPE_LABELS: Record<Task['task_type'], string> = {
   single: 'Single', scheduled: 'Scheduled',
 };
 
-// The 5 explicit stages shown in the task detail view and used to sort a
-// task into one of the 4 kanban columns (Not Started and In Progress share
-// one column -- see STAGE_COLUMN below -- not-started cards are just dimmed/
-// badged within it). needs_input wins over status: a completed or archived
-// task that's still flagged needs_input shows in Needs Review, not
-// Completed/Archived, until Brendan clears the flag.
+// The 5 explicit stages shown in the task detail view and each now its own
+// kanban column, in this order. needs_input wins over status: a completed
+// or archived task that's still flagged needs_input shows in Needs Review,
+// not Completed/Archived, until Brendan clears the flag.
 export type TaskStage = 'not_started' | 'in_progress' | 'needs_review' | 'completed' | 'archived';
 export const STAGE_LABELS: Record<TaskStage, string> = {
   not_started: 'Not Started', in_progress: 'In Progress', needs_review: 'Needs Review',
@@ -67,14 +65,11 @@ export function taskStage(t: Pick<Task, 'status' | 'needs_input'>): TaskStage {
   return 'in_progress';
 }
 
-export type KanbanColumn = 'in_progress' | 'needs_review' | 'completed' | 'archived';
-export const KANBAN_COLUMNS: KanbanColumn[] = ['in_progress', 'needs_review', 'completed', 'archived'];
-export const KANBAN_COLUMN_LABELS: Record<KanbanColumn, string> = {
-  in_progress: 'In Progress', needs_review: 'Needs Review', completed: 'Completed', archived: 'Archived',
-};
+export type KanbanColumn = TaskStage;
+export const KANBAN_COLUMNS: KanbanColumn[] = ['not_started', 'in_progress', 'needs_review', 'completed', 'archived'];
+export const KANBAN_COLUMN_LABELS: Record<KanbanColumn, string> = STAGE_LABELS;
 export function kanbanColumn(t: Pick<Task, 'status' | 'needs_input'>): KanbanColumn {
-  const stage = taskStage(t);
-  return stage === 'not_started' ? 'in_progress' : stage;
+  return taskStage(t);
 }
 
 // '' (blank) means "Brendan" implicitly — his own tasks don't get an owner
