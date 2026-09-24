@@ -28,6 +28,12 @@ export default function SkillDetail({ slug }: { slug: string }) {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  // A skill Brendan owns (source: 'brendan') used to render permanently as
+  // an editable textarea -- fine for editing, unreadable for the much more
+  // common case of just reading it. Read is now the default; Edit is an
+  // explicit switch, matching how library (non-editable) skills already
+  // only ever showed the formatted read view.
+  const [mode, setMode] = useState<'read' | 'edit'>('read');
 
   useEffect(() => {
     let live = true;
@@ -103,10 +109,16 @@ export default function SkillDetail({ slug }: { slug: string }) {
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => downloadSkill(skill)} style={btnSecondary}>Download as MD</button>
-        {editable && (
-          <button onClick={save} disabled={!dirty || saving} style={{ ...btnPrimary, opacity: !dirty || saving ? 0.5 : 1 }}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+        {editable && mode === 'read' && (
+          <button onClick={() => setMode('edit')} style={btnSecondary}>Edit</button>
+        )}
+        {editable && mode === 'edit' && (
+          <>
+            <button onClick={() => setMode('read')} style={btnSecondary}>Done editing</button>
+            <button onClick={save} disabled={!dirty || saving} style={{ ...btnPrimary, opacity: !dirty || saving ? 0.5 : 1 }}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </>
         )}
         {saveMsg && <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: saveMsg.startsWith('Saved') ? '#4b7a4f' : '#b3261e' }}>{saveMsg}</span>}
       </div>
@@ -120,7 +132,7 @@ export default function SkillDetail({ slug }: { slug: string }) {
         </div>
       )}
 
-      {editable ? (
+      {editable && mode === 'edit' ? (
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -137,7 +149,10 @@ export default function SkillDetail({ slug }: { slug: string }) {
           width: '100%', boxSizing: 'border-box',
           padding: '20px 24px', border: '1px solid rgba(17,17,17,.1)', borderRadius: 8, background: '#fff',
         }}>
-          <MarkdownContent content={stripFrontmatter(skill.content)} />
+          {/* Reads from `draft`, not `skill.content`: if there are unsaved
+              edits (dirty), the read view reflects them instead of silently
+              discarding what hasn't been saved yet when toggling modes. */}
+          <MarkdownContent content={stripFrontmatter(draft)} />
         </div>
       )}
     </Wrap>
