@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 const TABS = [
   { href: '/tasks', label: 'Tasks' },
   { href: '/agents', label: 'Agents' },
+  { href: '/skills', label: 'Skills' },
   { href: '/reflections', label: 'Reflections' },
   { href: '/ideas', label: 'Ideas' },
   { href: '/media', label: 'Media' },
@@ -41,7 +42,10 @@ export default function TopRail() {
       </span>
       <div className="hidden md:flex gap-7">
         {TABS.map((t) => {
-          const active = pathname === t.href;
+          // startsWith covers this tab's own sub-routes (e.g. /skills/library,
+          // /skills/[slug]) -- exact-match alone only worked while every tab
+          // was a single flat page.
+          const active = pathname === t.href || pathname.startsWith(`${t.href}/`);
           return (
             <Link
               key={t.href}

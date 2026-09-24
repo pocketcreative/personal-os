@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
 
 // Only `goal` is meant to be edited from the UI per spec (simple edit-in-
-// place, nothing fancy) -- skill_name/name are seeded and not exposed as
-// editable controls, but PATCHABLE also allows them server-side in case a
+// place, nothing fancy) -- skill_name is seeded and not exposed as an
+// editable control, but PATCHABLE also allows it server-side in case a
 // future admin need comes up, rather than a second migration just for that.
-const PATCHABLE = new Set(['goal', 'skill_name', 'name']);
+// `name` is intentionally NOT patchable: tasks link to agents by matching
+// the agent's `name` string in their `agent_tags` array, so renaming an
+// agent here would silently break every task's link to it (no cascade).
+const PATCHABLE = new Set(['goal', 'skill_name']);
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
