@@ -52,7 +52,29 @@ export function filterForAudience(markdown: string, audience: SopAudience): stri
     out.push(kept);
     prevBlank = blank;
   }
-  return out.join('\n');
+  return dropEmptyStepHeaders(out).join('\n');
+}
+
+// A "### Step N" header whose whole body was tagged for the other audience
+// would download as a lone header, so drop any step header with nothing under
+// it (next non-blank line is another heading or the end). Fences are skipped.
+function dropEmptyStepHeaders(lines: string[]): string[] {
+  const res: string[] = [];
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (FENCE.test(line)) inFence = !inFence;
+    if (!inFence && /^###\s+Step\s+\d+\s*$/.test(line)) {
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() === '') j++;
+      if (j >= lines.length || /^#{1,6}\s/.test(lines[j])) {
+        i = j - 1; // also skip the blank lines that followed the dropped header
+        continue;
+      }
+    }
+    res.push(line);
+  }
+  return res;
 }
 
 /**

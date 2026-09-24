@@ -35,7 +35,7 @@ function downloadSop(sop: Sop, audience: SopAudience) {
 
 // Real headers, not greyed placeholder text: opening Edit on an empty SOP
 // pre-fills these so they're permanent text Brendan writes under.
-const SOP_TEMPLATE = '## Goal\n\n## Principles\n\n## Steps\n\n## Example\n\n## Checklist\n';
+const SOP_TEMPLATE = '## Goal\n\n## Principles\n\n## Steps\n\n### Step 1\n\n### Step 2\n\n## Example\n\n## Checklist\n';
 
 const sectionLabel: React.CSSProperties = {
   font: "700 12.5px 'Inter Tight', sans-serif", color: '#111', marginBottom: 6, marginTop: 18,

@@ -170,3 +170,26 @@ describe('sopEmDashWarning', () => {
     expect(warning).toBeNull();
   });
 });
+
+describe('filterForAudience step headers', () => {
+  const md = '## Steps\n\n### Step 1\n\n[Internal] Do the internal thing\n\n### Step 2\n\nShared step\n\n### Step 3\n\n[Client] Client only\n';
+  it('drops a step header whose body was all for the other audience', () => {
+    const client = filterForAudience(md, 'client');
+    expect(client).not.toContain('### Step 1');
+    expect(client).toContain('### Step 2');
+    expect(client).toContain('### Step 3');
+    expect(client).toContain('Client only');
+    expect(client).not.toContain('internal thing');
+  });
+  it('keeps every header that still has a body in the internal download', () => {
+    const internal = filterForAudience(md, 'internal');
+    expect(internal).toContain('### Step 1');
+    expect(internal).toContain('Do the internal thing');
+    expect(internal).toContain('### Step 2');
+    expect(internal).not.toContain('### Step 3');
+  });
+  it('does not touch step-looking headers inside a code fence', () => {
+    const fenced = '```\n### Step 1\n```\n';
+    expect(filterForAudience(fenced, 'client')).toBe(fenced);
+  });
+});
