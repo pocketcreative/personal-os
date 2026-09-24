@@ -33,6 +33,10 @@ function downloadSop(sop: Sop) {
   URL.revokeObjectURL(url);
 }
 
+// Real headers, not greyed placeholder text: opening Edit on an empty SOP
+// pre-fills these so they're permanent text Brendan writes under.
+const SOP_TEMPLATE = '## Goal\n\n## Principles\n\n## Steps\n\n## Example\n\n## Checklist\n';
+
 const sectionLabel: React.CSSProperties = {
   font: "700 12.5px 'Inter Tight', sans-serif", color: '#111', marginBottom: 6, marginTop: 18,
 };
@@ -134,7 +138,7 @@ export default function SopDetail({ id }: { id: string }) {
       <div style={{ display: 'flex', gap: 10, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => downloadSop(sop)} style={btnSecondary}>Download as MD</button>
         {mode === 'read' && (
-          <button onClick={() => setMode('edit')} style={btnSecondary}>Edit</button>
+          <button onClick={() => { if (!draft.content.trim()) set('content', SOP_TEMPLATE); setMode('edit'); }} style={btnSecondary}>Edit</button>
         )}
         {mode === 'edit' && (
           <button onClick={() => setMode('read')} style={btnSecondary}>Done editing</button>
@@ -229,7 +233,6 @@ export default function SopDetail({ id }: { id: string }) {
           value={draft.content}
           onChange={(e) => set('content', e.target.value)}
           spellCheck={false}
-          placeholder={'## Goal\nWhat this process is for.\n\n## Principles\nThe rules/judgment calls behind the steps.\n\n## Steps\nThe actual step-by-step process.\n\n## Example\nA real worked example.\n\n## Checklist\n- [ ] First check\n- [ ] Second check'}
           style={{
             width: '100%', boxSizing: 'border-box', minHeight: '60vh', resize: 'vertical',
             fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, lineHeight: 1.6, color: '#111',
