@@ -13,6 +13,48 @@ export function sopEmDashWarning(fields: { title: string; content: string }): st
   return 'This SOP has an em dash in it. Brendan\'s standing rule is no em dashes anywhere -- use a comma, period, or restructure the sentence instead.';
 }
 
+export type SopAudience = 'internal' | 'client';
+
+// Start of a line: optional indent, optional list marker ("- ", "* ", "+ ", "1. "),
+// optional bold marker, then [Internal] or [Client] and the single space after it.
+const AUDIENCE_TAG = /^(\s*(?:[-*+]\s+|\d+[.)]\s+)?(?:\*\*|__)?)\[(internal|client)\] ?/i;
+const FENCE = /^\s*(```|~~~)/;
+
+/**
+ * Filters SOP markdown for one audience. Untagged lines are shared. A line
+ * starting with [Internal] or [Client] is kept only for that audience, with the
+ * tag removed. Fenced code blocks are never touched. Blank-line runs left
+ * behind by dropped lines collapse to one blank line. Headings are never dropped.
+ */
+export function filterForAudience(markdown: string, audience: SopAudience): string {
+  const out: string[] = [];
+  let inFence = false;
+  let prevBlank = false;
+  for (const line of markdown.split('\n')) {
+    if (FENCE.test(line)) {
+      inFence = !inFence;
+      out.push(line);
+      prevBlank = false;
+      continue;
+    }
+    if (inFence) {
+      out.push(line);
+      continue;
+    }
+    let kept = line;
+    const m = AUDIENCE_TAG.exec(line);
+    if (m) {
+      if (m[2].toLowerCase() !== audience) continue;
+      kept = m[1] + line.slice(m[0].length);
+    }
+    const blank = kept.trim() === '';
+    if (blank && prevBlank) continue;
+    out.push(kept);
+    prevBlank = blank;
+  }
+  return out.join('\n');
+}
+
 /**
  * Builds the downloadable MD for an SOP: Title, Version/System metadata,
  * the raw `content` body (Goal/Principles/Steps/Example/Checklist -- however
@@ -20,14 +62,14 @@ export function sopEmDashWarning(fields: { title: string; content: string }): st
  * branding (Q8). `content` is stored verbatim (migration 0025), so unlike
  * the old 5-field version this no longer synthesizes headings itself.
  */
-export function renderSopExport(sop: Sop): string {
+export function renderSopExport(sop: Sop, audience: SopAudience): string {
   const lines: string[] = [];
   lines.push(`# ${sop.title}`);
   lines.push('');
   lines.push(`**Version:** ${sop.version} (${sop.version_date})`);
   if (sop.systems.length > 0) lines.push(`**System:** ${sop.systems.join(', ')}`);
   lines.push('');
-  lines.push(sop.content.trim() || '_Not yet written._');
+  lines.push(filterForAudience(sop.content.trim(), audience) || '_Not yet written._');
   lines.push('');
   lines.push('---');
   lines.push('© Pocket Creative');
@@ -35,7 +77,7 @@ export function renderSopExport(sop: Sop): string {
   return lines.join('\n');
 }
 
-export function sopFileName(sop: Sop): string {
+export function sopFileName(sop: Sop, audience?: SopAudience): string {
   const slug = sop.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'untitled-sop';
-  return `${slug}-v${sop.version}.md`;
+  return `${slug}-v${sop.version}${audience ? `-${audience}` : ''}.md`;
 }

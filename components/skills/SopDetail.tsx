@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { fetchSop, saveSop } from '@/lib/useSops';
 import { useSkills } from '@/lib/useSkills';
-import { renderSopExport, sopEmDashWarning, sopFileName } from '@/lib/sopMarkdown';
+import { renderSopExport, sopEmDashWarning, sopFileName, type SopAudience } from '@/lib/sopMarkdown';
 import { SOP_PROGRESS, SOP_PROGRESS_COLORS, SOP_PROGRESS_LABELS, SOP_SYSTEMS, type Sop, type SopProgress, type SopSystem } from '@/lib/types';
 import MarkdownContent from './MarkdownContent';
 
@@ -21,12 +21,12 @@ function isDirty(draft: Draft, sop: Sop): boolean {
     || draft.progress !== sop.progress;
 }
 
-function downloadSop(sop: Sop) {
-  const blob = new Blob([renderSopExport(sop)], { type: 'text/markdown' });
+function downloadSop(sop: Sop, audience: SopAudience) {
+  const blob = new Blob([renderSopExport(sop, audience)], { type: 'text/markdown' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = sopFileName(sop);
+  a.download = sopFileName(sop, audience);
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -136,7 +136,8 @@ export default function SopDetail({ id }: { id: string }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button onClick={() => downloadSop(sop)} style={btnSecondary}>Download as MD</button>
+        <button onClick={() => downloadSop(sop, 'internal')} style={btnSecondary}>Download (Internal)</button>
+        <button onClick={() => downloadSop(sop, 'client')} style={btnSecondary}>Download (Client)</button>
         {mode === 'read' && (
           <button onClick={() => { if (!draft.content.trim()) set('content', SOP_TEMPLATE); setMode('edit'); }} style={btnSecondary}>Edit</button>
         )}
