@@ -1,8 +1,8 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Skill } from '@/lib/types';
+import type { Skill, SkillListItem } from '@/lib/types';
 
-async function fetchSkills(): Promise<{ skills: Skill[]; error: string | null }> {
+async function fetchSkills(): Promise<{ skills: SkillListItem[]; error: string | null }> {
   const res = await fetch('/api/skills');
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -11,12 +11,24 @@ async function fetchSkills(): Promise<{ skills: Skill[]; error: string | null }>
   return { skills: await res.json(), error: null };
 }
 
-interface SkillsState { skills: Skill[]; loading: boolean; error: string | null; }
+// Fix 2: server-side search (?q=) against slug + full content, so the
+// client never has to fetch full content just to search. Called debounced
+// from SkillsBoard, not on every keystroke.
+export async function searchSkills(q: string): Promise<SkillListItem[]> {
+  const res = await fetch(`/api/skills?q=${encodeURIComponent(q)}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `Search failed (${res.status})`);
+  }
+  return res.json();
+}
+
+interface SkillsState { skills: SkillListItem[]; loading: boolean; error: string | null; }
 
 // Same load-on-mount / event-refresh pattern as useAgentsRegistry. Fetches
-// the full list once (id, content and all -- the dataset is small, roughly
-// 90 skills of a few KB each) and both /skills and /skills/library filter
-// it client-side by `source`, rather than two separate API calls.
+// the lightweight list once (no `content` -- see SkillListItem) and /skills
+// filters it client-side by `source` via the filter chip row, rather than
+// two separate pages/API calls.
 export function useSkills() {
   const [state, setState] = useState<SkillsState>({ skills: [], loading: true, error: null });
   const mountedRef = useRef(true);

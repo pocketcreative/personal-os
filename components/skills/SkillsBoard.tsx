@@ -1,17 +1,28 @@
 'use client';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { useSkills } from '@/lib/useSkills';
-import { readTrigger } from '@/lib/skillFile';
-import type { Skill } from '@/lib/types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useSkills, searchSkills } from '@/lib/useSkills';
+import type { SkillListItem, SkillSource } from '@/lib/types';
 import SkillsAreaNav from '@/components/skills/SkillsAreaNav';
+
+// Fix 1: Skills and the old Skills Library are one page now, split by a
+// filter chip row instead of two routes. 'all' has no ?filter param so the
+// plain /skills URL stays the default/bookmarkable view.
+type FilterKey = 'all' | SkillSource;
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'brendan', label: 'Mine' },
+  { key: 'claude_ai', label: 'Claude.ai' },
+  { key: 'vendor', label: 'Vendor' },
+];
 
 // Sync badge for a Tier A ("brendan") skill card -- everything it needs is
 // already on the row, no filesystem access required (see 0020's comment on
 // why Vercel can't hash the local file itself). "Edited since last sync"
 // is inferred from updated_at moving past last_synced_at, not from a live
 // hash compare.
-function syncBadge(s: Skill): { text: string; color: string } {
+function syncBadge(s: SkillListItem): { text: string; color: string } {
   if (!s.sync_to_local) return { text: 'Library only', color: 'rgba(17,17,17,.4)' };
   if (!s.last_synced_at) return { text: 'Not yet synced', color: '#b3261e' };
   if (new Date(s.updated_at) > new Date(s.last_synced_at)) {
@@ -20,9 +31,8 @@ function syncBadge(s: Skill): { text: string; color: string } {
   return { text: 'Synced', color: '#4b7a4f' };
 }
 
-function SkillCard({ skill, variant }: { skill: Skill; variant: 'own' | 'library' }) {
-  const trigger = readTrigger(skill.content);
-  const badge = variant === 'own' ? syncBadge(skill) : null;
+function SkillCard({ skill }: { skill: SkillListItem }) {
+  const badge = skill.source === 'brendan' ? syncBadge(skill) : null;
   return (
     <Link
       href={`/skills/${encodeURIComponent(skill.slug)}`}
@@ -47,7 +57,7 @@ function SkillCard({ skill, variant }: { skill: Skill; variant: 'own' | 'library
         font: "500 12.5px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.6)', lineHeight: 1.45,
         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
       }}>
-        {trigger ?? <span style={{ color: 'rgba(17,17,17,.35)', fontStyle: 'italic' }}>No trigger description in frontmatter</span>}
+        {skill.trigger_description ?? <span style={{ color: 'rgba(17,17,17,.35)', fontStyle: 'italic' }}>No trigger description in frontmatter</span>}
       </div>
       <div style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>
         v{skill.version} &middot; {skill.version_date}
@@ -56,21 +66,56 @@ function SkillCard({ skill, variant }: { skill: Skill; variant: 'own' | 'library
   );
 }
 
-export default function SkillsBoard({ variant }: { variant: 'own' | 'library' }) {
+export default function SkillsBoard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawFilter = searchParams.get('filter');
+  const filter: FilterKey = FILTERS.some((f) => f.key === rawFilter) ? (rawFilter as FilterKey) : 'all';
+
   const { skills, loading, error } = useSkills();
   const [q, setQ] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
+  const [searchResults, setSearchResults] = useState<SkillListItem[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  // Debounced server-side search (Fix 2): fires ~300ms after typing stops,
+  // not on every keystroke, and only when there's an actual query.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const runSearch = useCallback(async (query: string) => {
+    if (!query) { setSearchResults(null); setSearchError(null); setSearching(false); return; }
+    setSearching(true);
+    try {
+      const r = await searchSkills(query);
+      setSearchResults(r);
+    } catch (e) {
+      setSearchError((e as Error).message);
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional, same load-effect pattern as lib/useReflections.ts/useSkills.ts
+  useEffect(() => { runSearch(debouncedQ); }, [debouncedQ, runSearch]);
+
+  const setFilter = (key: FilterKey) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (key === 'all') params.delete('filter'); else params.set('filter', key);
+    const qs = params.toString();
+    router.replace(qs ? `/skills?${qs}` : '/skills', { scroll: false });
+  };
 
   const filtered = useMemo(() => {
-    const inScope = skills.filter((s) => (variant === 'own' ? s.source === 'brendan' : s.source !== 'brendan'));
-    const query = q.trim().toLowerCase();
-    if (!query) return inScope;
-    return inScope.filter((s) => s.slug.toLowerCase().includes(query) || s.content.toLowerCase().includes(query));
-  }, [skills, variant, q]);
+    const source = debouncedQ ? (searchResults ?? []) : skills;
+    return filter === 'all' ? source : source.filter((s) => s.source === filter);
+  }, [debouncedQ, searchResults, skills, filter]);
 
-  const title = variant === 'own' ? 'Skills' : 'Skills Library';
-  const subtitle = variant === 'own'
-    ? "Your own skills, the ones you actually curate and use daily. Edit and save here, then sync writes the changes down to ~/.claude/skills."
-    : 'Every other installed skill (claude.ai-managed and vendor/reference), so nothing is sitting somewhere you can’t see it. Read-only here -- claude.ai or the vendor stays the real owner, nothing syncs back to disk.';
+  const isLoading = debouncedQ ? searching : loading;
+  const activeError = debouncedQ ? searchError : error;
 
   return (
     <div style={{ width: '96%', maxWidth: 1220, margin: '0 auto', padding: 'clamp(24px, 6vw, 56px) 0' }}>
@@ -80,10 +125,31 @@ export default function SkillsBoard({ variant }: { variant: 'own' | 'library' })
       }}>
         <SkillsAreaNav />
         <div className="board-header" style={{ marginBottom: 8 }}>
-          <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>{title}</div>
+          <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Skills</div>
         </div>
         <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)', marginBottom: 20, maxWidth: 720 }}>
-          {subtitle}
+          Everything installed, yours and everyone else&apos;s. Edit and save your own here, then sync writes the changes down to ~/.claude/skills. claude.ai and vendor skills are library/reference -- nothing here writes back to their real source.
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          {FILTERS.map((f) => {
+            const active = f.key === filter;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                style={{
+                  font: "700 12px 'Inter Tight', sans-serif",
+                  color: active ? '#fff' : '#111',
+                  background: active ? '#024ADD' : '#fff',
+                  border: `1px solid ${active ? '#024ADD' : 'rgba(17,17,17,.15)'}`,
+                  borderRadius: 20, padding: '6px 14px', cursor: 'pointer',
+                }}
+              >
+                {f.label}
+              </button>
+            );
+          })}
         </div>
 
         <input
@@ -97,27 +163,27 @@ export default function SkillsBoard({ variant }: { variant: 'own' | 'library' })
           }}
         />
 
-        {loading && <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Loading&hellip;</div>}
+        {isLoading && <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Loading&hellip;</div>}
 
-        {!loading && error && (
+        {!isLoading && activeError && (
           <div style={{
             background: 'rgba(179,38,30,.06)', border: '1px solid rgba(179,38,30,.25)', borderRadius: 8,
             padding: '14px 16px', font: "500 13px 'Inter Tight', sans-serif", color: '#8a2a22',
           }}>
-            Couldn&apos;t load the skills table ({error}). If this is a fresh install, migration{' '}
+            Couldn&apos;t load the skills table ({activeError}). If this is a fresh install, migration{' '}
             <code className="mono">0020_skills_sops.sql</code> may not be applied to the live database yet.
           </div>
         )}
 
-        {!loading && !error && filtered.length === 0 && (
+        {!isLoading && !activeError && filtered.length === 0 && (
           <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>
             {q ? 'No skills match that search.' : 'No skills imported yet.'}
           </div>
         )}
 
-        {!loading && !error && filtered.length > 0 && (
+        {!isLoading && !activeError && filtered.length > 0 && (
           <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
-            {filtered.map((s) => <SkillCard key={s.id} skill={s} variant={variant} />)}
+            {filtered.map((s) => <SkillCard key={s.id} skill={s} />)}
           </div>
         )}
       </div>

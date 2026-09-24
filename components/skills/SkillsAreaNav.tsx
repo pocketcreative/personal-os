@@ -2,21 +2,20 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-// Shared 3-way toggle for the Skills area (Skills / Library / SOPs) so SOPs
-// lives clearly inside the same navigational area as Skills rather than as
-// a disconnected new top-level page (per the build brief). Used by
-// SkillsBoard (both the "own" and "library" variants) and SopsBoard.
+// Shared toggle for the Skills area (Skills / SOPs) so SOPs lives clearly
+// inside the same navigational area as Skills rather than as a disconnected
+// new top-level page (per the build brief). Used by SkillsBoard and
+// SopsBoard. Skills and the old Skills Library are now one page (`/skills`,
+// filterable by source) -- the separate Library tab/route is gone;
+// `/skills/library` redirects to `/skills`.
 const TABS = [
   { href: '/skills', label: 'Skills' },
-  { href: '/skills/library', label: 'Library' },
   { href: '/skills/sops', label: 'SOPs' },
 ];
 
 function isActive(href: string, pathname: string): boolean {
   if (href === '/skills') {
-    return pathname === '/skills' || (
-      pathname.startsWith('/skills/') && !pathname.startsWith('/skills/library') && !pathname.startsWith('/skills/sops')
-    );
+    return pathname === '/skills' || (pathname.startsWith('/skills/') && !pathname.startsWith('/skills/sops'));
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

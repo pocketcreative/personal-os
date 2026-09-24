@@ -264,7 +264,8 @@ export const AGENT_RUN_STATUS_LABELS: Record<AgentRun['status'], string> = {
   running: 'Running', blocked: 'Needs Input', done: 'Done', failed: 'Failed',
 };
 
-// Skills library (`/skills`, `/skills/library`), Phase 2 Part A. Stored
+// Skills library (`/skills`, filterable by source -- the old `/skills/library`
+// route redirects here rather than staying a separate page). Stored
 // VERBATIM -- `content` is the exact bytes of the local SKILL.md
 // (frontmatter included). No template, no extracted fields; the trigger
 // text is read out of the frontmatter at display time (lib/skillFile.ts
@@ -282,9 +283,9 @@ export interface Skill {
   // with ~/.claude/skills/<slug>/SKILL.md via scripts/sync-skills.mjs.
   sync_to_local: boolean;
   // Who owns the canonical copy: 'brendan' (Tier A, editable + synced here),
-  // 'claude_ai' (owned by claude.ai, library-only), 'vendor' (every other
-  // installed skill -- addyosmani pack, hyperframes, remotion, humanizer,
-  // etc. -- library-only).
+  // 'claude_ai' (owned by claude.ai, editable here as a reference copy only,
+  // see SkillDetail's inline note), 'vendor' (every other installed skill --
+  // addyosmani pack, hyperframes, remotion, humanizer, etc. -- read-only).
   source: SkillSource;
   synced_hash: string | null;
   last_synced_at: string | null;
@@ -296,6 +297,14 @@ export interface Skill {
 export const SKILL_SOURCE_LABELS: Record<SkillSource, string> = {
   brendan: 'Your skill', claude_ai: 'Owned by claude.ai', vendor: 'Library',
 };
+
+// Lightweight row for the list view (GET /api/skills): everything a card
+// needs except `content`, which used to be shipped for all ~86 skills just
+// to extract a trigger blurb and support client-side search -- a 1.26MB
+// payload for a list. `trigger_description` is computed server-side from
+// content at query time (not a stored column -- see the Skill comment
+// above on why the trigger text isn't duplicated into the schema).
+export type SkillListItem = Omit<Skill, 'content'> & { trigger_description: string | null };
 
 // SOPs (`/skills/sops`), Phase 2 Part B. Human-facing process documents --
 // distinct from Skills (agent files, stored verbatim). Written to the

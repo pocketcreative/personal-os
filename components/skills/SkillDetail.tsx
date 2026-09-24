@@ -46,7 +46,11 @@ export default function SkillDetail({ slug }: { slug: string }) {
   if (loading) return <Wrap><div style={muted}>Loading&hellip;</div></Wrap>;
   if (error || !skill) return <Wrap><div style={errStyle}>{error ?? 'Not found'}</div></Wrap>;
 
-  const editable = skill.source === 'brendan';
+  // Fix 3: claude.ai-owned skills are editable here too now (Brendan's
+  // reasoning: he directs all of it, even the claude.ai-managed ones).
+  // Vendor skills stay read-only -- see the inline note below and the
+  // server-side guard in app/api/skills/[slug]/route.ts.
+  const editable = skill.source === 'brendan' || skill.source === 'claude_ai';
   const dirty = editable && draft !== skill.content;
   const trigger = readTrigger(skill.content);
 
@@ -72,10 +76,10 @@ export default function SkillDetail({ slug }: { slug: string }) {
       <div className="board-header" style={{ marginBottom: 4 }}>
         <div>
           <Link
-            href={editable ? '/skills' : '/skills/library'}
+            href={`/skills?filter=${skill.source}`}
             style={{ font: "600 12px 'Inter Tight', sans-serif", color: '#9a7a2e', textDecoration: 'none' }}
           >
-            &larr; {editable ? 'Skills' : 'Skills Library'}
+            &larr; Skills
           </Link>
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em', marginTop: 4 }}>
             {skill.slug}
@@ -122,6 +126,15 @@ export default function SkillDetail({ slug }: { slug: string }) {
         )}
         {saveMsg && <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: saveMsg.startsWith('Saved') ? '#4b7a4f' : '#b3261e' }}>{saveMsg}</span>}
       </div>
+
+      {skill.source === 'claude_ai' && (
+        <div style={{
+          background: 'rgba(2,74,221,.05)', border: '1px solid rgba(2,74,221,.25)', borderRadius: 8,
+          padding: '10px 14px', font: "500 12.5px 'Inter Tight', sans-serif", color: '#024ADD', marginBottom: 14, maxWidth: 720,
+        }}>
+          Editing here updates this reference copy only. It does not change your actual claude.ai skill, and a future sync from your account may overwrite this.
+        </div>
+      )}
 
       {warning && (
         <div style={{

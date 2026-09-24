@@ -49,6 +49,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
   let warning: string | null = null;
   const contentChanged = typeof body.content === 'string' && body.content !== current.content;
   if (contentChanged) {
+    // Fix 3: vendor skills stay read-only server-side too, not just hidden
+    // in the UI -- the Edit button is only ever shown for 'brendan' and
+    // 'claude_ai' sources, this is the backstop.
+    if (current.source === 'vendor') {
+      return NextResponse.json({ error: 'Vendor skills are read-only' }, { status: 403 });
+    }
     // 2.2.3: previous content goes into audit_log before being overwritten
     // (no separate versions table -- audit_log covers rollback).
     const { error: auditErr } = await db.from('audit_log').insert({
