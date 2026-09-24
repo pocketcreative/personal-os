@@ -20,7 +20,14 @@ export async function GET(req: NextRequest) {
     const openSession = sessions.find((s) => s.ended_at === null) ?? null;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to drop it from the spread
     const { timer_sessions: _drop, ...rest } = t;
-    return { ...rest, active_timer: openSession ? { id: openSession.id, started_at: openSession.started_at } : null };
+    return {
+      ...rest,
+      active_timer: openSession ? { id: openSession.id, started_at: openSession.started_at } : null,
+      // Defensive fallback for agent_tags/task_type: undefined until
+      // migration 0017 is applied on the live DB, real values after.
+      agent_tags: t.agent_tags ?? [],
+      task_type: t.task_type ?? 'single',
+    };
   });
   return NextResponse.json(withFlattenedTimer, { headers: { 'cache-control': 'no-store' } });
 }
@@ -34,7 +41,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'title required' }, { status: 400 });
   }
   const db = serviceClient();
-  const { data, error } = await db.from('tasks').insert({
+  const insertRow: Record<string, unknown> = {
     user_id: USER_ID,
     title: body.title.trim(),
     description: body.description ?? null,
@@ -47,7 +54,13 @@ export async function POST(req: NextRequest) {
     owner: body.owner ?? '',
     needs_input: body.needs_input ?? false,
     input_note: body.input_note ?? null,
-  }).select('*').single();
+  };
+  // Only sent when the caller actually provides them, so a plain "+ Add
+  // task" title-only create keeps working unchanged whether or not
+  // migration 0017 (agent_tags/task_type) has landed on the live DB yet.
+  if (body.agent_tags !== undefined) insertRow.agent_tags = body.agent_tags;
+  if (body.task_type !== undefined) insertRow.task_type = body.task_type;
+  const { data, error } = await db.from('tasks').insert(insertRow).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
+  return NextResponse.json({ ...data, agent_tags: data.agent_tags ?? [], task_type: data.task_type ?? 'single' }, { status: 201 });
 }

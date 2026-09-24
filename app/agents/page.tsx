@@ -1,5 +1,5 @@
-import AgentRunsBoard from '@/components/agents/AgentRunsBoard';
+import AgentsRegistry from '@/components/agents/AgentsRegistry';
 
 export default function AgentsPage() {
-  return <AgentRunsBoard />;
+  return <AgentsRegistry />;
 }

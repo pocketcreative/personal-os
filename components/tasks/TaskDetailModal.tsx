@@ -1,11 +1,31 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { Task } from '@/lib/types';
+import {
+  AGENT_TAGS, STAGE_LABELS, TASK_TYPES, TASK_TYPE_LABELS, URGENCIES, URGENCY_LABELS, taskStage,
+} from '@/lib/types';
+
+export interface TaskDetailPatch {
+  title?: string;
+  description?: string;
+  owner?: string;
+  needs_input?: boolean;
+  input_note?: string | null;
+  agent_tags?: string[];
+  task_type?: Task['task_type'];
+  urgency?: Task['urgency'];
+  due_date?: string | null;
+}
+
+const STAGE_DOT: Record<string, string> = {
+  not_started: 'rgba(17,17,17,.3)', in_progress: '#eab308', needs_review: '#9a7a2e',
+  completed: '#2f9e44', archived: 'rgba(154,122,46,.4)',
+};
 
 export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
   task: Task;
   onClose: () => void;
-  onSave: (patch: { title?: string; description?: string; owner?: string; needs_input?: boolean; input_note?: string | null }) => void;
+  onSave: (patch: TaskDetailPatch) => void;
   onDelete: () => void;
 }) {
   const [name, setName] = useState(task.title);
@@ -13,7 +33,13 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
   const [owner, setOwner] = useState(task.owner ?? '');
   const [needsInput, setNeedsInput] = useState(!!task.needs_input);
   const [inputNote, setInputNote] = useState(task.input_note ?? '');
+  const [agentTags, setAgentTags] = useState<string[]>(task.agent_tags ?? []);
+  const [customTagDraft, setCustomTagDraft] = useState('');
+  const [taskType, setTaskType] = useState<Task['task_type']>(task.task_type ?? 'single');
+  const [urgency, setUrgency] = useState<Task['urgency']>(task.urgency);
+  const [dueDate, setDueDate] = useState(task.due_date ?? '');
   const nameRef = useRef<HTMLTextAreaElement>(null);
+  const stage = taskStage(task);
 
   // Auto-grow the title field so a long title wraps and stays fully
   // visible/editable instead of scrolling sideways inside a single line.
@@ -32,7 +58,25 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
     if (needsInput !== task.needs_input || trimmedNote !== task.input_note) {
       onSave({ needs_input: needsInput, input_note: needsInput ? trimmedNote : null });
     }
+    const existingTags = task.agent_tags ?? [];
+    if (agentTags.length !== existingTags.length || agentTags.some((t, i) => t !== existingTags[i])) {
+      onSave({ agent_tags: agentTags });
+    }
+    if (taskType !== (task.task_type ?? 'single')) onSave({ task_type: taskType });
+    if (urgency !== task.urgency) onSave({ urgency });
+    const trimmedDue = dueDate.trim() || null;
+    if (trimmedDue !== task.due_date) onSave({ due_date: trimmedDue });
     onClose();
+  }
+
+  function toggleTag(tag: string) {
+    setAgentTags((cur) => (cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]));
+  }
+
+  function addCustomTag() {
+    const t = customTagDraft.trim();
+    if (t && !agentTags.includes(t)) setAgentTags((cur) => [...cur, t]);
+    setCustomTagDraft('');
   }
 
   return (
@@ -64,6 +108,15 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
           />
           <span onClick={done} style={{ cursor: 'pointer', color: 'rgba(17,17,17,.4)', fontSize: 18, padding: 4 }}>✕</span>
         </div>
+        <div style={{ padding: '0 32px 8px' }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, font: "600 12px 'Inter Tight', sans-serif",
+            color: 'rgba(17,17,17,.6)', background: 'rgba(17,17,17,.05)', borderRadius: 20, padding: '5px 12px',
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: STAGE_DOT[stage] }} />
+            {STAGE_LABELS[stage]}
+          </span>
+        </div>
         <div style={{ padding: '8px 32px 32px' }}>
           <div style={{ font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 10 }}>
             Description
@@ -76,6 +129,97 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete }: {
               resize: 'vertical', padding: '12px 14px', border: '1px solid rgba(17,17,17,.1)',
               borderRadius: 6, background: '#fff', boxSizing: 'border-box',
               fontFamily: "'Inter Tight', sans-serif", outline: 'none',
+            }}
+          />
+
+          <div style={{ font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)', letterSpacing: '.06em', textTransform: 'uppercase', margin: '20px 0 10px' }}>
+            Agents Assigned
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            {Array.from(new Set([...AGENT_TAGS, ...agentTags])).map((tag) => {
+              const active = agentTags.includes(tag);
+              return (
+                <span
+                  key={tag}
+                  onClick={() => toggleTag(tag)}
+                  style={{
+                    cursor: 'pointer', font: "600 12px 'Inter Tight', sans-serif",
+                    color: active ? '#9a7a2e' : 'rgba(17,17,17,.55)',
+                    background: active ? 'rgba(198,161,91,.14)' : 'rgba(17,17,17,.05)',
+                    border: `1px solid ${active ? 'rgba(198,161,91,.4)' : 'transparent'}`,
+                    borderRadius: 20, padding: '6px 12px',
+                  }}
+                >
+                  {tag}
+                </span>
+              );
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <input
+              value={customTagDraft} onChange={(e) => setCustomTagDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomTag(); } }}
+              placeholder="Add a custom agent tag…"
+              style={{
+                flex: 1, fontSize: 13, color: '#111', padding: '8px 12px',
+                border: '1px solid rgba(17,17,17,.1)', borderRadius: 6, background: '#fff',
+                boxSizing: 'border-box', fontFamily: "'Inter Tight', sans-serif", outline: 'none',
+              }}
+            />
+            <button
+              onClick={addCustomTag}
+              style={{
+                font: "600 12px 'Inter Tight', sans-serif", color: '#111', background: 'rgba(17,17,17,.06)',
+                border: 'none', borderRadius: 6, padding: '0 14px', cursor: 'pointer',
+              }}
+            >
+              Add
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 20, marginTop: 20 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+                Type
+              </div>
+              <select
+                value={taskType} onChange={(e) => setTaskType(e.target.value as Task['task_type'])}
+                style={{
+                  width: '100%', fontSize: 14, color: '#111', padding: '9px 12px',
+                  border: '1px solid rgba(17,17,17,.1)', borderRadius: 6, background: '#fff',
+                  boxSizing: 'border-box', fontFamily: "'Inter Tight', sans-serif", outline: 'none',
+                }}
+              >
+                {TASK_TYPES.map((t) => <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+                Urgency
+              </div>
+              <select
+                value={urgency} onChange={(e) => setUrgency(e.target.value as Task['urgency'])}
+                style={{
+                  width: '100%', fontSize: 14, color: '#111', padding: '9px 12px',
+                  border: '1px solid rgba(17,17,17,.1)', borderRadius: 6, background: '#fff',
+                  boxSizing: 'border-box', fontFamily: "'Inter Tight', sans-serif", outline: 'none',
+                }}
+              >
+                {URGENCIES.map((u) => <option key={u} value={u}>{URGENCY_LABELS[u]}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.4)', letterSpacing: '.06em', textTransform: 'uppercase', margin: '20px 0 10px' }}>
+            Due Date
+          </div>
+          <input
+            type="date"
+            value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+            style={{
+              width: '100%', fontSize: 14, color: '#111', padding: '9px 12px',
+              border: '1px solid rgba(17,17,17,.1)', borderRadius: 6, background: '#fff',
+              boxSizing: 'border-box', fontFamily: "'Inter Tight', sans-serif", outline: 'none',
             }}
           />
 

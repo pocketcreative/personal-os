@@ -25,6 +25,56 @@ export interface Task {
   owner: string; // free text: 'brendan', 'ai', or a named team member (e.g. 'fahad')
   needs_input: boolean; // true = blocked waiting on Brendan, shows a warning badge
   input_note: string | null; // what's needed from Brendan when needs_input is true
+  agent_tags: string[]; // which agent role(s) this task is assigned to -- separate from `owner` (a single identity); a task can carry more than one
+  task_type: 'single' | 'scheduled'; // 'scheduled' = a recurring automation; each firing is its own new row, not one row cycling forever
+}
+
+// Seed list shown in the Agents Assigned picker -- free text is still
+// allowed (agent_tags is a plain text[] column, not a DB enum) so a new role
+// can be tagged without a migration, this is just the quick-pick list.
+export const AGENT_TAGS = [
+  'Copywriter Agent',
+  'Developer Agent',
+  'Long Form Editor Agent',
+  'Short Form/Reel Editor Agent',
+  'Motion Graphics Agent',
+  'Ops/Research Agent',
+  'Brendan',
+] as const;
+
+export const TASK_TYPES = ['single', 'scheduled'] as const;
+export const TASK_TYPE_LABELS: Record<Task['task_type'], string> = {
+  single: 'Single', scheduled: 'Scheduled',
+};
+
+// The 5 explicit stages shown in the task detail view and used to sort a
+// task into one of the 4 kanban columns (Not Started and In Progress share
+// one column -- see STAGE_COLUMN below -- not-started cards are just dimmed/
+// badged within it). needs_input wins over status: a completed or archived
+// task that's still flagged needs_input shows in Needs Review, not
+// Completed/Archived, until Brendan clears the flag.
+export type TaskStage = 'not_started' | 'in_progress' | 'needs_review' | 'completed' | 'archived';
+export const STAGE_LABELS: Record<TaskStage, string> = {
+  not_started: 'Not Started', in_progress: 'In Progress', needs_review: 'Needs Review',
+  completed: 'Completed', archived: 'Archived',
+};
+
+export function taskStage(t: Pick<Task, 'status' | 'needs_input'>): TaskStage {
+  if (t.needs_input) return 'needs_review';
+  if (t.status === 'completed') return 'completed';
+  if (t.status === 'archived') return 'archived';
+  if (t.status === 'not_started') return 'not_started';
+  return 'in_progress';
+}
+
+export type KanbanColumn = 'in_progress' | 'needs_review' | 'completed' | 'archived';
+export const KANBAN_COLUMNS: KanbanColumn[] = ['in_progress', 'needs_review', 'completed', 'archived'];
+export const KANBAN_COLUMN_LABELS: Record<KanbanColumn, string> = {
+  in_progress: 'In Progress', needs_review: 'Needs Review', completed: 'Completed', archived: 'Archived',
+};
+export function kanbanColumn(t: Pick<Task, 'status' | 'needs_input'>): KanbanColumn {
+  const stage = taskStage(t);
+  return stage === 'not_started' ? 'in_progress' : stage;
 }
 
 // '' (blank) means "Brendan" implicitly — his own tasks don't get an owner
@@ -42,6 +92,25 @@ export const CATEGORIES = ['personal', 'business'] as const;
 export const CATEGORY_LABELS: Record<Task['category'], string> = {
   personal: 'Personal', business: 'Business',
 };
+
+export const URGENCIES = ['today', 'this_week', 'this_month', 'someday'] as const;
+export const URGENCY_LABELS: Record<Task['urgency'], string> = {
+  today: 'Today', this_week: 'This Week', this_month: 'This Month', someday: 'Someday',
+};
+
+// One row per agent ROLE (the Agents Registry, `/agents`) -- distinct from
+// AgentRun (a live log of individual sub-agent invocations, `agent_runs`)
+// and from Task.agent_tags (which roles a given task is assigned to).
+// task_count is derived client-side from tasks whose agent_tags includes
+// this agent's name, never stored on the row.
+export interface AgentProfile {
+  id: string;
+  name: string;
+  skill_name: string;
+  goal: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export const STATUSES = ['not_started', 'in_progress', 'completed', 'archived'] as const;
 export const STATUS_LABELS: Record<Task['status'], string> = {
