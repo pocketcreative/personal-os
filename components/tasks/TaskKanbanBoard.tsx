@@ -1,11 +1,16 @@
 'use client';
+import { useState } from 'react';
+import {
+  DndContext, DragOverlay, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors,
+} from '@dnd-kit/core';
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { useTaskDashboard } from '@/lib/useTaskDashboard';
 import TaskCard from './TaskCard';
 import TaskDetailModal from './TaskDetailModal';
 import GoalBanner from './GoalBanner';
 import AddTaskInput from './AddTaskInput';
 import FieldPopover from './FieldPopover';
-import type { Task } from '@/lib/types';
+import type { KanbanColumn, Task } from '@/lib/types';
 import { AGENT_TAGS, KANBAN_COLUMNS, KANBAN_COLUMN_LABELS, TASK_TYPES, TASK_TYPE_LABELS, URGENCY_LABELS, kanbanColumn } from '@/lib/types';
 
 // One responsive board for both desktop and mobile (replaces the old
@@ -16,8 +21,69 @@ import { AGENT_TAGS, KANBAN_COLUMNS, KANBAN_COLUMN_LABELS, TASK_TYPES, TASK_TYPE
 // for what's fundamentally the same layout at different widths.
 const COLUMN_MIN_WIDTH = 280;
 
+// Drag-and-drop: real mouse + touch support via @dnd-kit/core (native HTML5
+// drag doesn't work on touch, which is most of how this board gets checked).
+// MouseSensor needs a small movement (distance) before a drag "counts", so a
+// plain click still opens the card / fires the status popover instead of
+// being swallowed as a zero-distance drag. TouchSensor uses delay+tolerance
+// instead: a quick swipe (under the delay, or past the tolerance before it
+// elapses) is left alone so the board's horizontal column scroll keeps
+// working, only a deliberate press-and-hold starts a drag. This is dnd-kit's
+// documented pattern for a draggable list that's also a scrollable one —
+// don't set touch-action:none on the cards, that would kill the scroll this
+// is specifically trying to protect (per the task's own mobile-scroll note).
+function useBoardSensors() {
+  return useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
+}
+
+function DraggableTaskCard({ task, onOpen, onChangeStatus }: {
+  task: Task;
+  onOpen: () => void;
+  onChangeStatus: (status: Task['status']) => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={{
+        opacity: isDragging ? 0.4 : 1,
+        cursor: isDragging ? 'grabbing' : 'grab',
+        touchAction: 'manipulation',
+      }}
+    >
+      <TaskCard task={task} onOpen={onOpen} onChangeStatus={onChangeStatus} />
+    </div>
+  );
+}
+
+function DroppableColumn({ col, children }: { col: KanbanColumn; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: col });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        flex: `1 1 ${COLUMN_MIN_WIDTH}px`, minWidth: COLUMN_MIN_WIDTH, maxWidth: 420,
+        scrollSnapAlign: 'start',
+        background: isOver ? 'rgba(2,74,221,.05)' : 'rgba(17,17,17,.02)',
+        border: isOver ? '1px solid rgba(2,74,221,.35)' : '1px solid rgba(17,17,17,.06)',
+        borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
+        transition: 'background .12s ease, border-color .12s ease',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function TaskKanbanBoard() {
   const d = useTaskDashboard();
+  const sensors = useBoardSensors();
+  const [draggingTask, setDraggingTask] = useState<Task | null>(null);
 
   // Agent picker options: the 7 seeded roles plus any free-text tag already
   // in use on a real task, so a custom tag someone typed into the modal
@@ -29,6 +95,21 @@ export default function TaskKanbanBoard() {
 
   const columns: Record<string, Task[]> = { not_started: [], in_progress: [], needs_review: [], completed: [], archived: [] };
   for (const t of d.tasks) columns[kanbanColumn(t)].push(t);
+
+  function handleDragStart(event: DragStartEvent) {
+    const task = d.tasks.find((t) => t.id === event.active.id);
+    setDraggingTask(task ?? null);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setDraggingTask(null);
+    const overCol = event.over?.id as KanbanColumn | undefined;
+    if (!overCol) return;
+    const taskId = event.active.id as string;
+    const task = d.tasks.find((t) => t.id === taskId);
+    if (!task || kanbanColumn(task) === overCol) return;
+    d.moveToColumn(taskId, overCol);
+  }
 
   return (
     <div style={{ width: '96%', maxWidth: 2200, margin: '0 auto', padding: 'clamp(16px, 6vw, 56px) 0' }}>
@@ -101,47 +182,52 @@ export default function TaskKanbanBoard() {
             />
           </div>
 
-          <div style={{
-            display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 20,
-            scrollSnapType: 'x proximity',
-          }}>
-            {KANBAN_COLUMNS.map((col) => {
-              const colTasks = columns[col];
-              return (
-                <div
-                  key={col}
-                  style={{
-                    flex: `1 1 ${COLUMN_MIN_WIDTH}px`, minWidth: COLUMN_MIN_WIDTH, maxWidth: 420,
-                    scrollSnapAlign: 'start',
-                    background: 'rgba(17,17,17,.02)', border: '1px solid rgba(17,17,17,.06)',
-                    borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
-                  }}
-                >
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 7,
-                    font: "700 11.5px 'Archivo', sans-serif", color: '#111', letterSpacing: '.03em',
-                    textTransform: 'uppercase', padding: '2px 2px 6px',
-                  }}>
-                    {KANBAN_COLUMN_LABELS[col]}
-                    <span style={{ color: 'rgba(17,17,17,.35)', fontWeight: 600 }}>{colTasks.length}</span>
-                  </div>
-                  {colTasks.length === 0 && (
-                    <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.3)', padding: '4px 2px' }}>
-                      Nothing here
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDraggingTask(null)}>
+            <div style={{
+              display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 20,
+              scrollSnapType: 'x proximity',
+            }}>
+              {KANBAN_COLUMNS.map((col) => {
+                const colTasks = columns[col];
+                return (
+                  <DroppableColumn key={col} col={col}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 7,
+                      font: "700 11.5px 'Archivo', sans-serif", color: '#111', letterSpacing: '.03em',
+                      textTransform: 'uppercase', padding: '2px 2px 6px',
+                    }}>
+                      {KANBAN_COLUMN_LABELS[col]}
+                      <span style={{ color: 'rgba(17,17,17,.35)', fontWeight: 600 }}>{colTasks.length}</span>
                     </div>
-                  )}
-                  {colTasks.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onOpen={() => d.setActiveTaskId(task.id)}
-                      onChangeStatus={(status) => d.updateStatus(task.id, status)}
-                    />
-                  ))}
+                    {colTasks.length === 0 && (
+                      <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.3)', padding: '4px 2px' }}>
+                        Nothing here
+                      </div>
+                    )}
+                    {colTasks.map((task) => (
+                      <DraggableTaskCard
+                        key={task.id}
+                        task={task}
+                        onOpen={() => d.setActiveTaskId(task.id)}
+                        onChangeStatus={(status) => d.updateStatus(task.id, status)}
+                      />
+                    ))}
+                  </DroppableColumn>
+                );
+              })}
+            </div>
+
+            <DragOverlay>
+              {draggingTask && (
+                <div style={{
+                  width: COLUMN_MIN_WIDTH - 24, boxShadow: '0 14px 30px rgba(0,0,0,.2)', borderRadius: 10,
+                  transform: 'rotate(1.5deg)', cursor: 'grabbing',
+                }}>
+                  <TaskCard task={draggingTask} onOpen={() => {}} onChangeStatus={() => {}} />
                 </div>
-              );
-            })}
-          </div>
+              )}
+            </DragOverlay>
+          </DndContext>
         </div>
         <div style={{ height: 24 }} />
       </div>

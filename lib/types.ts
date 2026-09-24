@@ -72,6 +72,17 @@ export function kanbanColumn(t: Pick<Task, 'status' | 'needs_input'>): KanbanCol
   return taskStage(t);
 }
 
+// The inverse of kanbanColumn()/taskStage() above: given a column a card was
+// dropped into, the status/needs_input patch that actually produces
+// membership in that column. needs_review is the odd one out — it's driven
+// purely by needs_input (status is left alone, matching taskStage()'s "needs
+// input wins" rule), every other column sets needs_input back to false so a
+// card dragged back out of Needs Review clears the flag.
+export function columnPatch(col: KanbanColumn): Pick<Partial<Task>, 'status' | 'needs_input'> {
+  if (col === 'needs_review') return { needs_input: true };
+  return { status: col, needs_input: false };
+}
+
 // '' (blank) means "Brendan" implicitly — his own tasks don't get an owner
 // label at all, only named others (a teammate, or "ai" for Claude/a
 // sub-agent) show up, so the column stays quiet except when it's telling you

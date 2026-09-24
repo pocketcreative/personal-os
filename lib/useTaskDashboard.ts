@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Task } from '@/lib/types';
+import type { KanbanColumn, Task } from '@/lib/types';
+import { columnPatch } from '@/lib/types';
 import { sortTasks } from '@/lib/taskSort';
 
 async function fetchAllTasks(): Promise<Task[]> {
@@ -161,6 +162,10 @@ export function useTaskDashboard() {
     addTask,
     updateCategory: (id: string, category: Task['category']) => applyPatch(id, { category }),
     updateStatus: (id: string, status: Task['status']) => applyPatch(id, { status }),
+    // Drag-and-drop between kanban columns: translates the drop target into
+    // whatever status/needs_input combo actually produces that column (see
+    // columnPatch() in lib/types.ts, the inverse of kanbanColumn()).
+    moveToColumn: (id: string, column: KanbanColumn) => applyPatch(id, columnPatch(column)),
     updatePriority: (id: string, today: boolean) => applyPatch(id, { key: today }),
     updateExpected: (id: string, time_estimate_min: number) => applyPatch(id, { time_estimate_min }),
     updateActual: (id: string, actual_time_min: number) => applyPatch(id, { actual_time_min }),
