@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
 import {
-  BOARDS_MISSING_MESSAGE, BOARD_LIST_COLUMNS, SCENE_TOO_LARGE_MESSAGE, isMissingTableError, isSceneTooLarge,
+  BOARDS_MISSING_MESSAGE, BOARD_LIST_COLUMNS, isMissingTableError, isSceneTooLarge, sceneByteSize, sceneTooLargeMessage,
 } from '@/lib/boardScene';
 
 function fail(error: { code?: string; message: string }, status = 500) {
@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Host request limit is about 4.5 MB, so anything near it is refused with a
   // readable message rather than a generic host error.
   if (body.scene !== undefined && isSceneTooLarge(body.scene)) {
-    return NextResponse.json({ error: SCENE_TOO_LARGE_MESSAGE }, { status: 413 });
+    return NextResponse.json({ error: sceneTooLargeMessage(sceneByteSize(body.scene)) }, { status: 413 });
   }
   if (body.status !== undefined && body.status !== 'active' && body.status !== 'archived') {
     return NextResponse.json({ error: 'status must be active or archived' }, { status: 400 });

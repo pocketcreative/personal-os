@@ -3,7 +3,12 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BoardsApiError, fetchBoard, saveBoard } from '@/lib/useBoards';
-import { BOARDS_MISSING_MESSAGE, SCENE_TOO_LARGE_MESSAGE, buildScene, isSceneTooLarge } from '@/lib/boardScene';
+import {
+  BOARDS_MISSING_MESSAGE, MAX_SCENE_BYTES, SCENE_TOO_LARGE_MESSAGE, buildScene, isSceneTooLargeMessage, parseScene,
+  sceneByteSize, sceneTooLargeMessage,
+} from '@/lib/boardScene';
+import { IMAGE_UPLOAD_FAILED_MESSAGE, formatBytes, storedImageBytes, type StoredFile } from '@/lib/boardImages';
+import { loadStoredImages, storeSceneImages, type ImageCache } from '@/lib/boardImagesClient';
 import type { Board } from '@/lib/types';
 
 // Excalidraw touches window/document on import, so it is client-only.
@@ -23,6 +28,8 @@ export default function BoardEditor({ id }: { id: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  // Space this board uses: scene JSON plus its images in storage.
+  const [usedBytes, setUsedBytes] = useState<number | null>(null);
 
   // Latest unsaved edits. Saves are serialised (one in flight at a time) so
   // each PATCH carries the updated_at the previous one returned.
@@ -32,14 +39,23 @@ export default function BoardEditor({ id }: { id: string }) {
   const inflight = useRef(false);
   const again = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Images already in storage (by file id), so autosave never re-uploads them,
+  // and stored images that could not be fetched on load, whose entries are kept
+  // in the next save so their reference is not lost.
+  const imageCache = useRef<ImageCache>(new Map());
+  const unloaded = useRef<Record<string, StoredFile>>({});
 
   useEffect(() => {
     let cancelled = false;
-    fetchBoard(id).then((b) => {
+    fetchBoard(id).then(async (b) => {
+      const scene = parseScene(b.scene);
+      const images = await loadStoredImages(id, scene.files, imageCache.current);
       if (cancelled) return;
+      unloaded.current = images.unloaded;
       updatedAt.current = b.updated_at;
+      setUsedBytes(sceneByteSize(b.scene ?? {}) + storedImageBytes(scene.files));
       setTitle(b.title);
-      setBoard(b);
+      setBoard({ ...b, scene: { ...scene, files: images.files } });
     }).catch((e: Error) => {
       if (!cancelled) setLoadError(e instanceof BoardsApiError && e.missingTable ? BOARDS_MISSING_MESSAGE : e.message);
     });
@@ -57,17 +73,36 @@ export default function BoardEditor({ id }: { id: string }) {
         latest.current = null;
         pendingTitle.current = null;
         if (!l && t === null) break;
+        // Keep the unsaved edits so Retry (or the next change) sends them again,
+        // unless a newer edit has already replaced them.
+        const keepUnsaved = () => {
+          if (l && !latest.current) latest.current = l;
+          if (t !== null && pendingTitle.current === null) pendingTitle.current = t;
+        };
         const patch: Record<string, unknown> = {};
+        let used: number | null = null;
         if (t !== null) patch.title = t;
         if (l) {
-          const scene = buildScene(l.elements, l.files, l.appState);
+          let scene = buildScene(l.elements, { ...unloaded.current, ...(l.files as Record<string, unknown>) }, l.appState);
+          // Images go to storage first; a failed upload means nothing is sent, so
+          // a scene that lost an image is never saved.
+          setStatus({ kind: 'saving' });
+          try {
+            scene = await storeSceneImages(id, scene, imageCache.current);
+          } catch {
+            keepUnsaved();
+            setStatus({ kind: 'error', reason: IMAGE_UPLOAD_FAILED_MESSAGE });
+            break;
+          }
           // Same limit as the API's 413, checked here first so the warning shows
           // without sending megabytes the host would reject.
-          if (isSceneTooLarge(scene)) {
-            setStatus({ kind: 'error', reason: SCENE_TOO_LARGE_MESSAGE });
+          const size = sceneByteSize(scene);
+          if (size > MAX_SCENE_BYTES) {
+            setStatus({ kind: 'error', reason: sceneTooLargeMessage(size) });
             if (t === null) break;
           } else {
             patch.scene = scene;
+            used = size + storedImageBytes(scene.files);
           }
         }
         if (Object.keys(patch).length === 0) break;
@@ -75,16 +110,12 @@ export default function BoardEditor({ id }: { id: string }) {
         try {
           const saved = await saveBoard(id, patch, updatedAt.current);
           updatedAt.current = saved.updated_at;
+          if (used !== null) setUsedBytes(used);
           if (!latest.current && pendingTitle.current === null) setStatus({ kind: 'saved' });
         } catch (e) {
-          // Keep the unsaved edits so Retry (or the next change) sends them again,
-          // unless a newer edit has already replaced them.
-          if (l && !latest.current) latest.current = l;
-          if (t !== null && pendingTitle.current === null) pendingTitle.current = t;
-          setStatus({
-            kind: 'error',
-            reason: e instanceof BoardsApiError && e.status === 413 ? SCENE_TOO_LARGE_MESSAGE : (e as Error).message,
-          });
+          keepUnsaved();
+          const tooLarge = e instanceof BoardsApiError && e.status === 413 && !isSceneTooLargeMessage(e.message);
+          setStatus({ kind: 'error', reason: tooLarge ? SCENE_TOO_LARGE_MESSAGE : (e as Error).message });
           break;
         }
       } while (again.current || latest.current || pendingTitle.current !== null);
@@ -94,7 +125,7 @@ export default function BoardEditor({ id }: { id: string }) {
   }, [id]);
 
   const schedule = useCallback(() => {
-    setStatus((s) => (s.kind === 'error' && s.reason === SCENE_TOO_LARGE_MESSAGE ? s : { kind: 'dirty' }));
+    setStatus((s) => (s.kind === 'error' && isSceneTooLargeMessage(s.reason) ? s : { kind: 'dirty' }));
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => { timer.current = null; flush(); }, AUTOSAVE_MS);
   }, [flush]);
@@ -153,7 +184,7 @@ export default function BoardEditor({ id }: { id: string }) {
         {indicator && (
           <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: indicator.color, textAlign: 'right' }}>
             {indicator.text}
-            {status.kind === 'error' && status.reason !== SCENE_TOO_LARGE_MESSAGE && (
+            {status.kind === 'error' && !isSceneTooLargeMessage(status.reason) && (
               <button
                 onClick={() => flush()}
                 style={{
@@ -164,6 +195,11 @@ export default function BoardEditor({ id }: { id: string }) {
                 Retry
               </button>
             )}
+          </span>
+        )}
+        {usedBytes !== null && (
+          <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', whiteSpace: 'nowrap' }}>
+            {formatBytes(usedBytes)} used
           </span>
         )}
       </div>

@@ -7,11 +7,20 @@
 // tool, selection) and a `collaborators` Map that does not survive JSON, so
 // it is never persisted, only the four fields in pickAppState.
 
+import { formatBytes } from '@/lib/boardImages';
+
 // Host request limit is about 4.5 MB; leave room for the title/updated_at
 // wrapper and JSON overhead.
 export const MAX_SCENE_BYTES = 4_000_000;
 
 export const SCENE_TOO_LARGE_MESSAGE = 'Board too large to save: remove or shrink images';
+// Same message with the real size, e.g. "Board too large to save (4.3 MB): ...".
+export function sceneTooLargeMessage(bytes: number): string {
+  return `Board too large to save (${formatBytes(bytes)}): remove or shrink images`;
+}
+export function isSceneTooLargeMessage(reason: string): boolean {
+  return reason.startsWith('Board too large to save');
+}
 // Every column except the scene: it can be MBs of images and the list never needs it.
 export const BOARD_LIST_COLUMNS = 'id,user_id,title,status,created_at,updated_at';
 

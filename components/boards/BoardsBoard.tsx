@@ -1,9 +1,10 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useBoards, createBoard, saveBoard } from '@/lib/useBoards';
 import { BOARDS_MISSING_MESSAGE } from '@/lib/boardScene';
+import { STORAGE_LIMIT_LABEL, formatBytes } from '@/lib/boardImages';
 import type { Board } from '@/lib/types';
 
 const smallBtn: React.CSSProperties = {
@@ -86,6 +87,17 @@ export default function BoardsBoard() {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
+  // Space used by all boards. Stays null (and hidden) if the lookup fails.
+  const [usedBytes, setUsedBytes] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/boards/usage')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d: { bytes?: number } | null) => { if (!cancelled && typeof d?.bytes === 'number') setUsedBytes(d.bytes); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const newBoard = async () => {
     setCreating(true);
@@ -107,6 +119,11 @@ export default function BoardsBoard() {
       }}>
         <div className="board-header" style={{ marginBottom: 8 }}>
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Boards</div>
+          {usedBytes !== null && (
+            <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', whiteSpace: 'nowrap' }}>
+              {formatBytes(usedBytes)} used of {STORAGE_LIMIT_LABEL}
+            </div>
+          )}
         </div>
         <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)', marginBottom: 20, maxWidth: 720 }}>
           Whiteboards for mapping things out: shapes, arrows, text and images. Every board saves itself as you draw.
