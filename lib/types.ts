@@ -350,6 +350,18 @@ export interface Sop {
   updated_at: string;
 }
 
+// `scene` is only present on the single-board fetch (the list omits it);
+// its shape is BoardScene in lib/boardScene.ts.
+export interface Board {
+  id: string;
+  user_id: string;
+  title: string;
+  scene?: unknown;
+  status: 'active' | 'archived';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface OutreachLead {
   id: string;
   rank: number | null;
