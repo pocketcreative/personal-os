@@ -4,6 +4,7 @@ import { BOARD_IMAGES_BUCKET, isSafePathPart, isStoredEntry, storagePathFor } fr
 import { parseScene } from '@/lib/boardScene';
 import { PUBLIC_HEADERS } from '@/lib/shares';
 import { findActiveShare } from '@/lib/shareLookup';
+import { checkShareRate, recordShareFailure, tooManyRequests } from '@/lib/shareRateLimit';
 
 // PUBLIC route (no login, see middleware.ts). Streams one image of a shared
 // board. The file id must be one of the stored images in that board's own
@@ -13,10 +14,16 @@ function notFound() {
   return NextResponse.json({ error: 'not found' }, { status: 404, headers: PUBLIC_HEADERS });
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ token: string; fileId: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string; fileId: string }> }) {
   const { token, fileId } = await params;
+  const gate = await checkShareRate(req.headers);
+  if (!gate.allowed) return tooManyRequests(gate.retryAfter);
   const share = await findActiveShare(token);
-  if (!share || share.resource_type !== 'board' || !isSafePathPart(fileId)) return notFound();
+  if (!share) {
+    await recordShareFailure(gate.ctx);
+    return notFound();
+  }
+  if (share.resource_type !== 'board' || !isSafePathPart(fileId)) return notFound();
 
   const db = serviceClient();
   const { data: board } = await db.from('boards').select('scene').eq('id', share.resource_id).maybeSingle();

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/supabase';
 import { PUBLIC_HEADERS, toSharedBoard, toSharedSkill, toSharedSop } from '@/lib/shares';
 import { findActiveShare } from '@/lib/shareLookup';
+import { checkShareRate, recordShareFailure, tooManyRequests } from '@/lib/shareRateLimit';
 
 // PUBLIC route (no login, see middleware.ts). Returns only the one shared
 // item's minimal data. Unknown, revoked, expired and malformed tokens all get
@@ -10,10 +11,15 @@ function notFound() {
   return NextResponse.json({ error: 'not found' }, { status: 404, headers: PUBLIC_HEADERS });
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  const gate = await checkShareRate(req.headers);
+  if (!gate.allowed) return tooManyRequests(gate.retryAfter);
   const share = await findActiveShare(token);
-  if (!share) return notFound();
+  if (!share) {
+    await recordShareFailure(gate.ctx);
+    return notFound();
+  }
 
   const db = serviceClient();
   if (share.resource_type === 'sop') {
