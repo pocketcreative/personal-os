@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Task } from '@/lib/types';
 import {
-  AGENT_TAGS, STAGE_LABELS, TASK_TYPES, TASK_TYPE_LABELS, needsPrioritise, taskStage,
+  AGENT_TAGS, STAGE_LABELS, STATUSES, STATUS_LABELS, TASK_TYPES, TASK_TYPE_LABELS, needsPrioritise, taskStage,
 } from '@/lib/types';
 import { formatGoalSteps, parseGoalSteps } from '@/lib/taskDescription';
 
@@ -17,6 +17,7 @@ export interface TaskDetailPatch {
   urgency?: Task['urgency'];
   due_date?: string | null;
   decisions_log?: string | null;
+  status?: Task['status'];
 }
 
 // Shared look for the small uppercase section labels used throughout this
@@ -65,6 +66,7 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete, onSen
   const [taskType, setTaskType] = useState<Task['task_type']>(task.task_type ?? 'single');
   const [urgency, setUrgency] = useState<Task['urgency']>(task.urgency);
   const [dueDate, setDueDate] = useState(task.due_date ?? '');
+  const [status, setStatus] = useState<Task['status']>(task.status);
   const [sendBackOpen, setSendBackOpen] = useState(false);
   const [sendBackReason, setSendBackReason] = useState('');
   const nameRef = useRef<HTMLTextAreaElement>(null);
@@ -104,6 +106,7 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete, onSen
     if (urgency !== task.urgency) onSave({ urgency });
     const trimmedDue = dueDate.trim() || null;
     if (trimmedDue !== task.due_date) onSave({ due_date: trimmedDue });
+    if (status !== task.status) onSave({ status });
     onClose();
   }
 
@@ -212,6 +215,19 @@ export default function TaskDetailModal({ task, onClose, onSave, onDelete, onSen
           </div>
         )}
         <div style={{ padding: '8px 32px 32px' }}>
+          {/* Lets a finished or archived task be moved back (or archived)
+              from here, since Archived is no longer a column to drag into. */}
+          <div style={SECTION_LABEL_STYLE}>Status</div>
+          <select
+            value={status} onChange={(e) => setStatus(e.target.value as Task['status'])}
+            style={{
+              width: '100%', fontSize: 14, color: '#111', padding: '9px 12px', marginBottom: 20,
+              border: '1px solid rgba(17,17,17,.1)', borderRadius: 6, background: '#fff',
+              boxSizing: 'border-box', fontFamily: "'Inter Tight', sans-serif", outline: 'none',
+            }}
+          >
+            {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+          </select>
           {initialParsed ? (
             <>
               <div style={SECTION_LABEL_STYLE}>Goal</div>

@@ -11,8 +11,9 @@ import GoalBanner from './GoalBanner';
 import NeedsAttentionSoon from './NeedsAttentionSoon';
 import AddTaskInput from './AddTaskInput';
 import FieldPopover from './FieldPopover';
+import OlderTasksPanel from './OlderTasksPanel';
 import type { KanbanColumn, Task } from '@/lib/types';
-import { AGENT_TAGS, KANBAN_COLUMNS, KANBAN_COLUMN_LABELS, TASK_TYPES, TASK_TYPE_LABELS, URGENCY_LABELS, kanbanColumn } from '@/lib/types';
+import { AGENT_TAGS, KANBAN_COLUMNS, KANBAN_COLUMN_LABELS, TASK_TYPES, TASK_TYPE_LABELS, URGENCY_LABELS, isDoneRecently, kanbanColumn } from '@/lib/types';
 
 // One responsive board for both desktop and mobile (replaces the old
 // TaskBoardDesktop/TaskBoardMobile list-view split): columns sit in a
@@ -84,6 +85,7 @@ export default function TaskKanbanBoard() {
   const d = useTaskDashboard();
   const sensors = useBoardSensors();
   const [draggingTask, setDraggingTask] = useState<Task | null>(null);
+  const [olderOpen, setOlderOpen] = useState(false);
 
   // Agent picker options: the 7 seeded roles plus any free-text tag already
   // in use on a real task, so a custom tag someone typed into the modal
@@ -97,10 +99,19 @@ export default function TaskKanbanBoard() {
   // drop into a column while they're waiting on Brendan (In review), so the
   // columns stay about one-off work.
   const scheduled = d.tasks.filter((t) => t.task_type === 'scheduled' && t.status !== 'archived');
-  const columns: Record<string, Task[]> = { not_started: [], in_progress: [], needs_review: [], completed: [], archived: [] };
+  // Completed only shows the last 7 days; older Completed plus every Archived
+  // task go to the "Older and archived" list instead of cluttering the board.
+  const columns: Record<string, Task[]> = { not_started: [], in_progress: [], needs_review: [], completed: [] };
+  const older: Task[] = [];
+  let completedTotal = 0;
   for (const t of d.tasks) {
     const col = kanbanColumn(t);
     if (t.task_type === 'scheduled' && col !== 'needs_review') continue;
+    if (col === 'archived') { older.push(t); continue; }
+    if (col === 'completed') {
+      completedTotal++;
+      if (!isDoneRecently(t)) { older.push(t); continue; }
+    }
     columns[col].push(t);
   }
 
@@ -141,7 +152,7 @@ export default function TaskKanbanBoard() {
           </div>
 
           {/* Filters: Agent / Type / Urgency, per spec — Status has no
-              filter chip of its own since the 4 columns already are the
+              filter chip of its own since the columns already are the
               status breakdown. */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
             <FieldPopover
@@ -238,6 +249,11 @@ export default function TaskKanbanBoard() {
                       {KANBAN_COLUMN_LABELS[col]}
                       <span style={{ color: 'rgba(17,17,17,.35)', fontWeight: 600 }}>{colTasks.length}</span>
                     </div>
+                    {col === 'completed' && (
+                      <div style={{ font: "500 11.5px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', margin: '-6px 2px 0' }}>
+                        Last 7 days. {completedTotal} in total.
+                      </div>
+                    )}
                     {colTasks.length === 0 && (
                       <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.3)', padding: '4px 2px' }}>
                         Nothing here
@@ -250,6 +266,18 @@ export default function TaskKanbanBoard() {
                         onOpen={() => d.setActiveTaskId(task.id)}
                       />
                     ))}
+                    {col === 'completed' && (
+                      <button
+                        onClick={() => setOlderOpen(true)}
+                        style={{
+                          alignSelf: 'flex-start', font: "600 12.5px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)',
+                          background: 'transparent', border: 'none', padding: '10px 2px', minHeight: 44, cursor: 'pointer',
+                          textDecoration: 'underline', textDecorationColor: 'rgba(17,17,17,.2)', textUnderlineOffset: 3,
+                        }}
+                      >
+                        Older and archived ({older.length})
+                      </button>
+                    )}
                   </DroppableColumn>
                 );
               })}
@@ -270,6 +298,10 @@ export default function TaskKanbanBoard() {
         <div style={{ height: 24 }} />
       </div>
 
+      {olderOpen && (
+        <OlderTasksPanel tasks={older} onOpen={d.setActiveTaskId} onClose={() => setOlderOpen(false)} />
+      )}
+
       {d.activeTask && (
         <TaskDetailModal
           task={d.activeTask}
@@ -283,6 +315,7 @@ export default function TaskKanbanBoard() {
             if (patch.task_type !== undefined) d.updateTaskType(d.activeTask!.id, patch.task_type);
             if (patch.urgency !== undefined) d.updateUrgency(d.activeTask!.id, patch.urgency);
             if (patch.due_date !== undefined) d.updateDueDate(d.activeTask!.id, patch.due_date);
+            if (patch.status !== undefined) d.updateStatus(d.activeTask!.id, patch.status);
             if (patch.decisions_log !== undefined) d.updateDecisionsLog(d.activeTask!.id, patch.decisions_log);
           }}
           onDelete={() => { d.deleteTask(d.activeTask!.id); d.setActiveTaskId(null); }}

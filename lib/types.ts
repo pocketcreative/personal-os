@@ -74,7 +74,9 @@ export function taskStage(t: Pick<Task, 'status' | 'needs_input'>): TaskStage {
 }
 
 export type KanbanColumn = TaskStage;
-export const KANBAN_COLUMNS: KanbanColumn[] = ['not_started', 'in_progress', 'needs_review', 'completed', 'archived'];
+// Archived is not a board column any more: old and archived tasks live in the
+// "Older and archived" list instead (see OlderTasksPanel).
+export const KANBAN_COLUMNS: KanbanColumn[] = ['not_started', 'in_progress', 'needs_review', 'completed'];
 export const KANBAN_COLUMN_LABELS: Record<KanbanColumn, string> = STAGE_LABELS;
 export function kanbanColumn(t: Pick<Task, 'status' | 'needs_input'>): KanbanColumn {
   return taskStage(t);
@@ -89,6 +91,23 @@ export function kanbanColumn(t: Pick<Task, 'status' | 'needs_input'>): KanbanCol
 export function columnPatch(col: KanbanColumn): Pick<Partial<Task>, 'status' | 'needs_input'> {
   if (col === 'needs_review') return { needs_input: true };
   return { status: col, needs_input: false };
+}
+
+// When a task was finished. completed_at is the real stamp, but many older
+// completed rows never got one (they were closed by direct database writes),
+// so updated_at stands in. Archiving clears completed_at, so an archived
+// task's date is always updated_at (the day it was archived).
+export function doneAt(t: Pick<Task, 'completed_at' | 'updated_at'>): string {
+  return t.completed_at ?? t.updated_at;
+}
+
+export const RECENT_DONE_DAYS = 7;
+
+// True when the task was finished in the last 7 days. Compares real moments
+// in time (ms since epoch), not calendar days, so the local timezone can't
+// shift the result.
+export function isDoneRecently(t: Pick<Task, 'completed_at' | 'updated_at'>, now: Date = new Date()): boolean {
+  return Date.parse(doneAt(t)) >= now.getTime() - RECENT_DONE_DAYS * 24 * 60 * 60 * 1000;
 }
 
 // '' (blank) means "Brendan" implicitly — his own tasks don't get an owner
