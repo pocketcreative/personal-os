@@ -209,7 +209,9 @@ export default function TaskKanbanBoard() {
                         font: "700 10px 'Inter Tight', sans-serif", letterSpacing: '.04em', textTransform: 'uppercase',
                         color: inReview ? '#9a7a2e' : 'rgba(17,17,17,.4)', marginBottom: 4,
                       }}>
-                        {inReview ? 'In review, needs you' : KANBAN_COLUMN_LABELS[kanbanColumn(task)]}
+                        {inReview ? 'In review, needs you'
+                          : task.status === 'in_progress' ? 'Running now'
+                          : 'Dormant, waiting for next run'}
                       </div>
                       <TaskCard task={task} onOpen={() => d.setActiveTaskId(task.id)} />
                     </div>
