@@ -32,36 +32,12 @@ async function deleteTaskApi(id: string): Promise<boolean> {
   return res.ok;
 }
 
-async function startTimerApi(taskId: string): Promise<boolean> {
-  const res = await fetch('/api/timers/start', {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ task_id: taskId }),
-  });
-  if (!res.ok) console.error('startTimer failed', res.status, await res.text());
-  return res.ok;
-}
-
-async function stopTimerApi(taskId: string): Promise<boolean> {
-  const res = await fetch('/api/timers/stop', {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ task_id: taskId }),
-  });
-  if (!res.ok) console.error('stopTimer failed', res.status, await res.text());
-  return res.ok;
-}
-
 async function sendBackApi(id: string, reason: string): Promise<Task | null> {
   const res = await fetch(`/api/tasks/${id}/send-back`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ reason }),
   });
   if (!res.ok) { console.error('sendBack failed', res.status, await res.text()); return null; }
   return res.json();
-}
-
-async function reorderTasksApi(orderedIds: string[]): Promise<boolean> {
-  const res = await fetch('/api/tasks/reorder', {
-    method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderedIds }),
-  });
-  if (!res.ok) console.error('reorderTasks failed', res.status, await res.text());
-  return res.ok;
 }
 
 export function useTaskDashboard() {
@@ -112,31 +88,6 @@ export function useTaskDashboard() {
     if (!ok) load();
   }, [load]);
 
-  const startTimer = useCallback(async (taskId: string) => {
-    const ok = await startTimerApi(taskId);
-    if (ok) load(); // refetch to pick up the new active_timer from the server
-  }, [load]);
-
-  const stopTimer = useCallback(async (taskId: string) => {
-    const ok = await stopTimerApi(taskId);
-    if (ok) load();
-  }, [load]);
-
-  // Optimistically stamp each reordered task's sort_order to its new index
-  // so the UI doesn't visually snap back while the PATCH round-trips. On
-  // failure, resync from the server — same recovery pattern as deleteTask
-  // and applyPatch above.
-  const reorderTasks = useCallback(async (orderedIds: string[]) => {
-    dirtyRef.current = true;
-    const now = new Date().toISOString();
-    setTasks((cur) => cur.map((t) => {
-      const idx = orderedIds.indexOf(t.id);
-      return idx === -1 ? t : { ...t, sort_order: idx, updated_at: now };
-    }));
-    const ok = await reorderTasksApi(orderedIds);
-    if (!ok) load();
-  }, [load]);
-
   const toggleFilter = <T,>(arr: T[], val: T): T[] =>
     arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
 
@@ -179,8 +130,6 @@ export function useTaskDashboard() {
     updateDueDate: (id: string, due_date: string | null) => applyPatch(id, { due_date }),
     updateDecisionsLog: (id: string, decisions_log: string | null) => applyPatch(id, { decisions_log }),
     deleteTask,
-    startTimer, stopTimer,
-    reorderTasks,
     // Needs Review -> back to In Progress with a redo reason recorded (M8).
     // Returns the updated task on success (so the modal can update in
     // place), null on failure -- same fetch pattern as the rest of this
