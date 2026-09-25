@@ -93,8 +93,16 @@ export default function TaskKanbanBoard() {
     ...d.tasks.flatMap((t) => t.agent_tags ?? []),
   ]));
 
+  // Scheduled (recurring) tasks live in the strip above the board. They only
+  // drop into a column while they're waiting on Brendan (In review), so the
+  // columns stay about one-off work.
+  const scheduled = d.tasks.filter((t) => t.task_type === 'scheduled' && t.status !== 'archived');
   const columns: Record<string, Task[]> = { not_started: [], in_progress: [], needs_review: [], completed: [], archived: [] };
-  for (const t of d.tasks) columns[kanbanColumn(t)].push(t);
+  for (const t of d.tasks) {
+    const col = kanbanColumn(t);
+    if (t.task_type === 'scheduled' && col !== 'needs_review') continue;
+    columns[col].push(t);
+  }
 
   function handleDragStart(event: DragStartEvent) {
     const task = d.tasks.find((t) => t.id === event.active.id);
@@ -182,6 +190,34 @@ export default function TaskKanbanBoard() {
               }))}
             />
           </div>
+
+          {scheduled.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8,
+                font: "700 11.5px 'Archivo', sans-serif", color: '#111', letterSpacing: '.03em', textTransform: 'uppercase',
+              }}>
+                Scheduled
+                <span style={{ color: 'rgba(17,17,17,.35)', fontWeight: 600 }}>{scheduled.length}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 4 }}>
+                {scheduled.map((task) => {
+                  const inReview = kanbanColumn(task) === 'needs_review';
+                  return (
+                    <div key={task.id} style={{ flex: `0 0 ${COLUMN_MIN_WIDTH}px`, minWidth: COLUMN_MIN_WIDTH, maxWidth: 420 }}>
+                      <div style={{
+                        font: "700 10px 'Inter Tight', sans-serif", letterSpacing: '.04em', textTransform: 'uppercase',
+                        color: inReview ? '#9a7a2e' : 'rgba(17,17,17,.4)', marginBottom: 4,
+                      }}>
+                        {inReview ? 'In review, needs you' : KANBAN_COLUMN_LABELS[kanbanColumn(task)]}
+                      </div>
+                      <TaskCard task={task} onOpen={() => d.setActiveTaskId(task.id)} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDraggingTask(null)}>
             <div style={{
