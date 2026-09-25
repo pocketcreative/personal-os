@@ -5,6 +5,7 @@ import { fetchSkill, saveSkillContent } from '@/lib/useSkills';
 import { readTrigger, stripFrontmatter } from '@/lib/skillFile';
 import { SKILL_SOURCE_LABELS, SOP_SYSTEMS, type Skill, type SopSystem } from '@/lib/types';
 import MarkdownContent from './MarkdownContent';
+import ShareControl from '@/components/shares/ShareControl';
 
 function downloadSkill(skill: Skill) {
   // Skills are stored verbatim, so the download IS the stored content --
@@ -120,6 +121,7 @@ export default function SkillDetail({ slug }: { slug: string }) {
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => downloadSkill(skill)} style={btnSecondary}>Download as MD</button>
+        <ShareControl type="skill" id={skill.id} />
         {editable && mode === 'read' && (
           <button onClick={() => setMode('edit')} style={btnSecondary}>Edit</button>
         )}

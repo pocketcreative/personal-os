@@ -20,7 +20,7 @@ const STATUS_LABEL = { active: 'Active', expired: 'Expired', off: 'Turned off' }
 const STATUS_COLOR = { active: '#4b7a4f', expired: '#9a7a2e', off: '#b3261e' } as const;
 
 // A "Share" button that opens a small panel to make, copy and switch off
-// view-only links for one SOP or board. `align` picks which edge the panel
+// view-only links for one SOP, board or skill. `align` picks which edge the panel
 // lines up with, so it stays on screen wherever the button sits.
 export default function ShareControl({ type, id, align = 'left' }: { type: ShareResource; id: string; align?: 'left' | 'right' }) {
   const [open, setOpen] = useState(false);
@@ -81,7 +81,7 @@ export default function ShareControl({ type, id, align = 'left' }: { type: Share
           <div style={{ font: "700 13px 'Inter Tight', sans-serif", color: '#111', marginBottom: 4 }}>View-only links</div>
           <div style={{ ...muted, marginBottom: 12 }}>
             Anyone with the link can view this. Don&apos;t share anything private.
-            {type === 'sop' && ' Shows the last saved client version.'}
+            {type !== 'board' && ' Shows the last saved client version.'}
           </div>
 
           {error && (

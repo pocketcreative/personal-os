@@ -11,6 +11,7 @@ const ExcalidrawViewer = dynamic(() => import('@/components/boards/ExcalidrawVie
 
 type Shared =
   | { type: 'sop'; title: string; version: string; version_date: string; content: string }
+  | { type: 'skill'; title: string; version: string; version_date: string; content: string }
   | { type: 'board'; title: string; scene: { files: Record<string, unknown> } };
 
 // The public page for a share link: one item, read only, no app chrome.
@@ -43,7 +44,7 @@ export default function SharedView({ token }: { token: string }) {
     return <Centered><div style={{ font: "600 15px 'Inter Tight', sans-serif", color: '#111' }}>This link isn&apos;t available.</div></Centered>;
   }
 
-  if (item.type === 'sop') {
+  if (item.type === 'sop' || item.type === 'skill') {
     return (
       <div style={{ width: '96%', maxWidth: 1000, margin: '0 auto', padding: 'clamp(24px, 6vw, 56px) 0' }}>
         <div style={{

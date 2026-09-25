@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  generateToken, isShareActive, isUuid, isValidTokenShape, parseExpiry, shareStatus, toSharedBoard, toSharedSop,
+  generateToken, isShareActive, isUuid, isValidTokenShape, parseExpiry, shareStatus, toSharedBoard, toSharedSkill, toSharedSop, isShareResource,
 } from '@/lib/shares';
 
 const now = new Date('2026-09-25T12:00:00Z');
@@ -101,5 +101,35 @@ describe('toSharedBoard', () => {
     } as { title: string; scene: unknown });
     expect(Object.keys(out).sort()).toEqual(['scene', 'title', 'type']);
     expect(out.scene).toEqual({ elements: [{ id: 'a' }], files: {}, appState: { scrollX: 1 } });
+  });
+});
+
+describe('toSharedSkill', () => {
+  const row = {
+    slug: 'humanizer', version: '2.1', version_date: '2026-09-20', user_id: 'brendan', id: 'x', source: 'brendan',
+    content: '---\nname: humanizer\ndescription: strips AI tells\n---\n## Steps\n[Internal] Secret tuning notes\n[Client] Read it aloud\nShared line\n',
+  };
+  it('returns only the client version and the five public fields', () => {
+    const out = toSharedSkill(row);
+    expect(Object.keys(out).sort()).toEqual(['content', 'title', 'type', 'version', 'version_date']);
+    expect(out.type).toBe('skill');
+    expect(out.title).toBe('humanizer');
+    expect(out.content).not.toContain('Secret tuning notes');
+    expect(out.content).not.toContain('[Client]');
+    expect(out.content).toContain('Read it aloud');
+    expect(out.content).toContain('Shared line');
+  });
+  it('drops the YAML frontmatter like the read view does', () => {
+    expect(toSharedSkill(row).content).not.toContain('description:');
+    expect(toSharedSkill(row).content.startsWith('## Steps')).toBe(true);
+  });
+});
+
+describe('isShareResource', () => {
+  it('accepts sop, board and skill only', () => {
+    expect(isShareResource('skill')).toBe(true);
+    expect(isShareResource('sop')).toBe(true);
+    expect(isShareResource('board')).toBe(true);
+    expect(isShareResource('agent')).toBe(false);
   });
 });

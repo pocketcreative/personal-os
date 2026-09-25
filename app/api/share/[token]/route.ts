@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/supabase';
-import { PUBLIC_HEADERS, toSharedBoard, toSharedSop } from '@/lib/shares';
+import { PUBLIC_HEADERS, toSharedBoard, toSharedSkill, toSharedSop } from '@/lib/shares';
 import { findActiveShare } from '@/lib/shareLookup';
 
 // PUBLIC route (no login, see middleware.ts). Returns only the one shared
@@ -20,6 +20,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
     const { data } = await db.from('sops').select('title,version,version_date,content').eq('id', share.resource_id).maybeSingle();
     if (!data) return notFound();
     return NextResponse.json(toSharedSop(data), { headers: PUBLIC_HEADERS });
+  }
+  if (share.resource_type === 'skill') {
+    const { data } = await db.from('skills').select('slug,version,version_date,content').eq('id', share.resource_id).maybeSingle();
+    if (!data) return notFound();
+    return NextResponse.json(toSharedSkill(data), { headers: PUBLIC_HEADERS });
   }
   const { data } = await db.from('boards').select('title,scene').eq('id', share.resource_id).maybeSingle();
   if (!data) return notFound();

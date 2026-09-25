@@ -3,10 +3,13 @@
 import { randomBytes } from 'node:crypto';
 import { filterForAudience } from '@/lib/sopMarkdown';
 import { parseScene } from '@/lib/boardScene';
+import { stripFrontmatter } from '@/lib/skillFile';
 
-export type ShareResource = 'sop' | 'board';
+export type ShareResource = 'sop' | 'board' | 'skill';
 
 export const SHARES_MISSING_MESSAGE = 'Sharing needs one database step, ask Jarvis';
+// Migration 0029 not applied yet: the resource_type check rejects 'skill'.
+export const SHARES_SKILL_MISSING_MESSAGE = 'Sharing skills needs one database step, ask Jarvis';
 
 // Columns returned to the owner. user_id is never sent anywhere.
 export const SHARE_COLUMNS = 'id,resource_type,resource_id,token,expires_at,revoked_at,created_at';
@@ -49,7 +52,7 @@ export function isUuid(v: unknown): v is string {
 }
 
 export function isShareResource(v: unknown): v is ShareResource {
-  return v === 'sop' || v === 'board';
+  return v === 'sop' || v === 'board' || v === 'skill';
 }
 
 export function isShareActive(share: { expires_at: string | null; revoked_at: string | null }, now: Date): boolean {
@@ -94,4 +97,17 @@ export function toSharedSop(sop: { title: string; version: string; version_date:
 // the small appState subset), nothing else.
 export function toSharedBoard(board: { title: string; scene: unknown }) {
   return { type: 'board' as const, title: board.title, scene: parseScene(board.scene) };
+}
+
+// What a link holder gets for a skill: what SkillDetail shows in read mode
+// (slug as the title, the content without its YAML frontmatter), passed
+// through the same client filter as SOPs.
+export function toSharedSkill(skill: { slug: string; version: string; version_date: string; content: string }) {
+  return {
+    type: 'skill' as const,
+    title: skill.slug,
+    version: skill.version,
+    version_date: skill.version_date,
+    content: filterForAudience(stripFrontmatter(skill.content ?? ''), 'client'),
+  };
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
 import { isMissingTableError } from '@/lib/boardScene';
 import {
-  SHARES_MISSING_MESSAGE, SHARE_COLUMNS, generateToken, isShareResource, isUuid, parseExpiry, withStatus,
+  SHARES_MISSING_MESSAGE, SHARES_SKILL_MISSING_MESSAGE, SHARE_COLUMNS, generateToken, isShareResource, isUuid, parseExpiry, withStatus,
   type ShareRow,
 } from '@/lib/shares';
 
@@ -13,7 +13,7 @@ function fail(error: { code?: string; message: string }, status = 500) {
   return NextResponse.json({ error: error.message }, { status });
 }
 
-const TABLE = { sop: 'sops', board: 'boards' } as const;
+const TABLE = { sop: 'sops', board: 'boards', skill: 'skills' } as const;
 
 // One item's links, newest first.
 export async function GET(req: NextRequest) {
@@ -47,6 +47,10 @@ export async function POST(req: NextRequest) {
   const { data, error } = await db.from('shares')
     .insert({ user_id: USER_ID, resource_type: type, resource_id: id, token: generateToken(), expires_at: expiry.value })
     .select(SHARE_COLUMNS).single();
+  // Check violation (23514) on a skill share means migration 0029 is not applied.
+  if (error && type === 'skill' && error.code === '23514') {
+    return NextResponse.json({ error: SHARES_SKILL_MISSING_MESSAGE, code: 'shares_skill_unsupported' }, { status: 503 });
+  }
   if (error) return fail(error);
   return NextResponse.json(withStatus(data as ShareRow), { status: 201 });
 }
