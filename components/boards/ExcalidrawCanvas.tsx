@@ -1,9 +1,10 @@
 'use client';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Excalidraw, getSceneVersion } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import type { ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types';
 import { parseScene } from '@/lib/boardScene';
+import { installImageShrinkers } from '@/lib/boardImageIntercept';
 
 type OnChange = NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>;
 
@@ -25,9 +26,13 @@ export default function ExcalidrawCanvas({ scene, onChange }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const lastSig = useRef<string | null>(null);
+  const wrapper = useRef<HTMLDivElement>(null);
+
+  // Big image files are shrunk before Excalidraw's own 4 MiB check sees them.
+  useEffect(() => (wrapper.current ? installImageShrinkers(wrapper.current) : undefined), []);
 
   return (
-    <div style={{ height: '100%', width: '100%' }}>
+    <div ref={wrapper} style={{ height: '100%', width: '100%' }}>
       <Excalidraw
         initialData={initialData}
         onChange={(elements, appState, files) => {

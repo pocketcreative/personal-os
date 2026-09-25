@@ -10,6 +10,10 @@ export const BOARD_IMAGES_BUCKET = 'board-images';
 // Raster images whose dataURL is bigger than this get re-encoded.
 export const SHRINK_THRESHOLD_BYTES = 250_000;
 export const MAX_IMAGE_SIDE = 1600;
+
+// Excalidraw refuses any inserted image file over 4 MiB (not configurable), so
+// raster files over this are shrunk in the browser before Excalidraw sees them.
+export const PRE_SHRINK_FILE_BYTES = 2_500_000;
 export const SHRINK_QUALITY = 0.82;
 
 // A shrunk image is far below this; it stays under the host's 4.5 MB request limit.
@@ -34,6 +38,23 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 // SVG is vector, so it is never shrunk.
 export function shouldShrink(mimeType: string, dataUrlLength: number): boolean {
   return RASTER_TYPES.includes(mimeType) && dataUrlLength > SHRINK_THRESHOLD_BYTES;
+}
+
+// A file (drop, paste or picker) that must be shrunk before Excalidraw gets it.
+export function shouldPreShrinkFile(file: { type: string; size: number }): boolean {
+  return RASTER_TYPES.includes(file.type) && file.size > PRE_SHRINK_FILE_BYTES;
+}
+
+// The files in a list that need shrinking (empty when the list can be left alone).
+export function filesToPreShrink<T extends { type: string; size: number }>(files: ArrayLike<T> | null | undefined): T[] {
+  return files ? Array.from(files).filter(shouldPreShrinkFile) : [];
+}
+
+// A shrunk file keeps its name but takes the extension of its new type.
+export function shrunkFileName(name: string, type: string): string {
+  const ext = type === 'image/jpeg' ? 'jpg' : type === 'image/webp' ? 'webp' : 'png';
+  const dot = name.lastIndexOf('.');
+  return `${dot > 0 ? name.slice(0, dot) : name || 'image'}.${ext}`;
 }
 
 // Longest side capped at max, aspect ratio kept, never upscaled.

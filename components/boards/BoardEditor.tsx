@@ -204,7 +204,7 @@ export default function BoardEditor({ id }: { id: string }) {
         )}
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
-        {board && (
+        {board ? (
           <ExcalidrawCanvas
             scene={board.scene}
             onChange={(elements, appState, files) => {
@@ -212,6 +212,13 @@ export default function BoardEditor({ id }: { id: string }) {
               schedule();
             }}
           />
+        ) : (
+          <div style={{
+            height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)',
+          }}>
+            Loading board...
+          </div>
         )}
       </div>
     </div>

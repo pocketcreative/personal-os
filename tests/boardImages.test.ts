@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_IMAGE_SIDE, SHRINK_THRESHOLD_BYTES, formatBytes, isSafePathPart, isStoredEntry, outputType, shouldShrink,
-  storagePathFor, storedImageBytes, targetSize, toStoredEntry,
+  MAX_IMAGE_SIDE, PRE_SHRINK_FILE_BYTES, SHRINK_THRESHOLD_BYTES, filesToPreShrink, formatBytes, isSafePathPart, isStoredEntry, outputType, shouldPreShrinkFile, shouldShrink,
+  shrunkFileName, storagePathFor, storedImageBytes, targetSize, toStoredEntry,
 } from '@/lib/boardImages';
 import { buildScene, isSceneTooLargeMessage, sceneTooLargeMessage } from '@/lib/boardScene';
 
@@ -95,5 +95,46 @@ describe('too-large message', () => {
     expect(m).toContain('4.3 MB');
     expect(isSceneTooLargeMessage(m)).toBe(true);
     expect(isSceneTooLargeMessage('Save failed (500)')).toBe(false);
+  });
+});
+
+describe('shouldPreShrinkFile', () => {
+  it('flags raster files over the threshold only', () => {
+    const big = PRE_SHRINK_FILE_BYTES + 1;
+    for (const type of ['image/png', 'image/jpeg', 'image/webp', 'image/gif']) {
+      expect(shouldPreShrinkFile({ type, size: big })).toBe(true);
+      expect(shouldPreShrinkFile({ type, size: PRE_SHRINK_FILE_BYTES })).toBe(false);
+    }
+  });
+  it('leaves svg and non-images alone whatever their size', () => {
+    expect(shouldPreShrinkFile({ type: 'image/svg+xml', size: 9_000_000 })).toBe(false);
+    expect(shouldPreShrinkFile({ type: 'application/pdf', size: 9_000_000 })).toBe(false);
+    expect(shouldPreShrinkFile({ type: '', size: 9_000_000 })).toBe(false);
+  });
+});
+
+describe('filesToPreShrink', () => {
+  it('picks only the big raster files from a list', () => {
+    const small = { type: 'image/jpeg', size: 100 };
+    const big = { type: 'image/png', size: 5_000_000 };
+    const svg = { type: 'image/svg+xml', size: 5_000_000 };
+    expect(filesToPreShrink([small, big, svg])).toEqual([big]);
+    expect(filesToPreShrink([small, svg])).toEqual([]);
+  });
+  it('handles a missing list', () => {
+    expect(filesToPreShrink(null)).toEqual([]);
+    expect(filesToPreShrink(undefined)).toEqual([]);
+  });
+});
+
+describe('shrunkFileName', () => {
+  it('swaps the extension for the new type', () => {
+    expect(shrunkFileName('IMG_1.HEIC.png', 'image/jpeg')).toBe('IMG_1.HEIC.jpg');
+    expect(shrunkFileName('photo.png', 'image/webp')).toBe('photo.webp');
+    expect(shrunkFileName('photo.jpeg', 'image/png')).toBe('photo.png');
+  });
+  it('handles names without an extension', () => {
+    expect(shrunkFileName('photo', 'image/jpeg')).toBe('photo.jpg');
+    expect(shrunkFileName('', 'image/jpeg')).toBe('image.jpg');
   });
 });

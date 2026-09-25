@@ -3,7 +3,7 @@
 // decisions (when to shrink, target size, output type, entry shape) live in
 // lib/boardImages.ts.
 import {
-  SHRINK_QUALITY, isStoredEntry, outputType, shouldShrink, targetSize, toStoredEntry, type StoredFile,
+  SHRINK_QUALITY, isStoredEntry, outputType, shouldShrink, shrunkFileName, targetSize, toStoredEntry, type StoredFile,
 } from '@/lib/boardImages';
 import type { BoardScene } from '@/lib/boardScene';
 
@@ -22,9 +22,13 @@ export async function shrinkDataUrl(mimeType: string, dataURL: string): Promise<
   const original = { dataURL, mimeType };
   try {
     if (!shouldShrink(mimeType, dataURL.length)) return original;
+    // onload, not img.decode(): decode() never settles in a background tab.
     const img = new Image();
-    img.src = dataURL;
-    await img.decode();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('image failed to load'));
+      img.src = dataURL;
+    });
     const { width, height } = targetSize(img.naturalWidth, img.naturalHeight);
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -62,6 +66,29 @@ function blobToDataUrl(blob: Blob): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
   });
+}
+
+// Longest a file may take to shrink before the original is handed over instead.
+const SHRINK_FILE_TIMEOUT_MS = 20_000;
+
+// Shrinks one image File the way saved images are shrunk. Never throws: if the
+// result is not smaller, or anything fails, the original File comes back.
+export async function shrinkImageFile(file: File): Promise<File> {
+  const gaveUp = new Promise<File>((resolve) => setTimeout(() => resolve(file), SHRINK_FILE_TIMEOUT_MS));
+  return Promise.race([shrinkFileInner(file), gaveUp]);
+}
+
+async function shrinkFileInner(file: File): Promise<File> {
+  try {
+    const dataURL = await blobToDataUrl(file);
+    const small = await shrinkDataUrl(file.type, dataURL);
+    if (small.dataURL === dataURL) return file;
+    const blob = dataUrlToBlob(small.dataURL, small.mimeType);
+    if (blob.size >= file.size) return file;
+    return new File([blob], shrunkFileName(file.name, blob.type), { type: blob.type, lastModified: file.lastModified });
+  } catch {
+    return file;
+  }
 }
 
 // Raw image bytes in the body, the file id in the query, the type in content-type.
