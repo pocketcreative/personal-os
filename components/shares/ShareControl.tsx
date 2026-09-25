@@ -8,9 +8,9 @@ const btn: React.CSSProperties = {
   background: '#fff', color: '#111', border: '1px solid rgba(17,17,17,.15)', whiteSpace: 'nowrap',
 };
 const small: React.CSSProperties = {
-  font: "700 12px 'Inter Tight', sans-serif", color: '#024ADD', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+  font: "700 13px 'Inter Tight', sans-serif", color: '#024ADD', background: 'none', border: 'none', cursor: 'pointer', padding: '0 8px',
 };
-const muted: React.CSSProperties = { font: "500 11.5px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)' };
+const muted: React.CSSProperties = { font: "500 12.5px 'Inter Tight', sans-serif", color: 'var(--ink-3)' };
 
 function fmtDate(iso: string): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Singapore', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
@@ -71,10 +71,10 @@ export default function ShareControl({ type, id, align = 'left' }: { type: Share
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button onClick={toggle} style={btn}>Share</button>
+      <button onClick={toggle} className="share-trigger" style={btn}>Share</button>
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', [align]: 0, zIndex: 60, width: 'min(380px, calc(100vw - 32px))',
+          position: 'absolute', top: 'calc(100% + 6px)', [align]: 0, zIndex: 60, width: 'min(380px, calc(100vw - 48px))',
           boxSizing: 'border-box', background: '#fff', border: '1px solid rgba(17,17,17,.15)', borderRadius: 10,
           boxShadow: '0 8px 30px rgba(0,0,0,.12)', padding: 16, textAlign: 'left',
         }}>
@@ -87,7 +87,7 @@ export default function ShareControl({ type, id, align = 'left' }: { type: Share
           {error && (
             <div style={{
               background: 'rgba(179,38,30,.06)', border: '1px solid rgba(179,38,30,.25)', borderRadius: 8,
-              padding: '8px 10px', font: "500 12px 'Inter Tight', sans-serif", color: '#8a2a22', marginBottom: 12,
+              padding: '8px 10px', font: "500 12.5px 'Inter Tight', sans-serif", color: '#8a2a22', marginBottom: 12,
             }}>
               {error}
             </div>
@@ -100,12 +100,14 @@ export default function ShareControl({ type, id, align = 'left' }: { type: Share
                 type="date"
                 value={expiresOn}
                 onChange={(e) => setExpiresOn(e.target.value)}
+                className="tap-44"
                 style={{ font: "500 13px 'Inter Tight', sans-serif", padding: '7px 8px', border: '1px solid rgba(17,17,17,.14)', borderRadius: 8 }}
               />
             </label>
             <button
               onClick={create}
               disabled={busy}
+              className="tap-44"
               style={{ ...btn, background: '#024ADD', color: '#fff', border: '1px solid transparent', opacity: busy ? 0.5 : 1 }}
             >
               Create link
@@ -115,13 +117,13 @@ export default function ShareControl({ type, id, align = 'left' }: { type: Share
           {shares && shares.length === 0 && <div style={muted}>No links yet.</div>}
           {shares?.map((s) => (
             <div key={s.id} style={{ borderTop: '1px solid rgba(17,17,17,.08)', padding: '10px 0 2px' }}>
-              <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: '#111' }}>
+              <div style={{ font: "500 12.5px 'Inter Tight', sans-serif", color: '#111' }}>
                 Created {fmtDate(s.created_at)} &middot; {s.expires_at ? `expires ${fmtDate(s.expires_at)}` : 'never expires'}
               </div>
-              <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 4 }}>
-                <span style={{ font: "700 11.5px 'Inter Tight', sans-serif", color: STATUS_COLOR[s.status] }}>{STATUS_LABEL[s.status]}</span>
-                <button onClick={() => copy(s)} style={small}>{copied === s.id ? 'Copied' : 'Copy link'}</button>
-                <button onClick={() => flip(s)} style={small}>{s.status === 'off' ? 'Turn on' : 'Turn off'}</button>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 2 }}>
+                <span style={{ marginRight: 8, font: "700 12.5px 'Inter Tight', sans-serif", color: STATUS_COLOR[s.status] }}>{STATUS_LABEL[s.status]}</span>
+                <button onClick={() => copy(s)} className="tap-44" style={small}>{copied === s.id ? 'Copied' : 'Copy link'}</button>
+                <button onClick={() => flip(s)} className="tap-44" style={small}>{s.status === 'off' ? 'Turn on' : 'Turn off'}</button>
               </div>
             </div>
           ))}

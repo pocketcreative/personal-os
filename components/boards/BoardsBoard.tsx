@@ -8,7 +8,7 @@ import { STORAGE_LIMIT_LABEL, formatBytes } from '@/lib/boardImages';
 import type { Board } from '@/lib/types';
 
 const smallBtn: React.CSSProperties = {
-  font: "700 11.5px 'Inter Tight', sans-serif", borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+  font: "700 13px 'Inter Tight', sans-serif", borderRadius: 6, padding: '4px 12px', cursor: 'pointer',
   border: '1px solid rgba(17,17,17,.15)', background: '#fff', color: '#111',
 };
 
@@ -54,28 +54,28 @@ function BoardCard({ board, onChanged }: { board: Board; onChanged: () => void }
           }}
         />
       ) : (
-        <Link href={`/boards/${board.id}`} style={{ textDecoration: 'none' }}>
+        <Link href={`/boards/${board.id}`} className="tap-44" style={{ textDecoration: 'none', justifyContent: 'flex-start' }}>
           <div style={{ font: "700 15px 'Inter Tight', sans-serif", color: '#111', letterSpacing: '-0.01em' }}>{board.title}</div>
         </Link>
       )}
-      <div style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>
+      <div style={{ font: "600 12.5px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>
         Updated {updatedLabel(board.updated_at)}
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {renaming ? (
           <>
-            <button style={smallBtn} disabled={!name.trim()} onClick={() => update({ title: name.trim() })}>Save</button>
-            <button style={smallBtn} onClick={() => { setRenaming(false); setName(board.title); }}>Cancel</button>
+            <button className="tap-44" style={smallBtn} disabled={!name.trim()} onClick={() => update({ title: name.trim() })}>Save</button>
+            <button className="tap-44" style={smallBtn} onClick={() => { setRenaming(false); setName(board.title); }}>Cancel</button>
           </>
         ) : (
           <>
-            <button style={smallBtn} onClick={() => setRenaming(true)}>Rename</button>
-            <button style={smallBtn} onClick={() => update({ status: board.status === 'active' ? 'archived' : 'active' })}>
+            <button className="tap-44" style={smallBtn} onClick={() => setRenaming(true)}>Rename</button>
+            <button className="tap-44" style={smallBtn} onClick={() => update({ status: board.status === 'active' ? 'archived' : 'active' })}>
               {board.status === 'active' ? 'Archive' : 'Restore'}
             </button>
           </>
         )}
-        {err && <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: '#b3261e' }}>{err}</span>}
+        {err && <span style={{ font: "500 13px 'Inter Tight', sans-serif", color: '#b3261e' }}>{err}</span>}
       </div>
     </div>
   );
@@ -120,12 +120,12 @@ export default function BoardsBoard() {
         <div className="board-header" style={{ marginBottom: 8 }}>
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Boards</div>
           {usedBytes !== null && (
-            <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', whiteSpace: 'nowrap' }}>
+            <div style={{ font: "500 12.5px 'Inter Tight', sans-serif", color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
               {formatBytes(usedBytes)} used of {STORAGE_LIMIT_LABEL}
             </div>
           )}
         </div>
-        <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)', marginBottom: 20, maxWidth: 720 }}>
+        <div style={{ font: "500 14px 'Inter Tight', sans-serif", color: 'var(--ink-3)', marginBottom: 20, maxWidth: 720 }}>
           Whiteboards for mapping things out: shapes, arrows, text and images. Every board saves itself as you draw.
         </div>
 
@@ -133,8 +133,9 @@ export default function BoardsBoard() {
           <button
             onClick={newBoard}
             disabled={creating || missingTable}
+            className="tap-44"
             style={{
-              font: "700 12.5px 'Inter Tight', sans-serif", borderRadius: 8, padding: '10px 16px', cursor: 'pointer',
+              font: "700 14px 'Inter Tight', sans-serif", borderRadius: 8, padding: '10px 16px', cursor: 'pointer',
               border: '1px solid transparent', background: '#024ADD', color: '#fff', whiteSpace: 'nowrap',
               opacity: creating || missingTable ? 0.5 : 1,
             }}
@@ -143,8 +144,9 @@ export default function BoardsBoard() {
           </button>
           <button
             onClick={() => setArchived((a) => !a)}
+            className="tap-44"
             style={{
-              font: "700 11.5px 'Inter Tight', sans-serif", borderRadius: 20, padding: '5px 12px', cursor: 'pointer',
+              font: "700 13px 'Inter Tight', sans-serif", borderRadius: 20, padding: '5px 16px', cursor: 'pointer',
               border: archived ? '1px solid #024ADD' : '1px solid rgba(17,17,17,.15)',
               background: archived ? 'rgba(2,74,221,.08)' : '#fff',
               color: archived ? '#024ADD' : 'rgba(17,17,17,.6)',
@@ -152,10 +154,10 @@ export default function BoardsBoard() {
           >
             Archived
           </button>
-          {createErr && <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: '#b3261e' }}>{createErr}</span>}
+          {createErr && <span style={{ font: "500 13px 'Inter Tight', sans-serif", color: '#b3261e' }}>{createErr}</span>}
         </div>
 
-        {loading && <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Loading&hellip;</div>}
+        {loading && <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>Loading&hellip;</div>}
 
         {!loading && error && (
           <div style={{
@@ -169,7 +171,7 @@ export default function BoardsBoard() {
         {!loading && !error && boards.length === 0 && (
           <div style={{
             border: '1px dashed rgba(17,17,17,.15)', borderRadius: 10, padding: '40px 20px', textAlign: 'center',
-            font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)',
+            font: "500 14px 'Inter Tight', sans-serif", color: 'var(--ink-3)',
           }}>
             {archived ? 'No archived boards.' : 'No boards yet. Create your first one.'}
           </div>

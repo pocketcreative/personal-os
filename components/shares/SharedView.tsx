@@ -52,7 +52,7 @@ export default function SharedView({ token }: { token: string }) {
           boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: 'clamp(20px, 5vw, 40px) clamp(18px, 3vw, 44px) 32px',
         }}>
           <h1 style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em', margin: 0 }}>{item.title}</h1>
-          <div style={{ font: "600 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', margin: '4px 0 18px' }}>
+          <div style={{ font: "600 12.5px 'Inter Tight', sans-serif", color: 'var(--ink-3)', margin: '4px 0 18px' }}>
             v{item.version} &middot; {item.version_date}
           </div>
           {item.content.trim()
@@ -72,7 +72,7 @@ export default function SharedView({ token }: { token: string }) {
         }}>
           {item.title}
         </h1>
-        <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', whiteSpace: 'nowrap' }}>View only</span>
+        <span style={{ font: "500 12.5px 'Inter Tight', sans-serif", color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>View only</span>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <ExcalidrawViewer scene={item.scene} />
@@ -85,4 +85,4 @@ function Centered({ children }: { children: React.ReactNode }) {
   return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>{children}</div>;
 }
 
-const muted: React.CSSProperties = { font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' };
+const muted: React.CSSProperties = { font: "500 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)' };

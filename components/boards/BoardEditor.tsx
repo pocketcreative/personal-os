@@ -15,7 +15,7 @@ import type { Board } from '@/lib/types';
 // Excalidraw touches window/document on import, so it is client-only.
 const ExcalidrawCanvas = dynamic(() => import('@/components/boards/ExcalidrawCanvas'), {
   ssr: false,
-  loading: () => <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', padding: 20 }}>Loading editor&hellip;</div>,
+  loading: () => <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)', padding: 20 }}>Loading editor&hellip;</div>,
 });
 
 const AUTOSAVE_MS = 1500;
@@ -146,7 +146,7 @@ export default function BoardEditor({ id }: { id: string }) {
   }, []);
 
   const indicator = (() => {
-    if (status.kind === 'saving' || status.kind === 'dirty') return { text: 'Saving...', color: 'rgba(17,17,17,.45)' };
+    if (status.kind === 'saving' || status.kind === 'dirty') return { text: 'Saving...', color: 'var(--ink-3)' };
     if (status.kind === 'saved') return { text: 'Saved', color: '#4b7a4f' };
     if (status.kind === 'error') return { text: `Not saved: ${status.reason}`, color: '#b3261e' };
     return null;
@@ -155,7 +155,7 @@ export default function BoardEditor({ id }: { id: string }) {
   if (loadError) {
     return (
       <div style={{ width: '96%', maxWidth: 720, margin: '0 auto', padding: 'clamp(24px, 6vw, 56px) 0' }}>
-        <Link href="/boards" style={{ font: "600 12px 'Inter Tight', sans-serif", color: '#024ADD', textDecoration: 'none' }}>&larr; Boards</Link>
+        <Link href="/boards" className="tap-44" style={{ font: "600 13px 'Inter Tight', sans-serif", color: '#024ADD', textDecoration: 'none' }}>&larr; Boards</Link>
         <div style={{
           marginTop: 12, background: 'rgba(179,38,30,.06)', border: '1px solid rgba(179,38,30,.25)', borderRadius: 8,
           padding: '14px 16px', font: "500 13px 'Inter Tight', sans-serif", color: '#8a2a22',
@@ -167,9 +167,9 @@ export default function BoardEditor({ id }: { id: string }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 56px)', background: '#fff' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 20px', borderBottom: '1px solid rgba(17,17,17,.08)' }}>
-        <Link href="/boards" style={{ font: "600 12px 'Inter Tight', sans-serif", color: '#024ADD', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+    <div className="board-editor">
+      <div className="board-editor-bar">
+        <Link href="/boards" className="tap-44 board-editor-back" style={{ font: "600 13px 'Inter Tight', sans-serif", color: '#024ADD', textDecoration: 'none', whiteSpace: 'nowrap' }}>
           &larr; Boards
         </Link>
         <input
@@ -177,21 +177,24 @@ export default function BoardEditor({ id }: { id: string }) {
           disabled={!board}
           onChange={(e) => { setTitle(e.target.value); pendingTitle.current = e.target.value; schedule(); }}
           aria-label="Board title"
+          className="board-editor-title"
           style={{
-            flex: 1, minWidth: 0, boxSizing: 'border-box', font: "800 18px 'Archivo', sans-serif", color: '#111',
-            letterSpacing: '-0.02em', border: 'none', outline: 'none', padding: 0, background: 'transparent',
+            boxSizing: 'border-box', font: "800 18px 'Archivo', sans-serif", color: '#111',
+            letterSpacing: '-0.02em', border: 'none', outline: 'none', padding: '6px 0', background: 'transparent',
+            textOverflow: 'ellipsis',
           }}
         />
         {indicator && (
-          <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: indicator.color, textAlign: 'right' }}>
+          <span style={{ font: "500 12.5px 'Inter Tight', sans-serif", color: indicator.color, textAlign: 'right', minWidth: 0 }}>
             {indicator.text}
             {status.kind === 'error' && !isSceneTooLargeMessage(status.reason) && (
               <button
                 onClick={() => flush()}
                 style={{
-                  marginLeft: 8, font: "700 12px 'Inter Tight', sans-serif", color: '#024ADD', background: 'none',
+                  marginLeft: 8, font: "700 13px 'Inter Tight', sans-serif", color: '#024ADD', background: 'none',
                   border: 'none', cursor: 'pointer', padding: 0,
                 }}
+                className="tap-44"
               >
                 Retry
               </button>
@@ -199,7 +202,7 @@ export default function BoardEditor({ id }: { id: string }) {
           </span>
         )}
         {usedBytes !== null && (
-          <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', whiteSpace: 'nowrap' }}>
+          <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
             {formatBytes(usedBytes)} used
           </span>
         )}
@@ -217,7 +220,7 @@ export default function BoardEditor({ id }: { id: string }) {
         ) : (
           <div style={{
             height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)',
+            font: "500 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)',
           }}>
             Loading board...
           </div>

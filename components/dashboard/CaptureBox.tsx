@@ -222,7 +222,7 @@ export default function CaptureBox() {
   }
 
   // Public share pages show only the shared item, no capture button.
-  if (pathname.startsWith('/share/')) return null;
+  if (pathname.startsWith('/share/') || pathname.startsWith('/boards/')) return null;
 
   return (
     <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 50 }}>

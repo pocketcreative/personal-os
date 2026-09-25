@@ -52,10 +52,10 @@ const components: Components = {
     </a>
   ),
   ul: ({ children }) => (
-    <ul style={{ ...BODY, fontWeight: 500, fontSize: 14, lineHeight: 1.75, margin: '0 0 14px', paddingLeft: 22 }}>{children}</ul>
+    <ul style={{ ...BODY, fontWeight: 500, fontSize: 14, lineHeight: 1.75, margin: '0 0 14px', paddingLeft: 22, listStyleType: 'disc' }}>{children}</ul>
   ),
   ol: ({ children }) => (
-    <ol style={{ ...BODY, fontWeight: 500, fontSize: 14, lineHeight: 1.75, margin: '0 0 14px', paddingLeft: 22 }}>{children}</ol>
+    <ol style={{ ...BODY, fontWeight: 500, fontSize: 14, lineHeight: 1.75, margin: '0 0 14px', paddingLeft: 22, listStyleType: 'decimal' }}>{children}</ol>
   ),
   li: ({ children, ...props }) => {
     // GFM task-list items (- [ ] / - [x]) come through with a `checked` prop

@@ -166,3 +166,40 @@ body {
     overflow-y: visible;
   }
 }
+
+/* Board editor page: fills the screen under the top rail. dvh so the bottom
+   canvas controls are not hidden behind a phone browser's own toolbar (vh is
+   kept first as the fallback). On phones the title gets its own row so it is
+   not squeezed to a few letters next to the status and Share button. */
+.board-editor {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px);
+  height: calc(100dvh - 56px);
+  background: #fff;
+}
+.board-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(17, 17, 17, .08);
+}
+.board-editor-title { flex: 1; min-width: 0; }
+
+/* Touch-sized hit area for small controls, on phones and any touch screen. */
+@media (max-width: 640px), (pointer: coarse) {
+  .tap-44 {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+@media (max-width: 640px) {
+  .board-editor-bar { flex-wrap: wrap; gap: 0 12px; padding: 4px 16px 8px; }
+  .board-editor-back { margin-right: auto; }
+  .board-editor-title { flex: 1 1 100%; order: 3; min-height: 44px; }
+  .board-editor-bar .share-trigger { min-height: 44px; }
+}
