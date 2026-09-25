@@ -66,8 +66,6 @@ async function reorderTasksApi(orderedIds: string[]): Promise<boolean> {
 
 export function useTaskDashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [statusFilters, setStatusFilters] = useState<Task['status'][]>([]);
-  const [priorityFilters, setPriorityFilters] = useState<('today' | 'dash')[]>([]);
   // Kanban board filters (Part 1 spec, 2026-09-24): Agent (multi-select over
   // whatever's actually in agent_tags — not a closed enum), Type, Urgency.
   const [agentFilters, setAgentFilters] = useState<string[]>([]);
@@ -142,26 +140,19 @@ export function useTaskDashboard() {
   const toggleFilter = <T,>(arr: T[], val: T): T[] =>
     arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
 
-  // Kanban view shows every stage (Archived is its own column now, not
-  // hidden-by-default like the old list view), so statusFilters/
-  // priorityFilters are unused by the board itself but kept for now in case
-  // another view still wants them — new filtering is additive below.
+  // Archived is off the board and lives in the Older and archived list
+  // (components/tasks/OlderTasksPanel.tsx).
   const filtered = tasks.filter((t) => {
-    const passesStatus = statusFilters.length === 0 ? true : statusFilters.includes(t.status);
-    const passesPriority = priorityFilters.length === 0 || priorityFilters.includes(t.key ? 'today' : 'dash');
     const passesAgent = agentFilters.length === 0 || (t.agent_tags ?? []).some((tag) => agentFilters.includes(tag));
     const passesType = typeFilters.length === 0 || typeFilters.includes(t.task_type ?? 'single');
     const passesUrgency = urgencyFilters.length === 0 || urgencyFilters.includes(t.urgency);
-    return passesStatus && passesPriority && passesAgent && passesType && passesUrgency;
+    return passesAgent && passesType && passesUrgency;
   });
   const sorted = sortTasks(filtered);
 
   return {
     tasks: sorted,
-    statusFilters, priorityFilters,
     agentFilters, typeFilters, urgencyFilters,
-    toggleStatusFilter: (v: Task['status']) => setStatusFilters((f) => toggleFilter(f, v)),
-    togglePriorityFilter: (v: 'today' | 'dash') => setPriorityFilters((f) => toggleFilter(f, v)),
     toggleAgentFilter: (v: string) => setAgentFilters((f) => toggleFilter(f, v)),
     toggleTypeFilter: (v: Task['task_type']) => setTypeFilters((f) => toggleFilter(f, v)),
     toggleUrgencyFilter: (v: Task['urgency']) => setUrgencyFilters((f) => toggleFilter(f, v)),

@@ -13,7 +13,7 @@ export interface SortableTask {
  * filtered in, so their relative order barely matters.
  *
  * "Today" priority (key) deliberately does NOT factor into rank — it's a
- * filter/badge only (see useTaskDashboard's priorityFilters). It used to
+ * filter/badge only (see the urgency filter in useTaskDashboard). It used to
  * boost today-flagged tasks above same-status ones, but that fought with
  * manual drag-to-reorder: marking a different task "today" could shove it
  * above a position the user had deliberately placed something else in.

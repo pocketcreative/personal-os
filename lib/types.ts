@@ -158,8 +158,8 @@ export function needsPrioritise(t: Pick<Task, 'urgency' | 'due_date' | 'status'>
 }
 
 // One row per agent ROLE (the Agents Registry, `/agents`) -- distinct from
-// AgentRun (a live log of individual sub-agent invocations, `agent_runs`)
-// and from Task.agent_tags (which roles a given task is assigned to).
+// the legacy `agent_runs` log (individual sub-agent invocations, no longer
+// typed here) and from Task.agent_tags (which roles a given task is assigned to).
 // task_count is derived server-side from OPEN tasks (not completed/archived)
 // whose agent_tags includes this agent's name, never stored on the row.
 export interface AgentProfile {
@@ -268,20 +268,6 @@ export interface ContentComment {
   resolved: boolean;
   created_at: string;
 }
-
-export interface AgentRun {
-  id: string;
-  title: string;
-  status: 'running' | 'blocked' | 'done' | 'failed';
-  summary: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export const AGENT_RUN_STATUSES = ['running', 'blocked', 'done', 'failed'] as const;
-export const AGENT_RUN_STATUS_LABELS: Record<AgentRun['status'], string> = {
-  running: 'Running', blocked: 'Needs Input', done: 'Done', failed: 'Failed',
-};
 
 // Skills library (`/skills`, filterable by source -- the old `/skills/library`
 // route redirects here rather than staying a separate page). Stored
