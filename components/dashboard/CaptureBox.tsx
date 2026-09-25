@@ -1,4 +1,5 @@
 'use client';
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 interface ChatMessage {
@@ -61,6 +62,7 @@ function outcomeTouchedTasks(outcome: AssistantResponse): boolean {
 type RecState = 'idle' | 'recording' | 'transcribing';
 
 export default function CaptureBox() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -218,6 +220,9 @@ export default function CaptureBox() {
     else if (recState === 'recording') stopRecording();
     // 'transcribing' — ignore clicks until the round trip finishes.
   }
+
+  // Public share pages show only the shared item, no capture button.
+  if (pathname.startsWith('/share/')) return null;
 
   return (
     <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 50 }}>

@@ -32,6 +32,8 @@ export default function TopRail() {
     const id = setInterval(tick, 10_000);
     return () => clearInterval(id);
   }, []);
+  // Public share pages show only the shared item, with no way into the app.
+  if (pathname.startsWith('/share/')) return null;
   return (
     <nav
       id="app-top-rail"

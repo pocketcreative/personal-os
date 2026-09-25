@@ -6,6 +6,7 @@ import { useSkills } from '@/lib/useSkills';
 import { renderSopExport, sopEmDashWarning, sopFileName, type SopAudience } from '@/lib/sopMarkdown';
 import { SOP_PROGRESS, SOP_PROGRESS_COLORS, SOP_PROGRESS_LABELS, SOP_SYSTEMS, type Sop, type SopProgress, type SopSystem } from '@/lib/types';
 import MarkdownContent from './MarkdownContent';
+import ShareControl from '@/components/shares/ShareControl';
 
 type Draft = {
   title: string; content: string; systems: SopSystem[]; skill_id: string | null; progress: SopProgress;
@@ -138,6 +139,7 @@ export default function SopDetail({ id }: { id: string }) {
       <div style={{ display: 'flex', gap: 10, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => downloadSop(sop, 'internal')} style={btnSecondary}>Download (Internal)</button>
         <button onClick={() => downloadSop(sop, 'client')} style={btnSecondary}>Download (Client)</button>
+        <ShareControl type="sop" id={sop.id} />
         {mode === 'read' && (
           <button onClick={() => { if (!draft.content.trim()) set('content', SOP_TEMPLATE); setMode('edit'); }} style={btnSecondary}>Edit</button>
         )}

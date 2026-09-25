@@ -9,6 +9,7 @@ import {
 } from '@/lib/boardScene';
 import { IMAGE_UPLOAD_FAILED_MESSAGE, formatBytes, storedImageBytes, type StoredFile } from '@/lib/boardImages';
 import { loadStoredImages, storeSceneImages, type ImageCache } from '@/lib/boardImagesClient';
+import ShareControl from '@/components/shares/ShareControl';
 import type { Board } from '@/lib/types';
 
 // Excalidraw touches window/document on import, so it is client-only.
@@ -202,6 +203,7 @@ export default function BoardEditor({ id }: { id: string }) {
             {formatBytes(usedBytes)} used
           </span>
         )}
+        {board && <ShareControl type="board" id={id} align="right" />}
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         {board ? (

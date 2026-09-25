@@ -126,15 +126,17 @@ export async function storeSceneImages(boardId: string, scene: BoardScene, cache
 // and seeds the cache so it is not re-uploaded. An image that cannot be fetched
 // is returned in `unloaded` so the editor can keep its entry in the next save
 // instead of losing the reference. Inline (legacy) entries pass through as is.
+// `urlFor` lets the public share page fetch through its own token route.
 export async function loadStoredImages(
   boardId: string, files: Record<string, unknown>, cache: ImageCache,
+  urlFor: (fileId: string) => string = (fileId) => `/api/boards/${encodeURIComponent(boardId)}/images/${encodeURIComponent(fileId)}`,
 ): Promise<{ files: Record<string, unknown>; unloaded: Record<string, StoredFile> }> {
   const loaded: Record<string, unknown> = {};
   const unloaded: Record<string, StoredFile> = {};
   await Promise.all(Object.entries(files).map(async ([fileId, f]) => {
     if (!isStoredEntry(f)) { loaded[fileId] = f; return; }
     try {
-      const res = await fetch(`/api/boards/${encodeURIComponent(boardId)}/images/${encodeURIComponent(fileId)}`);
+      const res = await fetch(urlFor(fileId));
       if (!res.ok) throw new Error(String(res.status));
       const dataURL = await blobToDataUrl(await res.blob());
       cache.set(fileId, { source: dataURL, mimeType: f.mimeType, size: f.size ?? 0 });
