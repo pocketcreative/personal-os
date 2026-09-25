@@ -73,7 +73,7 @@ export default function TopRail() {
           get dropdown navigation without a custom menu component. */}
       <select
         className="md:hidden"
-        value={pathname}
+        value={TABS.find((t) => pathname === t.href || pathname.startsWith(`${t.href}/`))?.href ?? pathname}
         onChange={(e) => router.push(e.target.value)}
         style={{
           fontFamily: "'Inter Tight', sans-serif", fontSize: 13, fontWeight: 700,
