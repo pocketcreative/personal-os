@@ -52,7 +52,7 @@ export default function SkillDetail({ slug }: { slug: string }) {
   // reasoning: he directs all of it, even the claude.ai-managed ones).
   // Vendor skills stay read-only -- see the inline note below and the
   // server-side guard in app/api/skills/[slug]/route.ts.
-  const editable = skill.source === 'brendan' || skill.source === 'claude_ai';
+  const editable = skill.source === 'brendan';
   const contentDirty = editable && draft !== skill.content;
   const systemsDirty = JSON.stringify(systemsDraft) !== JSON.stringify(skill.systems ?? []);
   const dirty = contentDirty || systemsDirty;
@@ -162,14 +162,6 @@ export default function SkillDetail({ slug }: { slug: string }) {
         Optional. Leave blank if this skill doesn&apos;t map to one of the 8 systems.
       </div>
 
-      {skill.source === 'claude_ai' && (
-        <div style={{
-          background: 'rgba(2,74,221,.05)', border: '1px solid rgba(2,74,221,.25)', borderRadius: 8,
-          padding: '10px 14px', font: "500 12.5px 'Inter Tight', sans-serif", color: '#024ADD', marginBottom: 14, maxWidth: 720,
-        }}>
-          Editing here updates this reference copy only. It does not change your actual claude.ai skill, and a future sync from your account may overwrite this.
-        </div>
-      )}
 
       {warning && (
         <div style={{

@@ -15,7 +15,7 @@
 // Sources, per Brendan's final Q1/Q4/Q5 answers (2026-09-24):
 //  - Tier A (source='brendan', sync_to_local=true): the 22 skills below,
 //    hand-picked, full bidirectional sync via scripts/sync-skills.mjs.
-//  - claude.ai-synced (source='claude_ai', sync_to_local=false): everything
+//  - claude.ai-synced (source='brendan', sync_to_local=false): everything
 //    under ~/.claude/skills/synced/*/*, EXCEPT the 7 Anthropic defaults
 //    (docs, docx, pdf, pptx, xlsx, skill-creator, import-memory). Discovered
 //    from disk, not hardcoded -- confirms the real current list rather than
@@ -154,7 +154,7 @@ async function main() {
 
   const plan = [
     ...tierA.map((s) => ({ ...s, source: 'brendan', sync_to_local: true })),
-    ...claudeAi.map((s) => ({ ...s, source: 'claude_ai', sync_to_local: false })),
+    ...claudeAi.map((s) => ({ ...s, source: 'brendan', sync_to_local: false })),
     ...vendor.map((s) => ({ ...s, source: 'vendor', sync_to_local: false })),
   ];
 

@@ -59,8 +59,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
   const contentChanged = typeof body.content === 'string' && body.content !== current.content;
   if (contentChanged) {
     // Fix 3: vendor skills stay read-only server-side too, not just hidden
-    // in the UI -- the Edit button is only ever shown for 'brendan' and
-    // 'claude_ai' sources, this is the backstop.
+    // in the UI -- the Edit button is only ever shown for 'brendan'
+    // skills, this is the backstop.
     if (current.source === 'vendor') {
       return NextResponse.json({ error: 'Vendor skills are read-only' }, { status: 403 });
     }

@@ -13,7 +13,6 @@ type FilterKey = 'all' | SkillSource;
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'brendan', label: 'Mine' },
-  { key: 'claude_ai', label: 'Claude.ai' },
   { key: 'vendor', label: 'Vendor' },
 ];
 
@@ -23,7 +22,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 // is inferred from updated_at moving past last_synced_at, not from a live
 // hash compare.
 function syncBadge(s: SkillListItem): { text: string; color: string } {
-  if (!s.sync_to_local) return { text: 'Library only', color: 'rgba(17,17,17,.4)' };
+  if (!s.sync_to_local) return { text: 'Not synced', color: 'rgba(17,17,17,.4)' };
   if (!s.last_synced_at) return { text: 'Not yet synced', color: '#b3261e' };
   if (new Date(s.updated_at) > new Date(s.last_synced_at)) {
     return { text: 'Edited since last sync', color: '#9a7a2e' };
@@ -55,7 +54,7 @@ function SkillCard({ skill }: { skill: SkillListItem }) {
           flexShrink: 0, font: "700 10.5px 'Archivo', sans-serif", color: badge?.color ?? '#9a7a2e',
           background: 'rgba(154,122,46,.10)', borderRadius: 20, padding: '3px 9px', whiteSpace: 'nowrap',
         }}>
-          {badge ? badge.text : (skill.source === 'claude_ai' ? 'Owned by claude.ai' : 'Library')}
+          {badge ? badge.text : 'Library'}
         </span>
       </div>
       <div style={{
@@ -147,7 +146,7 @@ export default function SkillsBoard() {
           <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Skills</div>
         </div>
         <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)', marginBottom: 20, maxWidth: 720 }}>
-          Everything installed, yours and everyone else&apos;s. Edit and save your own here, then sync writes the changes down to ~/.claude/skills. claude.ai and vendor skills are library/reference -- nothing here writes back to their real source.
+          Everything installed, yours and everyone else&apos;s. Edit and save your own here, then sync writes the changes down to ~/.claude/skills. Vendor skills are library/reference -- nothing here writes back to their real source.
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>

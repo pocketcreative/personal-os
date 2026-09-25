@@ -275,7 +275,7 @@ export interface ContentComment {
 // (frontmatter included). No template, no extracted fields; the trigger
 // text is read out of the frontmatter at display time (lib/skillFile.ts
 // readTrigger), not duplicated into its own column.
-export type SkillSource = 'brendan' | 'claude_ai' | 'vendor';
+export type SkillSource = 'brendan' | 'vendor';
 
 export interface Skill {
   id: string;
@@ -288,8 +288,7 @@ export interface Skill {
   // with ~/.claude/skills/<slug>/SKILL.md via scripts/sync-skills.mjs.
   sync_to_local: boolean;
   // Who owns the canonical copy: 'brendan' (Tier A, editable + synced here),
-  // 'claude_ai' (owned by claude.ai, editable here as a reference copy only,
-  // see SkillDetail's inline note), 'vendor' (every other installed skill --
+  // 'vendor' (every other installed skill --
   // addyosmani pack, hyperframes, remotion, humanizer, etc. -- read-only).
   source: SkillSource;
   synced_hash: string | null;
@@ -303,7 +302,7 @@ export interface Skill {
 }
 
 export const SKILL_SOURCE_LABELS: Record<SkillSource, string> = {
-  brendan: 'Your skill', claude_ai: 'Owned by claude.ai', vendor: 'Library',
+  brendan: 'Your skill', vendor: 'Library',
 };
 
 // Lightweight row for the list view (GET /api/skills): everything a card
