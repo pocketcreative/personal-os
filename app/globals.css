@@ -201,3 +201,70 @@ body {
   .board-editor-title { flex: 1 1 100%; order: 3; min-height: 44px; }
   .board-editor-bar .share-trigger { min-height: 44px; }
 }
+
+/* /media: launcher into the Notion Content Management System. */
+:root { --brand-blue: #024add; }
+.media-launcher { max-width: 720px; margin: 0 auto; padding: clamp(32px, 8vw, 72px) 24px 48px; }
+.media-launcher-title { font: 800 28px 'Archivo', sans-serif; letter-spacing: -0.01em; color: var(--ink-4); }
+.media-launcher-intro { margin-top: 6px; font: 400 15px 'Inter Tight', sans-serif; color: var(--ink-3); }
+.media-launcher-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 28px;
+  min-height: 64px;
+  padding: 0 24px;
+  border-radius: 12px;
+  background: var(--brand-blue);
+  color: #fff;
+  font: 700 17px 'Inter Tight', sans-serif;
+  text-align: center;
+  transition: background-color 150ms ease-out;
+}
+.media-launcher-primary:hover { background: #0339a8; }
+.media-launcher-primary:active { background: #022f8c; }
+.media-launcher-heading { margin-top: 36px; font: 700 14px 'Inter Tight', sans-serif; color: var(--ink-4); }
+.media-launcher-grid {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.media-launcher-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--ink-2);
+  background: var(--ink-1);
+  color: var(--ink-4);
+  font: 600 14px 'Inter Tight', sans-serif;
+  transition: border-color 150ms ease-out, color 150ms ease-out;
+}
+.media-launcher-secondary:hover { border-color: var(--brand-blue); color: var(--brand-blue); }
+.media-launcher-archive {
+  display: inline-block;
+  margin-top: 40px;
+  padding: 10px 0;
+  font: 500 12px 'Inter Tight', sans-serif;
+  color: var(--ink-3);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.media-launcher-archive:hover { color: var(--ink-4); }
+.media-launcher-primary:focus-visible,
+.media-launcher-secondary:focus-visible,
+.media-launcher-archive:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; }
+@media (max-width: 640px) {
+  .media-launcher { padding: 28px 16px 40px; }
+  .media-launcher-primary { min-height: 72px; font-size: 18px; }
+  .media-launcher-grid { grid-template-columns: 1fr; }
+  .media-launcher-secondary { min-height: 52px; }
+  .media-launcher-archive { padding: 14px 0; }
+}
