@@ -275,7 +275,7 @@ body {
 .strategy-switch { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: rgba(17, 17, 17, .07); margin-bottom: 14px; }
 .strategy-switch-btn {
   font: 700 13px 'Inter Tight', sans-serif; color: var(--ink-3); background: transparent;
-  border: none; border-radius: 8px; padding: 9px 20px; min-height: 40px; cursor: pointer;
+  border: none; border-radius: 8px; padding: 9px 18px; min-height: 40px; cursor: pointer; white-space: nowrap;
   transition: background-color 150ms ease-out, color 150ms ease-out;
 }
 .strategy-switch-btn:hover { color: var(--ink-4); }

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
-import { checkContent, MAX_VERSIONS, VERSION_LIST_LIMIT, versionsToPrune } from '@/lib/strategyDocs';
+import { checkContent, isDocSlug, MAX_VERSIONS, VERSION_LIST_LIMIT, versionsToPrune } from '@/lib/strategyDocs';
 
 // Login-gated by middleware.ts like every other /api route.
 const DOC_FIELDS = 'id, slug, title, content, updated_at';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  if (!isDocSlug(slug)) return NextResponse.json({ error: 'not found' }, { status: 404 });
   const db = serviceClient();
   const { data: doc, error } = await db.from('strategy_docs').select(DOC_FIELDS)
     .eq('user_id', USER_ID).eq('slug', slug).maybeSingle();
@@ -24,6 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
 // still holds the old text (plus one harmless extra version row).
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  if (!isDocSlug(slug)) return NextResponse.json({ error: 'not found' }, { status: 404 });
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
   const check = checkContent(body.content);
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });

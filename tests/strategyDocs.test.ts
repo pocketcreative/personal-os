@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { checkContent, extractSections, MAX_CONTENT_CHARS, versionsToPrune } from '@/lib/strategyDocs';
+import {
+  checkContent, DEFAULT_DOC_KEY, DOC_OPTIONS, extractSections, isDocSlug, MAX_CONTENT_CHARS, parseDocParam, slugForKey, versionsToPrune,
+} from '@/lib/strategyDocs';
 
 describe('extractSections', () => {
   it('returns H2 and H3 lines in order, skipping H1 and H4', () => {
@@ -57,5 +59,40 @@ describe('checkContent', () => {
   it('accepts exactly the size cap and rejects one over', () => {
     expect(checkContent('a'.repeat(MAX_CONTENT_CHARS)).ok).toBe(true);
     expect(checkContent('a'.repeat(MAX_CONTENT_CHARS + 1)).ok).toBe(false);
+  });
+});
+
+describe('document choices', () => {
+  it('has three documents in the switch order with the right labels', () => {
+    expect(DOC_OPTIONS.map((d) => d.label)).toEqual(['Target Audience', 'Workshop Offer', 'Partnership Offer']);
+    expect(DOC_OPTIONS.map((d) => d.key)).toEqual(['target-audience', 'workshop-offer', 'partnership-offer']);
+  });
+  it('keeps the live database slug `offer` for the Partnership Offer', () => {
+    expect(slugForKey('partnership-offer')).toBe('offer');
+    expect(slugForKey('workshop-offer')).toBe('workshop-offer');
+    expect(slugForKey('target-audience')).toBe('target-audience');
+  });
+  it('the API accepts exactly the three database slugs', () => {
+    for (const ok of ['target-audience', 'workshop-offer', 'offer']) expect(isDocSlug(ok)).toBe(true);
+    for (const bad of ['partnership-offer', 'nope', '', 'Offer']) expect(isDocSlug(bad)).toBe(false);
+  });
+});
+
+describe('parseDocParam', () => {
+  it('reads each new value', () => {
+    expect(parseDocParam('target-audience')).toBe('target-audience');
+    expect(parseDocParam('workshop-offer')).toBe('workshop-offer');
+    expect(parseDocParam('partnership-offer')).toBe('partnership-offer');
+  });
+  it('maps the old ?doc=offer bookmark to the Partnership Offer', () => {
+    expect(parseDocParam('offer')).toBe('partnership-offer');
+  });
+  it('falls back to Target Audience when missing or unknown', () => {
+    for (const v of [undefined, null, '', 'nope', 'Offer', 'workshop']) expect(parseDocParam(v)).toBe(DEFAULT_DOC_KEY);
+    expect(DEFAULT_DOC_KEY).toBe('target-audience');
+  });
+  it('uses the first value when the link repeats ?doc=', () => {
+    expect(parseDocParam(['workshop-offer', 'offer'])).toBe('workshop-offer');
+    expect(parseDocParam([])).toBe('target-audience');
   });
 });

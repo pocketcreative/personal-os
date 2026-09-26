@@ -1,7 +1,9 @@
 import TaOffer from '@/components/strategy/TaOffer';
+import { parseDocParam } from '@/lib/strategyDocs';
 
-// ?doc=target-audience (default) or ?doc=offer picks which document opens.
-export default async function TaOfferPage({ searchParams }: { searchParams: Promise<{ doc?: string }> }) {
+// ?doc=target-audience (default), workshop-offer or partnership-offer picks which document opens.
+// The old ?doc=offer still works and opens the Partnership Offer.
+export default async function TaOfferPage({ searchParams }: { searchParams: Promise<{ doc?: string | string[] }> }) {
   const { doc } = await searchParams;
-  return <TaOffer initialDoc={doc === 'offer' ? 'offer' : 'target-audience'} />;
+  return <TaOffer initialDoc={parseDocParam(doc)} />;
 }
