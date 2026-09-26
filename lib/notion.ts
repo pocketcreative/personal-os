@@ -10,4 +10,5 @@ export const NOTION_DASHBOARDS = [
   { label: 'Short Form', url: 'https://app.notion.com/p/3e330905fc3880909538c60190fb85e8' },
   { label: 'Ads', url: 'https://app.notion.com/p/3e730905fc3880dc830ae0668f55a8f4' },
   { label: 'VSLs', url: 'https://app.notion.com/p/3e730905fc3880ff8d8be07933d5b66f' },
+  { label: 'Ideas', url: 'https://app.notion.com/p/3e330905fc3880ccb6ceeca7b5478327' },
 ] as const;

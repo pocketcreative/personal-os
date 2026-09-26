@@ -210,14 +210,6 @@ export const STATUS_LABELS: Record<Task['status'], string> = {
   not_started: 'Not started', in_progress: 'In progress', completed: 'Completed', archived: 'Archived',
 };
 
-export interface Idea {
-  id: string;
-  text: string;
-  used: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 export type ContentFormat = 'long_form' | 'short_form' | 'lts' | 'carousel' | 'ad' | 'vsl';
 
 export interface ContentPiece {

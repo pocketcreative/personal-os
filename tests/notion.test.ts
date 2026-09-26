@@ -4,9 +4,9 @@ import { NOTION_CMS_URL, NOTION_DASHBOARDS } from '@/lib/notion';
 const ALL = [NOTION_CMS_URL, ...NOTION_DASHBOARDS.map((d) => d.url)];
 
 describe('notion links', () => {
-  it('has the five dashboards', () => {
+  it('has the six dashboards', () => {
     expect(NOTION_DASHBOARDS.map((d) => d.label)).toEqual([
-      'Long Form', 'Long to Short (LTS)', 'Short Form', 'Ads', 'VSLs',
+      'Long Form', 'Long to Short (LTS)', 'Short Form', 'Ads', 'VSLs', 'Ideas',
     ]);
   });
   it('every link is an https app.notion.com link, never the public notion.site one', () => {

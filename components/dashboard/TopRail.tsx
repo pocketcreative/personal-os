@@ -9,7 +9,6 @@ const TABS = [
   { href: '/skills', label: 'Skills' },
   { href: '/boards', label: 'Boards' },
   { href: '/reflections', label: 'Reflections' },
-  { href: '/ideas', label: 'Ideas' },
   { href: '/media', label: 'Media' },
   { href: '/data', label: 'Data' },
 ];
