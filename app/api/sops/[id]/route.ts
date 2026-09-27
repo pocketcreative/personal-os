@@ -96,3 +96,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
+
+// Soft delete, same convention as Skills' DELETE above and the row's own
+// `status` field (SOPs are already filtered to `active` by default in
+// GET /api/sops, `archived` stays queryable via ?status=archived). SOPs have
+// no vendor/read-only concept -- every row here is Brendan's own (0022's
+// comment: "starts EMPTY on purpose, no seed rows") -- so no source guard.
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const db = serviceClient();
+
+  const { data: current, error: curErr } = await db.from('sops').select('*')
+    .eq('user_id', USER_ID).eq('id', id).single();
+  if (curErr) return NextResponse.json({ error: curErr.message }, { status: 404 });
+
+  const { error: auditErr } = await db.from('audit_log').insert({
+    user_id: USER_ID, action: 'sop_archived', resource_type: 'sops', resource_id: current.id,
+    metadata: { title: current.title, previous_status: current.status },
+  });
+  if (auditErr) return NextResponse.json({ error: auditErr.message }, { status: 500 });
+
+  const { error } = await db.from('sops')
+    .update({ status: 'archived', updated_at: new Date().toISOString() })
+    .eq('id', current.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

@@ -58,7 +58,20 @@ export async function saveSop(id: string, patch: Record<string, unknown>, update
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(res.status === 409 ? 'This SOP changed elsewhere -- reload before saving.' : (text || `Save failed (${res.status})`));
+    throw new Error(res.status === 409 ? SAVE_CONFLICT_MESSAGE : (text || `Save failed (${res.status})`));
   }
   return res.json();
+}
+
+// Same discriminator pattern as useSkills.ts's SAVE_CONFLICT_MESSAGE.
+export const SAVE_CONFLICT_MESSAGE = 'This SOP changed elsewhere -- reload before saving.';
+
+// Soft delete (archives, doesn't hard-delete the row -- see the DELETE
+// handler's comment in app/api/sops/[id]/route.ts).
+export async function deleteSop(id: string): Promise<void> {
+  const res = await fetch(`/api/sops/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `Delete failed (${res.status})`);
+  }
 }

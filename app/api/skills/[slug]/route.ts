@@ -88,3 +88,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ...data, systems: data.systems ?? [], warning });
 }
+
+// Soft delete, same convention as the row's own `status` field (skills are
+// already filtered to `active` by default in GET /api/skills, `archived`
+// stays queryable via ?status=archived) -- not a hard row delete. Skills are
+// Brendan's own process/reference documents with real edit history in
+// audit_log; archiving keeps that history and is reversible (a hand PATCH
+// with status: 'active' undoes it), unlike a hard delete on tasks/content
+// pieces which are disposable work items. Vendor skills stay un-deletable
+// here, same read-only rule as the content-edit guard above.
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const db = serviceClient();
+
+  const { data: current, error: curErr } = await db.from('skills').select('*')
+    .eq('user_id', USER_ID).eq('slug', slug).single();
+  if (curErr) return NextResponse.json({ error: curErr.message }, { status: 404 });
+
+  if (current.source === 'vendor') {
+    return NextResponse.json({ error: 'Vendor skills are read-only' }, { status: 403 });
+  }
+
+  const { error: auditErr } = await db.from('audit_log').insert({
+    user_id: USER_ID, action: 'skill_archived', resource_type: 'skills', resource_id: current.id,
+    metadata: { slug: current.slug, previous_status: current.status },
+  });
+  if (auditErr) return NextResponse.json({ error: auditErr.message }, { status: 500 });
+
+  const { error } = await db.from('skills')
+    .update({ status: 'archived', updated_at: new Date().toISOString() })
+    .eq('id', current.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

@@ -1,7 +1,8 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchSop, saveSop } from '@/lib/useSops';
+import { deleteSop, fetchSop, saveSop, SAVE_CONFLICT_MESSAGE } from '@/lib/useSops';
 import { useSkills } from '@/lib/useSkills';
 import { renderSopExport, sopEmDashWarning, sopFileName, type SopAudience } from '@/lib/sopMarkdown';
 import { SOP_PROGRESS, SOP_PROGRESS_COLORS, SOP_PROGRESS_LABELS, SOP_SYSTEMS, type Sop, type SopProgress, type SopSystem } from '@/lib/types';
@@ -46,8 +47,11 @@ const btnBase: React.CSSProperties = {
 };
 const btnPrimary: React.CSSProperties = { ...btnBase, background: '#024ADD', color: '#fff' };
 const btnSecondary: React.CSSProperties = { ...btnBase, background: '#fff', color: '#111', border: '1px solid rgba(17,17,17,.15)' };
+// Same delete-button convention as ContentDetailModal/TaskDetailModal.
+const btnDanger: React.CSSProperties = { ...btnBase, background: 'transparent', color: '#c0392b', border: '1px solid rgba(192,57,43,.3)' };
 
 export default function SopDetail({ id }: { id: string }) {
+  const router = useRouter();
   const [sop, setSop] = useState<Sop | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +59,7 @@ export default function SopDetail({ id }: { id: string }) {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   // Same read/edit toggle as SkillDetail: read (rendered markdown) is the
   // default, edit (raw textarea) is an explicit switch. Only governs the
   // content box -- title/progress/systems/linked skill stay always-editable
@@ -107,9 +112,39 @@ export default function SopDetail({ id }: { id: string }) {
       setSaveMsg(`Saved as v${updated.version}.`);
       window.dispatchEvent(new Event('sops:refresh'));
     } catch (e) {
-      setSaveMsg((e as Error).message);
+      const message = (e as Error).message;
+      // Same recovery as SkillDetail: a 409 used to be a dead end (the
+      // message says "reload" but there's no reload control, and Save
+      // just resent the same stale updated_at forever). Refetch instead --
+      // the user's unsaved edits stay in `draft`, only the stale
+      // `sop.updated_at` this compares against gets refreshed.
+      if (message === SAVE_CONFLICT_MESSAGE) {
+        try {
+          const fresh = await fetchSop(sop.id);
+          setSop(fresh);
+          setSaveMsg('This changed elsewhere. Reloaded the latest version underneath your edits -- click Save again.');
+        } catch {
+          setSaveMsg(message);
+        }
+      } else {
+        setSaveMsg(message);
+      }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete "${sop.title}"? This archives it and can be restored later, but it leaves the list right away.`)) return;
+    setDeleting(true);
+    setSaveMsg(null);
+    try {
+      await deleteSop(sop.id);
+      window.dispatchEvent(new Event('sops:refresh'));
+      router.push('/skills/sops');
+    } catch (e) {
+      setSaveMsg((e as Error).message);
+      setDeleting(false);
     }
   };
 
@@ -148,6 +183,9 @@ export default function SopDetail({ id }: { id: string }) {
         )}
         <button onClick={save} disabled={!dirty || saving} style={{ ...btnPrimary, opacity: !dirty || saving ? 0.5 : 1 }}>
           {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button onClick={handleDelete} disabled={deleting} style={{ ...btnDanger, opacity: deleting ? 0.5 : 1 }}>
+          {deleting ? 'Deleting…' : 'Delete'}
         </button>
         {saveMsg && <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: saveMsg.startsWith('Saved') ? '#4b7a4f' : '#b3261e' }}>{saveMsg}</span>}
       </div>

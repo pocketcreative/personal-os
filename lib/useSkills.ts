@@ -66,7 +66,23 @@ export async function saveSkillContent(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(res.status === 409 ? 'This skill changed elsewhere -- reload before saving.' : (text || `Save failed (${res.status})`));
+    throw new Error(res.status === 409 ? SAVE_CONFLICT_MESSAGE : (text || `Save failed (${res.status})`));
   }
   return res.json();
+}
+
+// Shared exact string so a catch block can tell "the 409 conflict" apart
+// from any other save failure without a separate status code round-tripping
+// through the thrown Error -- see SkillDetail's use of this to recover
+// automatically instead of leaving Save in a dead end.
+export const SAVE_CONFLICT_MESSAGE = 'This skill changed elsewhere -- reload before saving.';
+
+// Soft delete (archives, doesn't hard-delete the row -- see the DELETE
+// handler's comment in app/api/skills/[slug]/route.ts).
+export async function deleteSkill(slug: string): Promise<void> {
+  const res = await fetch(`/api/skills/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `Delete failed (${res.status})`);
+  }
 }

@@ -1,7 +1,8 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { fetchSkill, saveSkillContent } from '@/lib/useSkills';
+import { deleteSkill, fetchSkill, saveSkillContent, SAVE_CONFLICT_MESSAGE } from '@/lib/useSkills';
 import { readTrigger, stripFrontmatter } from '@/lib/skillFile';
 import { SKILL_SOURCE_LABELS, SOP_SYSTEMS, type Skill, type SopSystem } from '@/lib/types';
 import MarkdownContent from './MarkdownContent';
@@ -22,6 +23,7 @@ function downloadSkill(skill: Skill) {
 }
 
 export default function SkillDetail({ slug }: { slug: string }) {
+  const router = useRouter();
   const [skill, setSkill] = useState<Skill | null>(null);
   const [draft, setDraft] = useState('');
   const [systemsDraft, setSystemsDraft] = useState<SopSystem[]>([]);
@@ -30,6 +32,7 @@ export default function SkillDetail({ slug }: { slug: string }) {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   // A skill Brendan owns (source: 'brendan') used to render permanently as
   // an editable textarea -- fine for editing, unreadable for the much more
   // common case of just reading it. Read is now the default; Edit is an
@@ -73,9 +76,41 @@ export default function SkillDetail({ slug }: { slug: string }) {
       setSaveMsg(`Saved as v${updated.version}.`);
       window.dispatchEvent(new Event('skills:refresh'));
     } catch (e) {
-      setSaveMsg((e as Error).message);
+      const message = (e as Error).message;
+      // A 409 used to be a dead end: the error told Brendan to reload, but
+      // there was no way to do that short of a manual browser refresh, and
+      // clicking Save again just kept sending the same stale updated_at, so
+      // it looked like Save was permanently broken. Refetch the row here
+      // instead -- his unsaved edits in `draft` are untouched, only the
+      // stale `skill.updated_at` this compares against gets refreshed, so
+      // the very next Save click goes through.
+      if (message === SAVE_CONFLICT_MESSAGE) {
+        try {
+          const fresh = await fetchSkill(skill.slug);
+          setSkill(fresh);
+          setSaveMsg('This changed elsewhere. Reloaded the latest version underneath your edits -- click Save again.');
+        } catch {
+          setSaveMsg(message);
+        }
+      } else {
+        setSaveMsg(message);
+      }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete "${skill.slug}"? This archives it and can be restored later, but it leaves the list right away.`)) return;
+    setDeleting(true);
+    setSaveMsg(null);
+    try {
+      await deleteSkill(skill.slug);
+      window.dispatchEvent(new Event('skills:refresh'));
+      router.push('/skills');
+    } catch (e) {
+      setSaveMsg((e as Error).message);
+      setDeleting(false);
     }
   };
 
@@ -134,6 +169,11 @@ export default function SkillDetail({ slug }: { slug: string }) {
               {saving ? 'Saving…' : 'Save'}
             </button>
           </>
+        )}
+        {editable && (
+          <button onClick={handleDelete} disabled={deleting} style={{ ...btnDanger, opacity: deleting ? 0.5 : 1 }}>
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
         )}
         {saveMsg && <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: saveMsg.startsWith('Saved') ? '#4b7a4f' : '#b3261e' }}>{saveMsg}</span>}
       </div>
@@ -225,3 +265,5 @@ const btnBase: React.CSSProperties = {
 };
 const btnPrimary: React.CSSProperties = { ...btnBase, background: '#024ADD', color: '#fff' };
 const btnSecondary: React.CSSProperties = { ...btnBase, background: '#fff', color: '#111', border: '1px solid rgba(17,17,17,.15)' };
+// Same delete-button convention as ContentDetailModal/TaskDetailModal.
+const btnDanger: React.CSSProperties = { ...btnBase, background: 'transparent', color: '#c0392b', border: '1px solid rgba(192,57,43,.3)' };
