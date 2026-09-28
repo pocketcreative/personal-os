@@ -5,21 +5,15 @@ import { useEffect, useState } from 'react';
 import { deleteSkill, fetchSkill, saveSkillContent, SAVE_CONFLICT_MESSAGE } from '@/lib/useSkills';
 import { readTrigger, stripFrontmatter } from '@/lib/skillFile';
 import { SKILL_SOURCE_LABELS, SOP_SYSTEMS, type Skill, type SopSystem } from '@/lib/types';
+import { downloadTextFile } from '@/lib/downloadText';
 import MarkdownContent from './MarkdownContent';
 import ShareControl from '@/components/shares/ShareControl';
 
 function downloadSkill(skill: Skill) {
   // Skills are stored verbatim, so the download IS the stored content --
   // no template transformation, unlike the (not-yet-built) SOP export.
-  const blob = new Blob([skill.content], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${skill.slug}-v${skill.version}.md`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  // See lib/downloadText for why this isn't a plain Blob+anchor click.
+  downloadTextFile(`${skill.slug}-v${skill.version}.md`, skill.content);
 }
 
 export default function SkillDetail({ slug }: { slug: string }) {

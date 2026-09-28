@@ -2,6 +2,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { loadStoredImages } from '@/lib/boardImagesClient';
+import { downloadTextFile } from '@/lib/downloadText';
 import MarkdownContent from '@/components/skills/MarkdownContent';
 
 const ExcalidrawViewer = dynamic(() => import('@/components/boards/ExcalidrawViewer'), {
@@ -14,19 +15,12 @@ type Shared =
   | { type: 'skill'; title: string; version: string; version_date: string; content: string }
   | { type: 'board'; title: string; scene: { files: Record<string, unknown> } };
 
-// Same Blob + object URL + anchor pattern as SkillDetail's downloadSkill,
-// so downloaded filenames stay consistent app-wide. The public page already
-// has `content` client side (it's what's rendered), so no fetch is needed.
+// Shared with SkillDetail's downloadSkill via lib/downloadText, so
+// downloaded filenames and mobile-download behaviour stay consistent
+// app-wide. The public page already has `content` client side (it's what's
+// rendered), so no fetch is needed.
 function downloadShared(item: { title: string; version: string; content: string }) {
-  const blob = new Blob([item.content], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${item.title}-v${item.version}.md`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  downloadTextFile(`${item.title}-v${item.version}.md`, item.content);
 }
 
 // The public page for a share link: one item, read only, no app chrome.
