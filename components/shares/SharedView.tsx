@@ -14,6 +14,21 @@ type Shared =
   | { type: 'skill'; title: string; version: string; version_date: string; content: string }
   | { type: 'board'; title: string; scene: { files: Record<string, unknown> } };
 
+// Same Blob + object URL + anchor pattern as SkillDetail's downloadSkill,
+// so downloaded filenames stay consistent app-wide. The public page already
+// has `content` client side (it's what's rendered), so no fetch is needed.
+function downloadShared(item: { title: string; version: string; content: string }) {
+  const blob = new Blob([item.content], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${item.title}-v${item.version}.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // The public page for a share link: one item, read only, no app chrome.
 export default function SharedView({ token }: { token: string }) {
   const [item, setItem] = useState<Shared | null>(null);
@@ -51,7 +66,10 @@ export default function SharedView({ token }: { token: string }) {
           background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
           boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: 'clamp(20px, 5vw, 40px) clamp(18px, 3vw, 44px) 32px',
         }}>
-          <h1 style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em', margin: 0 }}>{item.title}</h1>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <h1 style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em', margin: 0 }}>{item.title}</h1>
+            <button onClick={() => downloadShared(item)} style={btnSecondary}>Download</button>
+          </div>
           <div style={{ font: "600 12.5px 'Inter Tight', sans-serif", color: 'var(--ink-3)', margin: '4px 0 18px' }}>
             v{item.version} &middot; {item.version_date}
           </div>
@@ -86,3 +104,7 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 const muted: React.CSSProperties = { font: "500 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)' };
+const btnSecondary: React.CSSProperties = {
+  font: "700 12.5px 'Inter Tight', sans-serif", borderRadius: 8, padding: '9px 16px', cursor: 'pointer',
+  background: '#fff', color: '#111', border: '1px solid rgba(17,17,17,.15)', whiteSpace: 'nowrap', flexShrink: 0,
+};
