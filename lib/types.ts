@@ -358,6 +358,20 @@ export interface Board {
   updated_at: string;
 }
 
+// /links: Brendan's main links reference table.
+export interface LinkItem {
+  id: string;
+  user_id: string;
+  name: string;
+  url: string | null;
+  trigger_link: string | null;
+  live_tested: boolean;
+  sort_order: number;
+  status: 'active' | 'archived';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface OutreachLead {
   id: string;
   rank: number | null;
