@@ -339,3 +339,31 @@ body {
   .strategy-textarea { min-height: 60vh; padding: 14px; }
 }
 .strategy-muted { font: 500 13px 'Inter Tight', sans-serif; color: rgba(17, 17, 17, .55); }
+
+/* /links: Brendan's main links reference. Static, hand-maintained list. */
+.links-page { max-width: 1040px; margin: 0 auto; padding: clamp(32px, 8vw, 72px) 24px 48px; }
+.links-page-title { font: 800 28px 'Archivo', sans-serif; letter-spacing: -0.01em; color: var(--ink-4); }
+.links-page-intro { margin-top: 6px; font: 400 15px 'Inter Tight', sans-serif; color: var(--ink-3); }
+.links-page-table-wrap { margin-top: 28px; overflow-x: auto; border: 1px solid var(--ink-2); border-radius: 10px; background: var(--ink-1); }
+.links-page-table { width: 100%; border-collapse: collapse; min-width: 720px; }
+.links-page-table th {
+  text-align: left; font: 700 11px 'Inter Tight', sans-serif; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ink-3); padding: 12px 16px; border-bottom: 1px solid var(--ink-2); white-space: nowrap;
+}
+.links-page-table td { padding: 12px 16px; border-bottom: 1px solid var(--ink-2); font: 500 13px 'Inter Tight', sans-serif; color: var(--ink-4); vertical-align: top; }
+.links-page-table tr:last-child td { border-bottom: none; }
+.links-page-name { font-weight: 700; white-space: nowrap; }
+.links-page-table td a { color: var(--brand-blue); text-decoration: none; word-break: break-all; }
+.links-page-table td a:hover { text-decoration: underline; }
+.links-page-note { color: var(--ink-3); font-style: italic; }
+.links-page-code {
+  font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--ink-4);
+  background: rgba(17, 17, 17, .06); border-radius: 5px; padding: 3px 6px; word-break: break-all; user-select: all;
+}
+.links-page-badge {
+  display: inline-block; font: 700 11px 'Inter Tight', sans-serif; color: #15803D; background: #DCFCE7;
+  border-radius: 999px; padding: 3px 10px;
+}
+@media (max-width: 640px) {
+  .links-page { padding: 28px 16px 40px; }
+}
