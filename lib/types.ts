@@ -289,9 +289,14 @@ export interface Skill {
   // Migration 0026. Same 8-section tag as Sop.systems. The API always returns
   // an array (defaults to [] if the migration isn't applied yet).
   systems: SopSystem[];
+  // Migration 0033. Who the skill is FOR: Brendan's own tools ('internal')
+  // or built for a client/agent to run ('client'). Different axis from source.
+  audience: SkillAudience;
   created_at: string;
   updated_at: string;
 }
+
+export type SkillAudience = 'internal' | 'client';
 
 export const SKILL_SOURCE_LABELS: Record<SkillSource, string> = {
   brendan: 'Your skill', vendor: 'Library',

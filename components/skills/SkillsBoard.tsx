@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSkills, searchSkills } from '@/lib/useSkills';
-import { SOP_SYSTEMS, type SkillListItem, type SkillSource, type SopSystem } from '@/lib/types';
+import { SOP_SYSTEMS, type SkillAudience, type SkillListItem, type SkillSource, type SopSystem } from '@/lib/types';
 import SkillsAreaNav from '@/components/skills/SkillsAreaNav';
 
 // Fix 1: Skills and the old Skills Library are one page now, split by a
@@ -14,6 +14,19 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'brendan', label: 'Mine' },
   { key: 'vendor', label: 'Vendor' },
+];
+
+// Top-level split (migration 0033): who a skill is FOR, not who wrote it.
+// Internal is the default (no ?view param); Clients is ?view=clients.
+const VIEWS: { key: SkillAudience; label: string; blurb: string }[] = [
+  {
+    key: 'internal', label: 'Skills (Internal)',
+    blurb: "Your own tools, plus the vendor library. Edit and save your own here, then sync writes the changes down to ~/.claude/skills. Vendor skills are library/reference -- nothing here writes back to their real source.",
+  },
+  {
+    key: 'client', label: 'Skills (Clients)',
+    blurb: "Built for an agent to run on their own account. These never hard-code your Target Audience, Offer, Supabase or Notion, the client plugs in their own.",
+  },
 ];
 
 // Sync badge for a Tier A ("brendan") skill card -- everything it needs is
@@ -79,7 +92,9 @@ export default function SkillsBoard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawFilter = searchParams.get('filter');
-  const filter: FilterKey = FILTERS.some((f) => f.key === rawFilter) ? (rawFilter as FilterKey) : 'all';
+  const view: SkillAudience = searchParams.get('view') === 'clients' ? 'client' : 'internal';
+  // Author filter only applies on the Internal view; every client skill is Brendan's own.
+  const filter: FilterKey = view === 'internal' && FILTERS.some((f) => f.key === rawFilter) ? (rawFilter as FilterKey) : 'all';
 
   const { skills, loading, error } = useSkills();
   const [q, setQ] = useState('');
@@ -119,14 +134,28 @@ export default function SkillsBoard() {
     router.replace(qs ? `/skills?${qs}` : '/skills', { scroll: false });
   };
 
+  const setView = (key: SkillAudience) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('filter');
+    if (key === 'client') params.set('view', 'clients'); else params.delete('view');
+    const qs = params.toString();
+    router.replace(qs ? `/skills?${qs}` : '/skills', { scroll: false });
+  };
+
+  const viewCounts = useMemo(() => ({
+    internal: skills.filter((s) => s.audience !== 'client').length,
+    client: skills.filter((s) => s.audience === 'client').length,
+  }), [skills]);
+
   const filtered = useMemo(() => {
     const source = debouncedQ ? (searchResults ?? []) : skills;
     return source.filter((s) => {
+      if ((s.audience === 'client' ? 'client' : 'internal') !== view) return false;
       if (filter !== 'all' && s.source !== filter) return false;
       if (systemFilter.length > 0 && !systemFilter.some((f) => (s.systems ?? []).includes(f))) return false;
       return true;
     });
-  }, [debouncedQ, searchResults, skills, filter, systemFilter]);
+  }, [debouncedQ, searchResults, skills, view, filter, systemFilter]);
 
   const toggleSystem = (sys: SopSystem) => {
     setSystemFilter((prev) => (prev.includes(sys) ? prev.filter((s) => s !== sys) : [...prev, sys]));
@@ -142,14 +171,41 @@ export default function SkillsBoard() {
         boxShadow: '0 2px 18px rgba(0,0,0,.05)', padding: 'clamp(20px, 5vw, 40px) clamp(18px, 3vw, 44px) 32px',
       }}>
         <SkillsAreaNav />
-        <div className="board-header" style={{ marginBottom: 8 }}>
-          <div style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em' }}>Skills</div>
+        <div role="tablist" aria-label="Who the skills are for" style={{ display: 'flex', justifyContent: 'flex-start', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 22, rowGap: 4, marginBottom: 8 }}>
+          {VIEWS.map((v) => {
+            const active = v.key === view;
+            return (
+              <button
+                key={v.key}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setView(v.key)}
+                className="skills-view-tab"
+                style={{
+                  font: "800 22px 'Archivo', sans-serif", letterSpacing: '-0.02em',
+                  color: active ? '#111' : 'rgba(17,17,17,.32)',
+                  background: 'none', border: 'none', padding: 0, cursor: active ? 'default' : 'pointer',
+                  display: 'inline-flex', alignItems: 'baseline', gap: 7,
+                }}
+              >
+                {v.label}
+                {!loading && (
+                  <span style={{
+                    font: "700 12px 'Inter Tight', sans-serif", fontVariantNumeric: 'tabular-nums', letterSpacing: 0,
+                    color: active ? '#024ADD' : 'rgba(17,17,17,.32)',
+                  }}>
+                    {viewCounts[v.key]}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
         <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)', marginBottom: 20, maxWidth: 720 }}>
-          Everything installed, yours and everyone else&apos;s. Edit and save your own here, then sync writes the changes down to ~/.claude/skills. Vendor skills are library/reference -- nothing here writes back to their real source.
+          {VIEWS.find((v) => v.key === view)!.blurb}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {view === 'internal' && <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           {FILTERS.map((f) => {
             const active = f.key === filter;
             return (
@@ -168,7 +224,7 @@ export default function SkillsBoard() {
               </button>
             );
           })}
-        </div>
+        </div>}
 
         <input
           value={q}

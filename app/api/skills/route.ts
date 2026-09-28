@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     rows = (data ?? []) as ListRow[];
   }
 
-  const list = rows.map(({ content, ...rest }) => ({ ...rest, systems: rest.systems ?? [], trigger_description: readTrigger(content) }));
+  const list = rows.map(({ content, ...rest }) => ({ ...rest, systems: rest.systems ?? [], audience: rest.audience ?? 'internal', trigger_description: readTrigger(content) }));
   return NextResponse.json(list, { headers: { 'cache-control': 'no-store' } });
 }
 
