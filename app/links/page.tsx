@@ -80,9 +80,8 @@ const LINKS: LinkRow[] = [
     live: false,
   },
   {
-    name: 'Workshop Payment',
-    url: null,
-    urlNote: 'Link cut off in the screenshot, ask Brendan for the full URL.',
+    name: 'Workshop Payment Link',
+    url: 'https://link.fastpaydirect.com/payment-link/6ab60c6a4ae1d4567283981f',
     trigger: null,
     live: false,
   },
