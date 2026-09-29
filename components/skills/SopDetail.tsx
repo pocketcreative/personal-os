@@ -1,21 +1,23 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { deleteSop, fetchSop, saveSop, SAVE_CONFLICT_MESSAGE } from '@/lib/useSops';
 import { useSkills } from '@/lib/useSkills';
 import { renderSopExport, sopEmDashWarning, sopFileName, type SopAudience } from '@/lib/sopMarkdown';
 import { SOP_PROGRESS, SOP_PROGRESS_COLORS, SOP_PROGRESS_LABELS, SOP_SYSTEMS, type Sop, type SopProgress, type SopSystem } from '@/lib/types';
 import dynamic from 'next/dynamic';
-import MarkdownContent from './MarkdownContent';
 import ShareControl from '@/components/shares/ShareControl';
 
 // Client-only (ProseMirror needs the DOM) and code-split, so the editor's
-// weight only loads once someone actually clicks Edit.
+// weight only loads once someone opens a SOP.
 const MarkdownEditor = dynamic(() => import('./MarkdownEditor'), {
   ssr: false,
   loading: () => <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', padding: '20px 0' }}>Loading editor&hellip;</div>,
 });
+
+// Debounce delay for autosave, matching SkillDetail.
+const AUTOSAVE_DELAY_MS = 2000;
 
 type Draft = {
   title: string; content: string; systems: SopSystem[]; skill_id: string | null; progress: SopProgress;
@@ -43,8 +45,10 @@ function downloadSop(sop: Sop, audience: SopAudience) {
   URL.revokeObjectURL(url);
 }
 
-// Real headers, not greyed placeholder text: opening Edit on an empty SOP
-// pre-fills these so they're permanent text Brendan writes under.
+// Real headers, not greyed placeholder text: a brand-new SOP (empty content)
+// gets pre-filled with these on load so there's permanent text to write
+// under from the start, now that there's no separate Edit click to hang
+// this off of.
 const SOP_TEMPLATE = '## Goal\n\n## Principles\n\n## Steps\n\n### Step 1\n\n### Step 2\n\n## Example\n\n## Checklist\n';
 
 const sectionLabel: React.CSSProperties = {
@@ -53,7 +57,6 @@ const sectionLabel: React.CSSProperties = {
 const btnBase: React.CSSProperties = {
   font: "700 12.5px 'Inter Tight', sans-serif", borderRadius: 8, padding: '9px 16px', cursor: 'pointer', border: '1px solid transparent',
 };
-const btnPrimary: React.CSSProperties = { ...btnBase, background: '#024ADD', color: '#fff' };
 const btnSecondary: React.CSSProperties = { ...btnBase, background: '#fff', color: '#111', border: '1px solid rgba(17,17,17,.15)' };
 // Same delete-button convention as ContentDetailModal/TaskDetailModal.
 const btnDanger: React.CSSProperties = { ...btnBase, background: 'transparent', color: '#c0392b', border: '1px solid rgba(192,57,43,.3)' };
@@ -68,18 +71,20 @@ export default function SopDetail({ id }: { id: string }) {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  // Same read/edit toggle as SkillDetail: read (rendered markdown) is the
-  // default, edit (raw textarea) is an explicit switch. Only governs the
-  // content box -- title/progress/systems/linked skill stay always-editable
-  // the way they already were, per Brendan's instruction to leave those
-  // fields exactly as they are.
-  const [mode, setMode] = useState<'read' | 'edit'>('read');
   const { skills } = useSkills();
 
   useEffect(() => {
     let live = true;
     fetchSop(id)
-      .then((s) => { if (live) { setSop(s); setDraft(toDraft(s)); setLoading(false); } })
+      .then((s) => {
+        if (!live) return;
+        setSop(s);
+        // Pre-fill the template on a brand-new (empty) SOP -- see the
+        // SOP_TEMPLATE comment above. This is itself just a draft change,
+        // so the debounce effect below autosaves it the same as any edit.
+        setDraft(toDraft(s.content.trim() ? s : { ...s, content: SOP_TEMPLATE }));
+        setLoading(false);
+      })
       .catch((e) => { if (live) { setError(e.message); setLoading(false); } });
     return () => { live = false; };
   }, [id]);
@@ -89,24 +94,10 @@ export default function SopDetail({ id }: { id: string }) {
     [skills],
   );
 
-  if (loading) return <Wrap><div style={muted}>Loading&hellip;</div></Wrap>;
-  if (error || !sop || !draft) return <Wrap><div style={errStyle}>{error ?? 'Not found'}</div></Wrap>;
-
-  const dirty = isDirty(draft, sop);
-  const linkedSkillSlug = sop.skill_id ? skills.find((s) => s.id === sop.skill_id)?.slug ?? null : null;
-
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => (d ? { ...d, [key]: value } : d));
-
-  const toggleSystem = (sys: SopSystem) => {
-    setDraft((d) => {
-      if (!d) return d;
-      const has = d.systems.includes(sys);
-      return { ...d, systems: has ? d.systems.filter((s) => s !== sys) : [...d.systems, sys] };
-    });
-  };
+  const dirty = sop !== null && draft !== null && isDirty(draft, sop);
 
   const save = async () => {
-    if (!draft) return;
+    if (!sop || !draft) return;
     setSaving(true);
     setSaveMsg(null);
     try {
@@ -117,20 +108,21 @@ export default function SopDetail({ id }: { id: string }) {
       setSop(updated);
       setDraft(toDraft(updated));
       setWarning(sopEmDashWarning({ title: draft.title, content: draft.content }));
-      setSaveMsg(`Saved as v${updated.version}.`);
+      setSaveMsg('Saved.');
       window.dispatchEvent(new Event('sops:refresh'));
     } catch (e) {
       const message = (e as Error).message;
-      // Same recovery as SkillDetail: a 409 used to be a dead end (the
-      // message says "reload" but there's no reload control, and Save
-      // just resent the same stale updated_at forever). Refetch instead --
-      // the user's unsaved edits stay in `draft`, only the stale
-      // `sop.updated_at` this compares against gets refreshed.
+      // Same recovery as SkillDetail: a 409 used to be a dead end under the
+      // old manual-Save flow (the message says "reload" but there's no
+      // reload control). Refetch instead -- the user's unsaved edits stay
+      // in `draft`, only the stale `sop.updated_at` this compares against
+      // gets refreshed, and autosave's next debounced attempt (triggered
+      // automatically since `dirty` stays true) retries on its own.
       if (message === SAVE_CONFLICT_MESSAGE) {
         try {
           const fresh = await fetchSop(sop.id);
           setSop(fresh);
-          setSaveMsg('This changed elsewhere. Reloaded the latest version underneath your edits -- click Save again.');
+          setSaveMsg('This changed elsewhere -- reloaded the latest version underneath your edits, retrying save.');
         } catch {
           setSaveMsg(message);
         }
@@ -140,6 +132,37 @@ export default function SopDetail({ id }: { id: string }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Debounced autosave, Notion-style: no Save button, this fires ~2s after
+  // the user stops typing/toggling anything in `draft` (title, content,
+  // progress, systems, or linked skill). Declared before the loading/error
+  // early return below (rules of hooks), guarded on `dirty`/`saving`
+  // internally instead.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    if (!dirty || saving) return undefined;
+    saveTimer.current = setTimeout(() => { save(); }, AUTOSAVE_DELAY_MS);
+    return () => {
+      if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, dirty, saving]);
+
+  if (loading) return <Wrap><div style={muted}>Loading&hellip;</div></Wrap>;
+  if (error || !sop || !draft) return <Wrap><div style={errStyle}>{error ?? 'Not found'}</div></Wrap>;
+
+  const linkedSkillSlug = sop.skill_id ? skills.find((s) => s.id === sop.skill_id)?.slug ?? null : null;
+
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => (d ? { ...d, [key]: value } : d));
+
+  const toggleSystem = (sys: SopSystem) => {
+    setDraft((d) => {
+      if (!d) return d;
+      const has = d.systems.includes(sys);
+      return { ...d, systems: has ? d.systems.filter((s) => s !== sys) : [...d.systems, sys] };
+    });
   };
 
   const handleDelete = async () => {
@@ -183,19 +206,17 @@ export default function SopDetail({ id }: { id: string }) {
         <button onClick={() => downloadSop(sop, 'internal')} style={btnSecondary}>Download (Internal)</button>
         <button onClick={() => downloadSop(sop, 'client')} style={btnSecondary}>Download (Client)</button>
         <ShareControl type="sop" id={sop.id} />
-        {mode === 'read' && (
-          <button onClick={() => { if (!draft.content.trim()) set('content', SOP_TEMPLATE); setMode('edit'); }} style={btnSecondary}>Edit</button>
-        )}
-        {mode === 'edit' && (
-          <button onClick={() => setMode('read')} style={btnSecondary}>Done editing</button>
-        )}
-        <button onClick={save} disabled={!dirty || saving} style={{ ...btnPrimary, opacity: !dirty || saving ? 0.5 : 1 }}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
         <button onClick={handleDelete} disabled={deleting} style={{ ...btnDanger, opacity: deleting ? 0.5 : 1 }}>
           {deleting ? 'Deleting…' : 'Delete'}
         </button>
-        {saveMsg && <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: saveMsg.startsWith('Saved') ? '#4b7a4f' : '#b3261e' }}>{saveMsg}</span>}
+        {(saving || saveMsg) && (
+          <span style={{
+            font: "500 12px 'Inter Tight', sans-serif",
+            color: saving ? 'rgba(17,17,17,.45)' : (saveMsg?.startsWith('Saved') ? '#4b7a4f' : '#b3261e'),
+          }}>
+            {saving ? 'Saving…' : saveMsg}
+          </span>
+        )}
       </div>
 
       {warning && (
@@ -277,23 +298,7 @@ export default function SopDetail({ id }: { id: string }) {
       )}
 
       <div style={sectionLabel}>Content</div>
-      {mode === 'edit' ? (
-        <MarkdownEditor value={draft.content} onChange={(v) => set('content', v)} />
-      ) : (
-        <div style={{
-          width: '100%', boxSizing: 'border-box',
-          padding: '20px 24px', border: '1px solid rgba(17,17,17,.1)', borderRadius: 8, background: '#fff',
-        }}>
-          {/* Reads from `draft`, not `sop.content`: if there are unsaved
-              edits (dirty), the read view reflects them instead of silently
-              discarding what hasn't been saved yet when toggling modes. */}
-          {draft.content.trim() ? (
-            <MarkdownContent content={draft.content} />
-          ) : (
-            <div style={muted}>Nothing written yet. Click Edit to add Goal / Principles / Steps / Example / Checklist.</div>
-          )}
-        </div>
-      )}
+      <MarkdownEditor value={draft.content} onChange={(v) => set('content', v)} />
     </Wrap>
   );
 }
