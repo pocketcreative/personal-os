@@ -1,0 +1,38 @@
+/* Notion-style bubble toolbar. Shown/hidden via Milkdown's TooltipProvider,
+   which toggles data-show on this element and positions it with inline
+   left/top styles (floating-ui). Matches MarkdownEditor's editor chrome:
+   white surface, rgba(17,17,17,.14) border, 8px radius, Inter Tight. */
+.toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid rgba(17, 17, 17, .14);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(17, 17, 17, .14);
+}
+.toolbar[data-show='false'] { display: none; }
+
+.button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font: 700 13px 'Inter Tight', sans-serif;
+  color: rgba(17, 17, 17, .75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.button:hover { background: rgba(2, 74, 221, .1); color: #024ADD; }
+.button + .button { margin-left: 0; }
+.headingButton { font-size: 11px; }

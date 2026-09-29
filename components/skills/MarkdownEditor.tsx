@@ -8,6 +8,7 @@ import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { getMarkdown } from '@milkdown/kit/utils';
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
 import { splitFrontmatter } from '@/lib/frontmatter';
+import { configureFormatToolbar, formatToolbarPlugin } from './formatToolbar';
 import styles from './MarkdownEditor.module.css';
 
 // Live-formatting (Notion-style) markdown editor for Skills and SOPs.
@@ -57,11 +58,13 @@ function Inner({ value, onChange }: Props) {
             body.current = md === baseline.current ? initial.body : md;
             onChangeRef.current(header.current + body.current);
           });
+        configureFormatToolbar(ctx);
       })
       .use(commonmark)
       .use(gfm)
       .use(history)
-      .use(listener),
+      .use(listener)
+      .use(formatToolbarPlugin),
   []);
 
   return (
