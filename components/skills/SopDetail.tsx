@@ -6,8 +6,16 @@ import { deleteSop, fetchSop, saveSop, SAVE_CONFLICT_MESSAGE } from '@/lib/useSo
 import { useSkills } from '@/lib/useSkills';
 import { renderSopExport, sopEmDashWarning, sopFileName, type SopAudience } from '@/lib/sopMarkdown';
 import { SOP_PROGRESS, SOP_PROGRESS_COLORS, SOP_PROGRESS_LABELS, SOP_SYSTEMS, type Sop, type SopProgress, type SopSystem } from '@/lib/types';
+import dynamic from 'next/dynamic';
 import MarkdownContent from './MarkdownContent';
 import ShareControl from '@/components/shares/ShareControl';
+
+// Client-only (ProseMirror needs the DOM) and code-split, so the editor's
+// weight only loads once someone actually clicks Edit.
+const MarkdownEditor = dynamic(() => import('./MarkdownEditor'), {
+  ssr: false,
+  loading: () => <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', padding: '20px 0' }}>Loading editor&hellip;</div>,
+});
 
 type Draft = {
   title: string; content: string; systems: SopSystem[]; skill_id: string | null; progress: SopProgress;
@@ -270,17 +278,7 @@ export default function SopDetail({ id }: { id: string }) {
 
       <div style={sectionLabel}>Content</div>
       {mode === 'edit' ? (
-        <textarea
-          value={draft.content}
-          onChange={(e) => set('content', e.target.value)}
-          spellCheck={false}
-          style={{
-            width: '100%', boxSizing: 'border-box', minHeight: '60vh', resize: 'vertical',
-            fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, lineHeight: 1.6, color: '#111',
-            padding: '16px 18px', border: '1px solid rgba(17,17,17,.14)', borderRadius: 8, background: '#fff',
-            outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          }}
-        />
+        <MarkdownEditor value={draft.content} onChange={(v) => set('content', v)} />
       ) : (
         <div style={{
           width: '100%', boxSizing: 'border-box',

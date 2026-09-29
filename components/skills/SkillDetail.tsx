@@ -6,8 +6,16 @@ import { deleteSkill, fetchSkill, saveSkillContent, SAVE_CONFLICT_MESSAGE } from
 import { readTrigger, stripFrontmatter } from '@/lib/skillFile';
 import { SKILL_SOURCE_LABELS, SOP_SYSTEMS, type Skill, type SopSystem } from '@/lib/types';
 import { downloadTextFile } from '@/lib/downloadText';
+import dynamic from 'next/dynamic';
 import MarkdownContent from './MarkdownContent';
 import ShareControl from '@/components/shares/ShareControl';
+
+// Client-only (ProseMirror needs the DOM) and code-split, so the editor's
+// weight only loads once someone actually clicks Edit.
+const MarkdownEditor = dynamic(() => import('./MarkdownEditor'), {
+  ssr: false,
+  loading: () => <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', padding: '20px 0' }}>Loading editor&hellip;</div>,
+});
 
 function downloadSkill(skill: Skill) {
   // Skills are stored verbatim, so the download IS the stored content --
@@ -207,17 +215,7 @@ export default function SkillDetail({ slug }: { slug: string }) {
       )}
 
       {editable && mode === 'edit' ? (
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          spellCheck={false}
-          style={{
-            width: '100%', boxSizing: 'border-box', minHeight: '60vh', resize: 'vertical',
-            fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, lineHeight: 1.6, color: '#111',
-            padding: '16px 18px', border: '1px solid rgba(17,17,17,.14)', borderRadius: 8, background: '#fff',
-            outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          }}
-        />
+        <MarkdownEditor value={draft} onChange={setDraft} />
       ) : (
         <div style={{
           width: '100%', boxSizing: 'border-box',
