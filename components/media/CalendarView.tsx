@@ -50,23 +50,25 @@ function DraggableItemPill({ item, conflict }: { item: ContentItem; conflict: bo
       onClick={() => router.push(`/media/item/${item.id}`)}
       style={{
         opacity: isDragging ? 0.3 : 1, cursor: isDragging ? 'grabbing' : 'grab',
-        display: 'flex', alignItems: 'center', gap: 5, padding: '3px 7px', borderRadius: 6,
+        padding: '3px 7px', borderRadius: 6,
         background: conflict ? 'rgba(179,38,30,.08)' : 'rgba(2,74,221,.08)',
         border: conflict ? '1px solid rgba(179,38,30,.35)' : '1px solid rgba(2,74,221,.15)',
-        marginBottom: 3, touchAction: 'manipulation', flexWrap: 'wrap',
+        marginBottom: 3, touchAction: 'manipulation',
       }}
     >
-      <span style={{ font: "700 9px 'Inter Tight', sans-serif", color: '#024ADD', letterSpacing: '.02em' }}>
-        {item.type.toUpperCase()}
-      </span>
-      <span style={{ font: "500 11px 'Inter Tight', sans-serif", color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 5 }}>
+        <span style={{ font: "700 9px 'Inter Tight', sans-serif", color: '#024ADD', letterSpacing: '.02em' }}>
+          {item.type.toUpperCase()}
+        </span>
+        {time && (
+          <span style={{ font: "600 9px 'Inter Tight', sans-serif", color: conflict ? '#b3261e' : 'rgba(2,74,221,.7)', whiteSpace: 'nowrap' }}>
+            {conflict ? '⚠️ ' : ''}{time}
+          </span>
+        )}
+      </div>
+      <span style={{ display: 'block', font: "500 11px 'Inter Tight', sans-serif", color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {item.name}
       </span>
-      {time && (
-        <span style={{ font: "600 9px 'Inter Tight', sans-serif", color: conflict ? '#b3261e' : 'rgba(2,74,221,.7)', whiteSpace: 'nowrap' }}>
-          {conflict ? '⚠️ ' : ''}{time}
-        </span>
-      )}
     </div>
   );
 }
