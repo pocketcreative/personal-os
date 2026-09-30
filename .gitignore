@@ -46,3 +46,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# YouTube Analytics OAuth client secret + saved refresh token (real credentials, never commit)
+.google-youtube-analytics-client-secret.json
+.google-youtube-analytics-tokens.json

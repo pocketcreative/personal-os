@@ -31,6 +31,11 @@ function resolveAccount(platformName: string) {
   return PLATFORM_ACCOUNTS[platformName.trim().toLowerCase()] ?? null;
 }
 
+// Instagram (@brendanangg) is the account the analytics dashboard reads --
+// confirmed live 2026-09-30 via mcp__zernio__analytics_get_analytics
+// (1143 followers, 40 posts, matches Zernio's own dashboard).
+export const INSTAGRAM_ACCOUNT_ID = PLATFORM_ACCOUNTS.instagram.accountId;
+
 function apiKey(): string | null {
   return process.env.ZERNIO_API_KEY || null;
 }
@@ -141,4 +146,75 @@ export async function cancelZernioPosts(refs: ZernioPostRef[]): Promise<void> {
     if (ref.status !== 'scheduled' || !ref.post_id) continue;
     try { await zernioFetch(`/posts/${ref.post_id}`, { method: 'DELETE' }); } catch { /* best-effort */ }
   }
+}
+
+export interface ZernioPostAnalytics {
+  id: string;
+  content: string;
+  publishedAt: string | null;
+  platformPostUrl: string | null;
+  thumbnailUrl: string | null;
+  impressions: number;
+  reach: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  engagementRate: number;
+}
+
+export interface ZernioAccountAnalytics {
+  followersCount: number;
+  totalPosts: number;
+  posts: ZernioPostAnalytics[];
+}
+
+// Real GET /v1/analytics -- confirmed 2026-09-30 via Zernio's own docs
+// (mcp__zernio__docs_search) and a live call: returns per-post analytics
+// plus account follower counts, same shape the connected MCP tools use.
+export async function getInstagramAnalytics(limit = 20): Promise<ZernioAccountAnalytics> {
+  const key = apiKey();
+  if (!key) throw new Error('ZERNIO_API_KEY not set');
+  const body = await zernioFetch(
+    `/analytics?accountId=${INSTAGRAM_ACCOUNT_ID}&limit=${limit}&page=1&sortBy=date&order=desc`,
+    { method: 'GET' },
+  );
+  const accounts = (body.accounts as Record<string, unknown>[] | undefined) ?? [];
+  const account = accounts.find((a) => a._id === INSTAGRAM_ACCOUNT_ID);
+  const overview = body.overview as Record<string, unknown> | undefined;
+  const posts = ((body.posts as Record<string, unknown>[] | undefined) ?? []).map((p): ZernioPostAnalytics => {
+    const a = (p.analytics as Record<string, unknown>) ?? {};
+    return {
+      id: p._id as string,
+      content: (p.content as string) ?? '',
+      publishedAt: (p.publishedAt as string) ?? null,
+      platformPostUrl: (p.platformPostUrl as string) ?? null,
+      thumbnailUrl: (p.thumbnailUrl as string) ?? null,
+      impressions: (a.impressions as number) ?? 0,
+      reach: (a.reach as number) ?? 0,
+      likes: (a.likes as number) ?? 0,
+      comments: (a.comments as number) ?? 0,
+      shares: (a.shares as number) ?? 0,
+      saves: (a.saves as number) ?? 0,
+      engagementRate: (a.engagementRate as number) ?? 0,
+    };
+  });
+  return {
+    followersCount: (account?.followersCount as number) ?? 0,
+    totalPosts: (overview?.totalPosts as number) ?? posts.length,
+    posts,
+  };
+}
+
+// Real GET /v1/accounts/follower-stats -- daily follower count history for
+// the trend line.
+export async function getInstagramFollowerHistory(fromDate: string): Promise<{ date: string; followers: number }[]> {
+  const key = apiKey();
+  if (!key) throw new Error('ZERNIO_API_KEY not set');
+  const body = await zernioFetch(
+    `/accounts/follower-stats?accountIds=${INSTAGRAM_ACCOUNT_ID}&fromDate=${fromDate}`,
+    { method: 'GET' },
+  );
+  const stats = (body.stats as Record<string, { date: string; followers: number }[]> | undefined) ?? {};
+  return stats[INSTAGRAM_ACCOUNT_ID] ?? [];
 }
