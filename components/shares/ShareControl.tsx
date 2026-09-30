@@ -20,12 +20,14 @@ const STATUS_LABEL = { active: 'Active', expired: 'Expired', off: 'Turned off' }
 const STATUS_COLOR = { active: '#4b7a4f', expired: '#9a7a2e', off: '#b3261e' } as const;
 
 // A "Share" button that opens a small panel to make, copy and switch off
-// view-only links for one SOP, board or skill. `align` picks which edge the panel
-// lines up with, so it stays on screen wherever the button sits.
-export default function ShareControl({ type, id, align = 'left' }: { type: ShareResource; id: string; align?: 'left' | 'right' }) {
+// view-only links for one SOP, board, skill, or (with `id` omitted) the
+// whole CMS. `align` picks which edge the panel lines up with, so it stays
+// on screen wherever the button sits.
+export default function ShareControl({ type, id, align = 'left' }: { type: ShareResource; id?: string; align?: 'left' | 'right' }) {
   const [open, setOpen] = useState(false);
   const [shares, setShares] = useState<ShareWithStatus[] | null>(null);
   const [expiresOn, setExpiresOn] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -45,9 +47,10 @@ export default function ShareControl({ type, id, align = 'left' }: { type: Share
     setBusy(true);
     setError(null);
     try {
-      const made = await createShare(type, id, expiresOn);
+      const made = await createShare(type, id, expiresOn, password);
       setShares((list) => [made, ...(list ?? [])]);
       setExpiresOn('');
+      setPassword('');
     } catch (e) { fail(e); } finally { setBusy(false); }
   };
 
@@ -104,6 +107,17 @@ export default function ShareControl({ type, id, align = 'left' }: { type: Share
                 style={{ font: "500 13px 'Inter Tight', sans-serif", padding: '7px 8px', border: '1px solid rgba(17,17,17,.14)', borderRadius: 8 }}
               />
             </label>
+            <label style={{ ...muted, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              Password (optional)
+              <input
+                type="text"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="No password"
+                className="tap-44"
+                style={{ font: "500 13px 'Inter Tight', sans-serif", padding: '7px 8px', border: '1px solid rgba(17,17,17,.14)', borderRadius: 8, width: 140 }}
+              />
+            </label>
             <button
               onClick={create}
               disabled={busy}
@@ -120,8 +134,9 @@ export default function ShareControl({ type, id, align = 'left' }: { type: Share
               <div style={{ font: "500 12.5px 'Inter Tight', sans-serif", color: '#111' }}>
                 Created {fmtDate(s.created_at)} &middot; {s.expires_at ? `expires ${fmtDate(s.expires_at)}` : 'never expires'}
               </div>
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 2 }}>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 2, flexWrap: 'wrap' }}>
                 <span style={{ marginRight: 8, font: "700 12.5px 'Inter Tight', sans-serif", color: STATUS_COLOR[s.status] }}>{STATUS_LABEL[s.status]}</span>
+                {s.has_password && <span style={{ marginRight: 8, ...muted }}>Password protected</span>}
                 <button onClick={() => copy(s)} className="tap-44" style={small}>{copied === s.id ? 'Copied' : 'Copy link'}</button>
                 <button onClick={() => flip(s)} className="tap-44" style={small}>{s.status === 'off' ? 'Turn on' : 'Turn off'}</button>
               </div>

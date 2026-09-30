@@ -32,23 +32,46 @@
   .editor :global(.ProseMirror) { padding: 16px; min-height: 50vh; }
 }
 
+/* CMS usage only (ItemDetail/TemplateEditor, the only two callers that pass
+   `breaks`) -- content there tends to run long and fill past min-height, so
+   the plain 20px bottom padding above leaves almost no breathing room to
+   keep typing past the last line. Skills/SOPs don't pass `breaks`, so their
+   feel is untouched. */
+.editorRoomy :global(.ProseMirror) { padding-bottom: 160px; }
+@media (max-width: 600px) {
+  .editorRoomy :global(.ProseMirror) { padding-bottom: 120px; }
+}
+
 .editor :global(.ProseMirror) > :first-child { margin-top: 0; }
 .editor :global(.ProseMirror p) { margin: 0 0 14px; }
 
+/* Heading hierarchy: 3 genuinely distinct tiers, not just 3 sizes of bold.
+   h2 = top-level section (big, bordered). h3 = sub-section (a real but
+   smaller heading). h4 = the level below that -- styled as an uppercase
+   eyebrow label (same look as this app's own field labels, e.g. ItemDetail's
+   "STAGE" / "STATUS" labels) rather than a 4th size of bold text, so it
+   reads unmistakably as a lower tier at a glance, not just "slightly
+   smaller bold". h5/h6 fall back to the h4 treatment since real content
+   here never nests deeper than h4. */
 .editor :global(.ProseMirror h1),
 .editor :global(.ProseMirror h2),
 .editor :global(.ProseMirror h3) {
   font-family: var(--font-archivo), 'Archivo', sans-serif; color: #111; letter-spacing: -0.01em;
 }
-.editor :global(.ProseMirror h1) { font-weight: 800; font-size: 22px; line-height: 1.25; margin: 4px 0 14px; }
+.editor :global(.ProseMirror h1) { font-weight: 800; font-size: 22px; line-height: 1.25; margin: 4px 0 16px; }
 .editor :global(.ProseMirror h2) {
-  font-weight: 800; font-size: 18px; line-height: 1.3; margin: 30px 0 12px;
+  font-weight: 800; font-size: 18px; line-height: 1.3; margin: 34px 0 14px;
   padding-bottom: 8px; border-bottom: 1px solid rgba(17, 17, 17, .1);
 }
-.editor :global(.ProseMirror h3) { font-weight: 700; font-size: 15.5px; line-height: 1.35; margin: 22px 0 8px; }
+.editor :global(.ProseMirror h2):first-child { margin-top: 0; }
+.editor :global(.ProseMirror h3) { font-weight: 700; font-size: 15px; line-height: 1.35; margin: 24px 0 7px; }
 .editor :global(.ProseMirror h4),
 .editor :global(.ProseMirror h5),
-.editor :global(.ProseMirror h6) { font-weight: 700; font-size: 13.5px; margin: 16px 0 6px; color: #111; }
+.editor :global(.ProseMirror h6) {
+  font-family: var(--font-archivo), 'Archivo', sans-serif;
+  font-weight: 700; font-size: 10.5px; line-height: 1.4; margin: 18px 0 5px;
+  color: rgba(17, 17, 17, .5); letter-spacing: .06em; text-transform: uppercase;
+}
 
 .editor :global(.ProseMirror strong) { font-weight: 700; color: #111; }
 .editor :global(.ProseMirror em) { font-style: italic; }

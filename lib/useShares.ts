@@ -9,16 +9,24 @@ async function apiError(res: Response, fallback: string): Promise<Error> {
   return new Error(body?.error || `${fallback} (${res.status})`);
 }
 
-export async function fetchShares(type: ShareResource, id: string): Promise<ShareWithStatus[]> {
-  const res = await fetch(`/api/shares?resource_type=${type}&resource_id=${encodeURIComponent(id)}`);
+// `id` is omitted for a 'cms' share -- it shares the whole Content
+// Management System, not one row, so it has no resource_id.
+export async function fetchShares(type: ShareResource, id?: string): Promise<ShareWithStatus[]> {
+  const qs = new URLSearchParams({ resource_type: type, ...(id ? { resource_id: id } : {}) });
+  const res = await fetch(`/api/shares?${qs}`);
   if (!res.ok) throw await apiError(res, 'Failed to load links');
   return res.json();
 }
 
-export async function createShare(type: ShareResource, id: string, expiresOn: string): Promise<ShareWithStatus> {
+export async function createShare(type: ShareResource, id: string | undefined, expiresOn: string, password?: string): Promise<ShareWithStatus> {
   const res = await fetch('/api/shares', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ resource_type: type, resource_id: id, ...(expiresOn ? { expires_at: expiresOn } : {}) }),
+    body: JSON.stringify({
+      resource_type: type,
+      ...(id ? { resource_id: id } : {}),
+      ...(expiresOn ? { expires_at: expiresOn } : {}),
+      ...(password ? { password } : {}),
+    }),
   });
   if (!res.ok) throw await apiError(res, 'Create failed');
   return res.json();

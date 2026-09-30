@@ -42,7 +42,7 @@ export default function TopRail() {
       style={{ background: 'var(--ink-1)', borderBottom: '1px solid var(--ink-2)' }}
     >
       <span style={{ font: "800 15px 'Archivo', sans-serif", color: 'var(--ink-4)', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
-        Brendan OS
+        Acquire Clients OS
       </span>
       <div className="hidden md:flex gap-7">
         {TABS.map((t) => {

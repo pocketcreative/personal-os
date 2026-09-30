@@ -410,3 +410,174 @@ export interface OutreachMessage {
   ai_suggestion_original: string | null;
   created_at: string;
 }
+
+// Native Content Management System (Phase 1, migration 0034), replacing the
+// Notion "Content Management System (Sept 2026)" page. Distinct from the
+// older ContentPiece/content_pieces above (still live at /media/old).
+export type ContentItemType = 'lf' | 'lts' | 'sf' | 'ad' | 'vsl';
+
+export const CONTENT_ITEM_TYPES: ContentItemType[] = ['lf', 'lts', 'sf', 'ad', 'vsl'];
+export const CONTENT_ITEM_TYPE_LABELS: Record<ContentItemType, string> = {
+  lf: 'Long Form', lts: 'Long to Short', sf: 'Short Form', ad: 'Ads', vsl: 'VSLs',
+};
+
+// Exact strings read off each live Notion data source's schema (fetched
+// 2026-09-30) -- not invented. Stage options differ per type; Status
+// ("not started") is LF-only per decision 8.
+export const STAGE_OPTIONS: Record<ContentItemType, string[]> = {
+  lf: ['Draft', 'Pre-Production', 'Production', 'Post Production', 'Scheduled', 'Broadcast', 'LTS', 'Completed'],
+  lts: ['Draft Clips', 'Selected Clips', 'Post Production', 'Scheduled'],
+  sf: ['Draft', 'Pre-Production', 'Production', 'Post Production', 'Scheduled'],
+  ad: ['Draft', 'Pre-Production', 'Production', 'Post Production', 'Scheduled'],
+  vsl: ['Draft', 'Pre-Production', 'Production', 'Post Production', 'Scheduled'],
+};
+export const STATUS_OPTIONS: Record<ContentItemType, string[]> = {
+  lf: ['not started', 'In Progress', 'To Review', 'Complete', 'Archive'],
+  lts: ['In Progress', 'To Review', 'Complete', 'Archive'],
+  sf: ['In Progress', 'To Review', 'Complete', 'Archive'],
+  ad: ['In Progress', 'To Review', 'Complete', 'Archive'],
+  vsl: ['In Progress', 'To Review', 'Complete', 'Archive'],
+};
+// Default Stage/Status for a freshly created item of each type.
+export const DEFAULT_STAGE: Record<ContentItemType, string> = {
+  lf: 'Draft', lts: 'Draft Clips', sf: 'Draft', ad: 'Draft', vsl: 'Draft',
+};
+export const DEFAULT_STATUS: Record<ContentItemType, string> = {
+  lf: 'not started', lts: 'In Progress', sf: 'In Progress', ad: 'In Progress', vsl: 'In Progress',
+};
+
+// One entry per platform this item is actually scheduled on through the real
+// Zernio API (POST /v1/posts to create, PUT /v1/posts/{id} to reschedule).
+// Written by the server when a Post Date + platforms combination is saved;
+// see lib/zernio.ts. Empty = not scheduled through Zernio.
+export interface ZernioPostRef {
+  platform: string;
+  account_id: string;
+  post_id: string;
+  status: 'scheduled' | 'failed' | 'not_configured';
+  scheduled_for: string | null;
+  error?: string;
+}
+
+// scheduled_for is a naive "YYYY-MM-DDTHH:MM:SS" wall-clock string already in
+// Asia/Singapore time (see lib/zernio.ts -- Zernio is given `timezone:
+// "Asia/Singapore"` alongside it, no Z/offset suffix). Reading the HH:MM
+// straight out of the string (rather than `new Date(iso)` + a timeZone
+// conversion) is deliberate: a naive string with no offset gets parsed in
+// the *viewer's own local timezone* by Date, which would silently show the
+// wrong clock time to anyone not in Singapore. This always shows the real
+// Singapore time it was actually scheduled for.
+export function formatScheduledTime(scheduledFor: string): string | null {
+  const m = /T(\d{2}):(\d{2})/.exec(scheduledFor);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = m[2];
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h %= 12;
+  if (h === 0) h = 12;
+  return `${h}:${min} ${ampm}`;
+}
+
+// The real post time for a calendar/item card. Prefers the time Brendan
+// actually picked (post_time -- editable in the UI regardless of Zernio
+// state, see ItemDetail.tsx), falling back to a live Zernio scheduled_for
+// only for older items scheduled before post_time existed. Null when neither
+// is set (never a guessed/default time shown to Brendan).
+export function itemScheduledTime(item: Pick<ContentItem, 'zernio_post_ids' | 'post_time'>): string | null {
+  if (item.post_time) return formatTimeOfDay(item.post_time);
+  const live = item.zernio_post_ids.find((r) => r.status === 'scheduled' && r.scheduled_for);
+  return live ? formatScheduledTime(live.scheduled_for!) : null;
+}
+
+// Formats a naive "HH:MM" or "HH:MM:SS" time-of-day string (as stored in
+// content_items.post_time, always Singapore wall-clock) into "9:00 AM".
+export function formatTimeOfDay(time: string): string | null {
+  const m = /^(\d{2}):(\d{2})/.exec(time);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = m[2];
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h %= 12;
+  if (h === 0) h = 12;
+  return `${h}:${min} ${ampm}`;
+}
+
+// Minutes-since-midnight for conflict comparison, or null if unset/unparsable.
+export function timeToMinutes(time: string | null): number | null {
+  if (!time) return null;
+  const m = /^(\d{2}):(\d{2})/.exec(time);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+// Default time Zernio schedules a post for when Brendan hasn't picked one --
+// matches the old hardcoded 09:00 default in lib/contentItemsServer.ts, now
+// named so it isn't a silent magic string in two places.
+export const DEFAULT_POST_TIME = '09:00';
+
+// Two items on the same day are a real scheduling conflict (per Brendan's own
+// ask) when their times are identical or within this many minutes -- close
+// enough that they'd effectively compete for the same slot in a feed.
+export const CONFLICT_WINDOW_MINUTES = 5;
+
+export interface ContentItem {
+  id: string;
+  user_id: string;
+  type: ContentItemType;
+  name: string;
+  stage: string;
+  status: string | null;
+  post_date: string | null;
+  post_time: string | null; // "HH:MM:SS" wall-clock, Asia/Singapore -- see migration 0038
+  raw_footage: string | null; // LF = Drive project-folder link, LTS = the actual footage file link (per-type convention)
+  posted_footage: string | null;
+  reference_video: string | null;
+  asset_link: string | null; // LF-specific, always null on the other 4 types
+  platforms: string[];
+  caption: string | null;
+  zernio_post_ids: ZernioPostRef[];
+  // One continuous markdown document for the whole item, section structure
+  // expressed as `## Heading` lines WITHIN this string, not as separate
+  // stored fields (migration 0035 -- was a per-section jsonb map, collapsed
+  // into one field per Brendan's own instruction: template content is one
+  // textbox, not fragmented boxes).
+  body_md: string;
+  sort_order: number | null;
+  created_at: string;
+  updated_at: string;
+  comment_count: number; // derived server-side on GET, same pattern as ContentPiece
+  unresolved_comment_count: number;
+}
+
+export interface ContentTemplate {
+  id: string;
+  type: ContentItemType;
+  // One continuous markdown document (migration 0035 -- was an array of
+  // separate sections, one textarea each). A new item of this type starts
+  // as a copy of this string; Brendan edits structure by editing the
+  // `## Heading` lines directly, no separate add/reorder/remove UI.
+  template_md: string;
+  version: number;
+  updated_at: string;
+}
+
+export interface ContentItemComment {
+  id: string;
+  item_id: string;
+  author: string;
+  body: string;
+  video_timestamp_seconds: number | null;
+  resolved: boolean;
+  created_at: string;
+}
+
+export interface ContentIdea {
+  id: string;
+  user_id: string;
+  idea: string;
+  notes: string | null;
+  used: boolean;
+  sort_order: number | null;
+  created_at: string;
+  updated_at: string;
+}

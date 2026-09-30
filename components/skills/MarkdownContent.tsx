@@ -1,6 +1,7 @@
 'use client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import type { Components } from 'react-markdown';
 
 // Renders a Skill/SOP's stored markdown as an actual formatted document
@@ -11,7 +12,15 @@ import type { Components } from 'react-markdown';
 // monospace, scoped to a code-block look rather than the whole document.
 // Read-only view only -- edit mode still uses a raw textarea (see
 // SkillDetail/SopDetail), this component never round-trips content.
-
+//
+// `breaks`: off by default (standard CommonMark -- a single `\n` inside a
+// paragraph is a soft break, rendered as a space), matching how Skills/SOPs
+// content has always rendered here. The CMS (content_items.body_md) uses
+// single `\n` between short related lines (e.g. "Problems:\nOutcomes:") that
+// are meant to stack, not run together as one sentence -- pass `breaks`
+// there to turn every single `\n` into a real line break (GFM/"breaks: true"
+// style). Scoped per-caller rather than flipped globally, so this never
+// changes how existing Skills/SOPs/strategy-doc prose reads.
 const HEADING: React.CSSProperties = {
   fontFamily: "var(--font-archivo), 'Archivo', sans-serif",
   color: '#111',
@@ -25,21 +34,26 @@ const MONO = { fontFamily: 'ui-monospace, Menlo, monospace' };
 
 const components: Components = {
   h1: ({ children }) => (
-    <h1 style={{ ...HEADING, fontWeight: 800, fontSize: 22, margin: '4px 0 14px', lineHeight: 1.25 }}>{children}</h1>
+    <h1 style={{ ...HEADING, fontWeight: 800, fontSize: 22, margin: '4px 0 16px', lineHeight: 1.25 }}>{children}</h1>
   ),
   h2: ({ children }) => (
     <h2 style={{
-      ...HEADING, fontWeight: 800, fontSize: 18, margin: '30px 0 12px',
+      ...HEADING, fontWeight: 800, fontSize: 18, margin: '34px 0 14px',
       paddingBottom: 8, borderBottom: '1px solid rgba(17,17,17,.1)', lineHeight: 1.3,
     }}>
       {children}
     </h2>
   ),
   h3: ({ children }) => (
-    <h3 style={{ ...HEADING, fontWeight: 700, fontSize: 15.5, margin: '22px 0 8px', lineHeight: 1.35 }}>{children}</h3>
+    <h3 style={{ ...HEADING, fontWeight: 700, fontSize: 15, margin: '24px 0 7px', lineHeight: 1.35 }}>{children}</h3>
   ),
   h4: ({ children }) => (
-    <h4 style={{ ...BODY, fontWeight: 700, fontSize: 13.5, margin: '16px 0 6px' }}>{children}</h4>
+    <h4 style={{
+      ...HEADING, fontWeight: 700, fontSize: 10.5, margin: '18px 0 5px', color: 'rgba(17,17,17,.5)',
+      letterSpacing: '.06em', textTransform: 'uppercase', lineHeight: 1.4,
+    }}>
+      {children}
+    </h4>
   ),
   p: ({ children }) => (
     <p style={{ ...BODY, fontWeight: 500, fontSize: 14, lineHeight: 1.75, margin: '0 0 14px' }}>{children}</p>
@@ -123,10 +137,10 @@ const components: Components = {
   ),
 };
 
-export default function MarkdownContent({ content }: { content: string }) {
+export default function MarkdownContent({ content, breaks = false }: { content: string; breaks?: boolean }) {
   return (
     <div style={{ width: '100%', wordBreak: 'break-word' }}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown remarkPlugins={breaks ? [remarkGfm, remarkBreaks] : [remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>
     </div>

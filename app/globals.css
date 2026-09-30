@@ -165,6 +165,20 @@ body {
   }
 }
 
+/* CalendarView: month grid on desktop, agenda list on mobile -- same
+   breakpoint and hidden-vs-shown pattern as .content-modal-tabs above. */
+.calendar-agenda {
+  display: none;
+}
+@media (max-width: 640px) {
+  .calendar-grid {
+    display: none;
+  }
+  .calendar-agenda {
+    display: block;
+  }
+}
+
 /* Board editor page: fills the screen under the top rail. dvh so the bottom
    canvas controls are not hidden behind a phone browser's own toolbar (vh is
    kept first as the fallback). On phones the title gets its own row so it is

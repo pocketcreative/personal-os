@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/supabase';
+import { requireEnv, verifySignedToken } from '@/lib/auth';
 import { BOARD_IMAGES_BUCKET, isSafePathPart, isStoredEntry, storagePathFor } from '@/lib/boardImages';
 import { parseScene } from '@/lib/boardScene';
-import { PUBLIC_HEADERS } from '@/lib/shares';
+import { PUBLIC_HEADERS, shareCookieName, shareTokenName } from '@/lib/shares';
 import { findActiveShare } from '@/lib/shareLookup';
 import { checkShareRate, recordShareFailure, tooManyRequests } from '@/lib/shareRateLimit';
 
@@ -23,7 +24,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     await recordShareFailure(gate.ctx);
     return notFound();
   }
-  if (share.resource_type !== 'board' || !isSafePathPart(fileId)) return notFound();
+  if (share.resource_type !== 'board' || !share.resource_id || !isSafePathPart(fileId)) return notFound();
+  if (share.password_hash) {
+    const authed = await verifySignedToken(shareTokenName(token), req.cookies.get(shareCookieName(token))?.value, requireEnv('AUTH_SECRET'));
+    if (!authed) return notFound();
+  }
 
   const db = serviceClient();
   const { data: board } = await db.from('boards').select('scene').eq('id', share.resource_id).maybeSingle();

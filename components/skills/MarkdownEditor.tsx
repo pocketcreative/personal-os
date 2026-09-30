@@ -1,12 +1,13 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { defaultValueCtx, Editor, editorViewOptionsCtx, remarkStringifyOptionsCtx, rootCtx } from '@milkdown/kit/core';
+import { defaultValueCtx, Editor, editorViewOptionsCtx, remarkPluginsCtx, remarkStringifyOptionsCtx, rootCtx } from '@milkdown/kit/core';
 import { commonmark } from '@milkdown/kit/preset/commonmark';
 import { gfm } from '@milkdown/kit/preset/gfm';
 import { history } from '@milkdown/kit/plugin/history';
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { getMarkdown } from '@milkdown/kit/utils';
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
+import remarkBreaks from 'remark-breaks';
 import { splitFrontmatter } from '@/lib/frontmatter';
 import { configureFormatToolbar, formatToolbarPlugin } from './formatToolbar';
 import styles from './MarkdownEditor.module.css';
@@ -27,9 +28,20 @@ import styles from './MarkdownEditor.module.css';
 //  - The serializer is pinned to this vault's own style (`-` bullets,
 //    `---` rules, `**bold**`, backtick fences) to keep that re-write small.
 
-type Props = { value: string; onChange: (next: string) => void };
+type Props = {
+  value: string;
+  onChange: (next: string) => void;
+  // Off by default (standard CommonMark -- a single `\n` inside a paragraph
+  // is a soft break, rendered as a space), matching how Skills/SOPs content
+  // has always edited here. The CMS uses single `\n` between short related
+  // lines ("Problems:\nOutcomes:") meant to stack, not run together -- the
+  // CMS passes `breaks` so those parse as real line breaks. Scoped to this
+  // editor instance only (via Milkdown's own remarkPluginsCtx), so it never
+  // touches Skills/SOPs editing.
+  breaks?: boolean;
+};
 
-function Inner({ value, onChange }: Props) {
+function Inner({ value, onChange, breaks = false }: Props) {
   // Read once: after mount the editor owns the text, `value` only flows out.
   const [initial] = useState(() => splitFrontmatter(value));
   const header = useRef(initial.header);
@@ -51,6 +63,9 @@ function Inner({ value, onChange }: Props) {
           ...o, bullet: '-' as const, rule: '-' as const, listItemIndent: 'one' as const,
           emphasis: '*' as const, strong: '*' as const, fence: '`' as const,
         }));
+        if (breaks) {
+          ctx.update(remarkPluginsCtx, (rp) => [...rp, { plugin: remarkBreaks, options: {} }]);
+        }
         ctx.get(listenerCtx)
           .mounted((c) => { baseline.current = getMarkdown()(c); })
           .markdownUpdated((_c, md) => {
@@ -85,7 +100,7 @@ function Inner({ value, onChange }: Props) {
           />
         </label>
       )}
-      <div className={styles.editor}>
+      <div className={breaks ? `${styles.editor} ${styles.editorRoomy}` : styles.editor}>
         <Milkdown />
       </div>
     </div>

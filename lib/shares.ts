@@ -1,32 +1,40 @@
 // Pure helpers for view-only share links. SERVER ONLY (uses node:crypto);
 // client components may `import type` from here, never import values.
-import { randomBytes } from 'node:crypto';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { filterForAudience } from '@/lib/sopMarkdown';
 import { parseScene } from '@/lib/boardScene';
 import { stripFrontmatter } from '@/lib/skillFile';
+import type { ContentItem } from '@/lib/types';
 
-export type ShareResource = 'sop' | 'board' | 'skill';
+// 'cms' shares the whole Content Management System (every content_items row
+// across lf/lts/sf/ad/vsl), not one row in one table -- see toSharedCms and
+// migration 0037. Every other kind is unchanged from before.
+export type ShareResource = 'sop' | 'board' | 'skill' | 'cms';
 
 export const SHARES_MISSING_MESSAGE = 'Sharing needs one database step, ask Jarvis';
 // Migration 0029 not applied yet: the resource_type check rejects 'skill'.
 export const SHARES_SKILL_MISSING_MESSAGE = 'Sharing skills needs one database step, ask Jarvis';
 
-// Columns returned to the owner. user_id is never sent anywhere.
-export const SHARE_COLUMNS = 'id,resource_type,resource_id,token,expires_at,revoked_at,created_at';
+// Columns read server side. user_id is never sent anywhere. password_hash is
+// read for verification only -- withStatus() below strips it before any
+// response reaches the owner's browser, and it's never sent to the public
+// share routes' callers either.
+export const SHARE_COLUMNS = 'id,resource_type,resource_id,token,expires_at,revoked_at,created_at,password_hash';
 
 export type ShareStatus = 'active' | 'expired' | 'off';
 
 export interface ShareRow {
   id: string;
   resource_type: ShareResource;
-  resource_id: string;
+  resource_id: string | null; // null only for resource_type 'cms'
   token: string;
   expires_at: string | null;
   revoked_at: string | null;
   created_at: string;
+  password_hash: string | null;
 }
 
-export type ShareWithStatus = ShareRow & { status: ShareStatus };
+export type ShareWithStatus = Omit<ShareRow, 'password_hash'> & { status: ShareStatus; has_password: boolean };
 
 // Headers on every public response: never cached, never indexed.
 export const PUBLIC_HEADERS = {
@@ -52,7 +60,7 @@ export function isUuid(v: unknown): v is string {
 }
 
 export function isShareResource(v: unknown): v is ShareResource {
-  return v === 'sop' || v === 'board' || v === 'skill';
+  return v === 'sop' || v === 'board' || v === 'skill' || v === 'cms';
 }
 
 export function isShareActive(share: { expires_at: string | null; revoked_at: string | null }, now: Date): boolean {
@@ -67,7 +75,37 @@ export function shareStatus(share: { expires_at: string | null; revoked_at: stri
 }
 
 export function withStatus(share: ShareRow, now = new Date()): ShareWithStatus {
-  return { ...share, status: shareStatus(share, now) };
+  const { password_hash, ...rest } = share;
+  return { ...rest, status: shareStatus(share, now), has_password: !!password_hash };
+}
+
+// scrypt, not the app's login-gate plain-env-var compare: a share password
+// is chosen by whoever creates the link and stored in the DB, so it needs a
+// real per-password salt rather than a single shared secret. Format is
+// "salt:hash", both hex, so one text column holds everything.
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+export function verifyPassword(password: string, stored: string): boolean {
+  const [salt, hash] = stored.split(':');
+  if (!salt || !hash) return false;
+  const expected = Buffer.from(hash, 'hex');
+  const candidate = scryptSync(password, salt, 64);
+  return candidate.length === expected.length && timingSafeEqual(candidate, expected);
+}
+
+// The signed-cookie gate for a password-protected share (see lib/auth.ts's
+// createSignedToken/verifySignedToken, built for exactly this). Both the
+// cookie name and the signed token's `name` are bound to the specific share
+// token, so a cookie proving one share's password can never unlock another.
+export function shareCookieName(token: string): string {
+  return `sh_pw_${token}`;
+}
+export function shareTokenName(token: string): string {
+  return `share:${token}`;
 }
 
 // The expiry the owner picks is a date ("Expires on"). It means the end of
@@ -109,5 +147,46 @@ export function toSharedSkill(skill: { slug: string; version: string; version_da
     version: skill.version,
     version_date: skill.version_date,
     content: filterForAudience(stripFrontmatter(skill.content ?? ''), 'client'),
+  };
+}
+
+// What a link holder gets for a 'cms' share: every content_items row across
+// all 5 types, read-only fields only -- no user_id, no zernio_post_ids (an
+// internal scheduling detail, not something an external viewer needs).
+export interface SharedCmsItem {
+  id: string;
+  type: ContentItem['type'];
+  name: string;
+  stage: string;
+  status: string | null;
+  post_date: string | null;
+  body_md: string;
+  platforms: string[];
+  caption: string | null;
+  raw_footage: string | null;
+  posted_footage: string | null;
+  reference_video: string | null;
+  asset_link: string | null;
+}
+
+export function toSharedCms(items: ContentItem[]) {
+  return {
+    type: 'cms' as const,
+    title: 'Content Management System',
+    items: items.map((i): SharedCmsItem => ({
+      id: i.id,
+      type: i.type,
+      name: i.name,
+      stage: i.stage,
+      status: i.status,
+      post_date: i.post_date,
+      body_md: i.body_md,
+      platforms: i.platforms,
+      caption: i.caption,
+      raw_footage: i.raw_footage,
+      posted_footage: i.posted_footage,
+      reference_video: i.reference_video,
+      asset_link: i.asset_link,
+    })),
   };
 }
