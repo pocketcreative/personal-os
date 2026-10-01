@@ -30,9 +30,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Chart from 'chart.js/auto';
 
 // ── CONFIG ─────────────────────────────────────────────────────────────
-const AA_START_DATE = '2026-05-13'; // cutover — Meta Data before this = Agency, on/after = AA
+// Offer attribution replaces the old hardcoded Agency/AA date-cutover split
+// (was: AA_START_DATE = '2026-05-13'). Real offers (e.g. "DSP TV Funnel",
+// "Growth Roadmap") are discovered from the real sheet data at load time,
+// never hardcoded here. See parseMetaCampaignOffer/collectOffers below.
+const UNATTRIBUTED = 'Unattributed';
 
-type Offer = 'agency' | 'aa';
+type Offer = string;
 type Row = Record<string, string>;
 
 interface Targets {
@@ -56,9 +60,10 @@ const DEFAULT_TARGETS: Targets = {
 };
 
 interface DashState {
-  crmAgency: Row[];
-  crmAA: Row[];
+  crmAll: Row[]; // CRM Data + CRM Data (AA) merged — offer no longer determined by which tab a row came from
   metaRaw: Row[];
+  knownCrmOffers: string[]; // distinct real Source values from crmAll, used for Meta substring-fallback matching
+  offerList: string[]; // full dropdown list: knownCrmOffers ∪ offers parsed from Meta campaign names ∪ Unattributed
   charts: { spend?: Chart; month?: Chart };
   currentOffer: Offer;
   activeTargets: Targets;
@@ -113,6 +118,58 @@ function monthLabel(k: string): string {
 function rc(v: number, g: number, a: number): string {
   return v >= g ? 'b-green' : v >= a ? 'b-amber' : 'b-red';
 }
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── OFFER ATTRIBUTION ──────────────────────────────────────────────────
+// CRM leads: the real `Source` column value, used as-is, no parsing.
+function getCrmOffer(r: Row): string | null {
+  const v = (r['Source'] || '').trim();
+  return v || null;
+}
+
+// Meta spend rows: Brendan's real naming convention is a 6-digit date
+// (DDMMYY) then the objective then the offer, 3 segments. Confirmed from
+// the real Meta Data tab that current campaigns use "_" as the delimiter
+// (e.g. "280626_Leads_ AAprogram"), not "|" as first described — both
+// delimiters are checked here so either format works. Older campaigns that
+// predate this convention fall back to a literal case-insensitive substring
+// match against the real known CRM offer names. No match = Unattributed,
+// never guessed.
+function parseMetaCampaignOffer(campaign: string, knownOffers: string[]): string | null {
+  const c = (campaign || '').trim();
+  if (!c) return null;
+  for (const delim of ['|', '_']) {
+    if (c.includes(delim)) {
+      const parts = c.split(delim).map((p) => p.trim());
+      if (parts.length >= 3 && /^\d{6}$/.test(parts[0]) && parts[2]) return parts[2];
+    }
+  }
+  const lc = c.toLowerCase();
+  for (const offer of knownOffers) {
+    if (offer && lc.includes(offer.toLowerCase())) return offer;
+  }
+  return null;
+}
+
+// Builds the real offer dropdown list from actual data: every distinct
+// CRM Source value, union every offer parseMetaCampaignOffer actually
+// extracts from the real Meta Data rows, plus the Unattributed catch-all.
+function collectOffers(s: DashState): void {
+  const crmSet = new Set<string>();
+  s.crmAll.forEach((r) => { const v = getCrmOffer(r); if (v) crmSet.add(v); });
+  s.knownCrmOffers = Array.from(crmSet);
+
+  const all = new Set(s.knownCrmOffers);
+  s.metaRaw.forEach((r) => {
+    const o = parseMetaCampaignOffer(r['Campaign Name'] || '', s.knownCrmOffers);
+    if (o) all.add(o);
+  });
+  const sorted = Array.from(all).sort((a, b) => a.localeCompare(b));
+  sorted.push(UNATTRIBUTED);
+  s.offerList = sorted;
+}
 
 const STATUS = {
   BOOKED: (r: Row) => ['booked', 'conducted', 'closed'].includes(sl(r)),
@@ -131,15 +188,15 @@ function inRange(ds: string | undefined): boolean {
   return true;
 }
 
-function getCurrentCRM(s: DashState) { return s.currentOffer === 'aa' ? s.crmAA : s.crmAgency; }
+function getCurrentCRM(s: DashState) {
+  return s.crmAll.filter((r) => (getCrmOffer(r) || UNATTRIBUTED) === s.currentOffer);
+}
 function filterCRM(s: DashState) { return getCurrentCRM(s).filter((r) => inRange(r['Date Opt In'])); }
 function filterMeta(s: DashState) {
-  const cutoff = parseDate(AA_START_DATE);
   return s.metaRaw.filter((r) => {
     if (!inRange(r['Date'])) return false;
-    const d = parseDate(r['Date']);
-    if (!d || !cutoff) return true;
-    return s.currentOffer === 'aa' ? d >= cutoff : d < cutoff;
+    const offer = parseMetaCampaignOffer(r['Campaign Name'] || '', s.knownCrmOffers) || UNATTRIBUTED;
+    return offer === s.currentOffer;
   });
 }
 
@@ -361,12 +418,11 @@ function renderMonthly(s: DashState) {
     if (STATUS.CONDUCTED(r)) byMonth[mk].conducted++;
     if (STATUS.CLOSED(r)) { byMonth[mk].closed++; byMonth[mk].revenue += getRevClosed(r); }
   });
-  const cutoff = parseDate(AA_START_DATE);
   const metaByMonth: Record<string, { spend: number; impr: number; clicks: number }> = {};
   s.metaRaw.forEach((r) => {
     const d = parseDate(r['Date']); if (!d) return;
-    const belongsToAA = cutoff ? d >= cutoff : true;
-    if ((s.currentOffer === 'aa') !== belongsToAA) return;
+    const offer = parseMetaCampaignOffer(r['Campaign Name'] || '', s.knownCrmOffers) || UNATTRIBUTED;
+    if (offer !== s.currentOffer) return;
     const mk = monthKey(r['Date']); if (!mk) return;
     if (!metaByMonth[mk]) metaByMonth[mk] = { spend: 0, impr: 0, clicks: 0 };
     metaByMonth[mk].spend += num(r['Spend']); metaByMonth[mk].impr += num(r['Impressions']); metaByMonth[mk].clicks += num(r['Clicks']);
@@ -455,8 +511,8 @@ function switchPage(name: string, btn: HTMLElement) {
 // ── COMPONENT ───────────────────────────────────────────────────────────
 export default function SalesDashboard() {
   const stateRef = useRef<DashState>({
-    crmAgency: [], crmAA: [], metaRaw: [], charts: {},
-    currentOffer: 'aa', activeTargets: { ...DEFAULT_TARGETS },
+    crmAll: [], metaRaw: [], knownCrmOffers: [], offerList: [], charts: {},
+    currentOffer: '', activeTargets: { ...DEFAULT_TARGETS },
   });
   const [connState, setConnState] = useState<'idle' | 'loading' | 'ok' | 'error' | 'nokey'>('loading');
   const [connText, setConnText] = useState('Connecting…');
@@ -506,16 +562,30 @@ export default function SalesDashboard() {
           return o;
         });
       };
-      s.crmAgency = json.crmAgency?.ok ? parse(json.crmAgency) : [];
-      s.crmAA = json.crmAA?.ok ? parse(json.crmAA) : [];
+      const crmAgency = json.crmAgency?.ok ? parse(json.crmAgency) : [];
+      const crmAA = json.crmAA?.ok ? parse(json.crmAA) : [];
+      s.crmAll = [...crmAgency, ...crmAA];
       s.metaRaw = parse(json.meta);
 
       if (json.targets?.ok && json.targets.values) {
         parseTargetsFromSheet(json.targets, s);
       }
 
+      collectOffers(s);
+      // Default to whichever real offer has the most CRM leads, so the
+      // dashboard opens populated rather than on an arbitrary/empty offer.
+      const leadCounts: Record<string, number> = {};
+      s.crmAll.forEach((r) => { const o = getCrmOffer(r); if (o) leadCounts[o] = (leadCounts[o] || 0) + 1; });
+      const byVolume = Object.keys(leadCounts).sort((a, b) => leadCounts[b] - leadCounts[a]);
+      s.currentOffer = byVolume[0] || s.offerList[0] || UNATTRIBUTED;
+
+      const sel = $<HTMLSelectElement>('offerSelect');
+      sel.innerHTML = s.offerList.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+      sel.value = s.currentOffer;
+      $('offerPillTop').textContent = s.currentOffer;
+
       setConnState('ok');
-      setConnText(`${s.crmAA.length} AA leads`);
+      setConnText(`${s.crmAll.length} leads · ${s.offerList.length} offers`);
       renderAll(s);
     } catch (e) {
       setConnState('error');
@@ -545,10 +615,8 @@ export default function SalesDashboard() {
   function handleSwitchOffer(offer: Offer) {
     const s = stateRef.current;
     s.currentOffer = offer;
-    $('offerBtn-agency').classList.toggle('active', offer === 'agency');
-    $('offerBtn-aa').classList.toggle('active', offer === 'aa');
-    $('offerPillTop').textContent = offer === 'aa' ? 'AA Program' : 'Agency';
-    if (s.crmAA.length || s.crmAgency.length) renderAll(s);
+    $('offerPillTop').textContent = offer;
+    if (s.crmAll.length || s.metaRaw.length) renderAll(s);
   }
 
   function handleSwitchPage(name: string, e: React.MouseEvent<HTMLButtonElement>) {
@@ -577,8 +645,8 @@ export default function SalesDashboard() {
         </div>
 
         <div className="offer-toggle">
-          <button className="offer-btn" id="offerBtn-agency" onClick={() => handleSwitchOffer('agency')}>Agency</button>
-          <button className="offer-btn active" id="offerBtn-aa" onClick={() => handleSwitchOffer('aa')}>AA Program</button>
+          <label className="offer-select-label" htmlFor="offerSelect">Offer</label>
+          <select className="offer-select" id="offerSelect" onChange={(e) => handleSwitchOffer(e.target.value)} />
         </div>
 
         <nav className="sb-nav">
@@ -775,9 +843,9 @@ const CSS = `
 .data-dash .sb-brand span{color:var(--accent)}
 .data-dash .sb-sub{font-size:10px;color:var(--text3);margin-top:2px;font-family:'DM Mono',monospace;letter-spacing:.04em}
 
-.data-dash .offer-toggle{margin:14px 16px 0;display:flex;background:var(--surface2);border-radius:9px;padding:3px;border:1px solid var(--border)}
-.data-dash .offer-btn{flex:1;padding:7px 8px;border:none;background:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text2);transition:all .15s}
-.data-dash .offer-btn.active{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.data-dash .offer-toggle{margin:14px 16px 0}
+.data-dash .offer-select-label{display:block;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.data-dash .offer-select{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;padding:8px 10px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;color:var(--accent);outline:none;cursor:pointer}
 
 .data-dash .sb-nav{flex:1;padding:14px 12px}
 .data-dash .sb-sec{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:0 8px;margin:16px 0 6px}
