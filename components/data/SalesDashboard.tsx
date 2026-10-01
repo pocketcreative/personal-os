@@ -129,6 +129,59 @@ function getCrmOffer(r: Row): string | null {
   return v || null;
 }
 
+// Brendan's manually confirmed campaign -> offer mapping, confirmed over
+// Telegram 2026-10-01 after a real audit found 92% of Meta spend ($40,108 of
+// $41,782) falling into Unattributed because most real campaign names don't
+// literally contain a matching offer name (the segment-parsing/substring
+// logic below can't catch them). Checked BEFORE that logic, exact match on
+// the trimmed Campaign Name. Canonical offer strings ("DSP TV Funnel",
+// "AA Playbook", "Growth Roadmap") match the real CRM `Source` column values
+// verified against the live sheet, so Meta spend and CRM leads land in the
+// same bucket.
+//
+// Two assumptions in here were NOT explicitly confirmed by Brendan and
+// should be flagged back to him:
+// 1. "HF | Authority Agent | Leads | Test" -> AA Playbook was inferred only
+//    (shares the "Authority Agent" name + a "Test" tag with the confirmed
+//    campaign), not something he said directly.
+// 2. The "Legacy/Other" bucket itself (grouping every pre-2026/off-funnel
+//    campaign into one bucket rather than leaving them Unattributed or
+//    splitting them further) was not a choice he explicitly confirmed,
+//    just applied under "fix these all for me now".
+const META_CAMPAIGN_OFFER_MAP: Record<string, string> = {
+  'DSP Offer | Testing Campaign': 'DSP TV Funnel',
+  'DSP Offer | Scaling Campaign': 'DSP TV Funnel',
+  'DSP Offer | YouTube Videos': 'DSP TV Funnel',
+
+  '180726_Leads_ Podcast Offer': 'Scaling Podcast',
+
+  '280626_Leads_ AAprogram': 'Growth Roadmap', // stale "AAprogram" naming — Brendan confirmed this is Growth Roadmap now
+
+  'Authority Agent | Leads | 24 June 2026': 'AA Playbook',
+  'HF | Authority Agent | Leads | Test': 'AA Playbook', // inferred, not explicitly confirmed — flag to Brendan
+
+  // Top-of-funnel trust-building spend ("Haynes Venus fly trap"), never
+  // folded into an offer's CPL — its own line so it doesn't distort a
+  // specific offer's cost-per-lead.
+  '240826_Views_AA Program': 'Brand/Trust',
+
+  // Anything that doesn't match a current live offer. Bucket choice itself
+  // not explicitly confirmed by Brendan — flag to him.
+  '[1] Video Set Lead Generation Campaign - Nov 2024': 'Legacy/Other',
+  'VanTage Offer | Testing Campaign': 'Legacy/Other',
+  'Pocket Creative | Lead Form | Feeling Cramped? Your Bigger HDB Dream Home is Just One Move Away!': 'Legacy/Other',
+  'Acquire Clients SAAS': 'Legacy/Other',
+  'Ai Agency offer': 'Legacy/Other',
+  'Reels To Revenue Masterclass (India)': 'Legacy/Other',
+  '10K Offer Lead Generation Campaign - 11 Oct': 'Legacy/Other',
+  'Leads campaign to message- 28/8/2023': 'Legacy/Other',
+  'Engagement campaign to message: 24/8/23': 'Legacy/Other',
+  'Traffic campaign to visit IG page : 23/8/23': 'Legacy/Other',
+  'TEST IG Message Campaign': 'Legacy/Other',
+  'Traffic to message : 23/8/23': 'Legacy/Other',
+  'IG Organic Funnel': 'Legacy/Other',
+};
+
 // Meta spend rows: Brendan's real naming convention is a 6-digit date
 // (DDMMYY) then the objective then the offer, 3 segments. Confirmed from
 // the real Meta Data tab that current campaigns use "_" as the delimiter
@@ -140,6 +193,7 @@ function getCrmOffer(r: Row): string | null {
 function parseMetaCampaignOffer(campaign: string, knownOffers: string[]): string | null {
   const c = (campaign || '').trim();
   if (!c) return null;
+  if (META_CAMPAIGN_OFFER_MAP[c]) return META_CAMPAIGN_OFFER_MAP[c];
   for (const delim of ['|', '_']) {
     if (c.includes(delim)) {
       const parts = c.split(delim).map((p) => p.trim());
