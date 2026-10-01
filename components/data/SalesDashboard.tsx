@@ -1,16 +1,26 @@
 'use client';
 
 /**
- * Ported, near-verbatim, from Brendan's standalone self-contained HTML sales
- * dashboard (Chart.js + vanilla JS). The dashboard's own visual design
- * (DM Sans/Syne/DM Mono, light theme, blue/green/red/amber status colors) is
- * intentional and pre-approved — do not restyle it to match the rest of
- * Personal OS. Everything under `.data-dash` is scoped CSS from the original
- * file with selectors prefixed so it can't leak into/collide with the rest
- * of the app (the original had a `*{margin:0;padding:0}` reset that would
- * have broken every other page if left global).
+ * Ported, near-verbatim in structure/logic, from Brendan's standalone
+ * self-contained HTML sales dashboard (Chart.js + vanilla JS). Everything
+ * under `.data-dash` is scoped CSS so it can't leak into/collide with the
+ * rest of the app (the original had a `*{margin:0;padding:0}` reset that
+ * would have broken every other page if left global).
  *
- * Two deliberate changes from the original file:
+ * Restyled 2026-10-01 to match Personal OS's real, shipped design system
+ * (the warm ink-0/ink-1/ink-2/ink-3/ink-4 palette + brand-blue accent from
+ * app/globals.css, Archivo for display/numeric type and Inter Tight for body
+ * type via the same next/font vars the rest of the app uses, the 10px
+ * radius + soft shadow card treatment used by .strategy-card/.tbl-card
+ * elsewhere). The previous "do not restyle" note on this file is outdated —
+ * Brendan asked for this page to be brought in line with the rest of the
+ * app. This was a visual-only pass: class names referenced by the JS
+ * render functions below (`.kpi`, `.metric-tile`, `.badge`, `.b-green` etc.)
+ * were left untouched since they're used as string literals in generated
+ * HTML, only the CSS declarations and color/font tokens underneath them
+ * changed. No data-fetching, attribution, or calculation logic touched.
+ *
+ * Two other deliberate changes from the original file:
  * 1. The "Connect Data Source" modal is gone. Data now comes from an
  *    internal API route, GET /api/data-sheets (see
  *    app/api/data-sheets/route.ts), which fetches the four Google Sheet
@@ -21,9 +31,7 @@
  *    owned the whole viewport (its own sidebar starts at `top:0`). Here it
  *    sits below Personal OS's persistent TopRail nav, so those offsets are
  *    pushed down by `--app-top-h`, a CSS var this component measures from
- *    the real TopRail element at runtime (see useLayoutEffect below). This
- *    is a positioning fix only — no colors, fonts, spacing, or layout
- *    proportions were changed.
+ *    the real TopRail element at runtime (see useLayoutEffect below).
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -278,10 +286,10 @@ function parseTargetsFromSheet(tj: { values?: string[][] }, s: DashState) {
 }
 
 function metricTile(name: string, val: string, target: string, status: string, barPct: number | null = null): string {
-  const bc: Record<string, string> = { green: '#15803D', red: '#B91C1C', amber: '#B45309', neutral: '#9CA3AF' };
+  const bc: Record<string, string> = { green: '#15803D', red: '#B3261E', amber: '#9A7A2E', neutral: 'rgba(17,17,17,.35)' };
   const cls = status === 'green' ? 'green' : status === 'red' ? 'red' : status === 'amber' ? 'amber' : 'neutral';
   const bar = barPct !== null
-    ? `<div class="metric-bar-wrap"><div class="metric-bar" style="width:${Math.min(barPct, 100)}%;background:${bc[status] || '#9CA3AF'}"></div></div>`
+    ? `<div class="metric-bar-wrap"><div class="metric-bar" style="width:${Math.min(barPct, 100)}%;background:${bc[status] || 'rgba(17,17,17,.35)'}"></div></div>`
     : '';
   return `<div class="metric-tile"><div class="metric-name">${name}</div><div class="metric-val ${cls}">${val}</div><div class="metric-target">${target}</div>${bar}</div>`;
 }
@@ -353,13 +361,13 @@ function renderOverview(s: DashState) {
   if (ctx) {
     s.charts.spend = new Chart(ctx, {
       type: 'bar',
-      data: { labels: dl, datasets: [{ data: dd, backgroundColor: 'rgba(37,99,235,0.8)', borderRadius: 4, hoverBackgroundColor: '#1d4ed8' }] },
+      data: { labels: dl, datasets: [{ data: dd, backgroundColor: 'rgba(2,74,221,0.82)', borderRadius: 4, hoverBackgroundColor: '#0339A8' }] },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => 'S$' + (c.raw as number).toFixed(2) } } },
         scales: {
-          x: { ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 12, color: '#9CA3AF' }, grid: { display: false }, border: { display: false } },
-          y: { ticks: { font: { size: 10, family: 'DM Mono' }, callback: (v) => 'S$' + v, color: '#9CA3AF' }, grid: { color: '#F0F1F4' }, border: { display: false } },
+          x: { ticks: { font: { size: 10, family: 'Menlo, monospace' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 12, color: 'rgba(17,17,17,.45)' }, grid: { display: false }, border: { display: false } },
+          y: { ticks: { font: { size: 10, family: 'Menlo, monospace' }, callback: (v) => 'S$' + v, color: 'rgba(17,17,17,.45)' }, grid: { color: 'rgba(17,17,17,.07)' }, border: { display: false } },
         },
       },
     });
@@ -375,9 +383,9 @@ function renderFunnel(s: DashState) {
   const unq = crm.filter((r) => STATUS.UNQUALIFIED(r)).length;
 
   const steps = [
-    { label: 'Total Leads', count: leads, pct: 100, color: '#2563EB' },
+    { label: 'Total Leads', count: leads, pct: 100, color: '#024ADD' },
     { label: 'Call Booked', count: booked, pct: leads ? booked / leads * 100 : 0, color: '#0891B2' },
-    { label: 'Conducted', count: conducted, pct: leads ? conducted / leads * 100 : 0, color: '#D97706' },
+    { label: 'Conducted', count: conducted, pct: leads ? conducted / leads * 100 : 0, color: '#9A7A2E' },
     { label: 'Closed', count: closed, pct: leads ? closed / leads * 100 : 0, color: '#15803D' },
   ];
   $('funnelViz').innerHTML = steps.map((st) => `
@@ -492,17 +500,17 @@ function renderMonthly(s: DashState) {
       data: {
         labels: months.map(monthLabel),
         datasets: [
-          { label: 'Leads', data: months.map((m) => byMonth[m].leads), backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 3 },
+          { label: 'Leads', data: months.map((m) => byMonth[m].leads), backgroundColor: 'rgba(2,74,221,0.72)', borderRadius: 3 },
           { label: 'Booked', data: months.map((m) => byMonth[m].booked), backgroundColor: 'rgba(8,145,178,0.7)', borderRadius: 3 },
           { label: 'Closed', data: months.map((m) => byMonth[m].closed), backgroundColor: 'rgba(21,128,61,0.9)', borderRadius: 3 },
         ],
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'top', labels: { font: { size: 10, family: 'DM Sans' }, boxWidth: 10, padding: 12 } } },
+        plugins: { legend: { position: 'top', labels: { font: { size: 10, family: 'Inter Tight' }, boxWidth: 10, padding: 12 } } },
         scales: {
-          x: { ticks: { font: { size: 10, family: 'DM Mono' }, color: '#9CA3AF' }, grid: { display: false }, border: { display: false } },
-          y: { ticks: { font: { size: 10, family: 'DM Mono' }, color: '#9CA3AF' }, grid: { color: '#F0F1F4' }, border: { display: false } },
+          x: { ticks: { font: { size: 10, family: 'Menlo, monospace' }, color: 'rgba(17,17,17,.45)' }, grid: { display: false }, border: { display: false } },
+          y: { ticks: { font: { size: 10, family: 'Menlo, monospace' }, color: 'rgba(17,17,17,.45)' }, grid: { color: 'rgba(17,17,17,.07)' }, border: { display: false } },
         },
       },
     });
@@ -679,16 +687,10 @@ export default function SalesDashboard() {
 
   return (
     <div className="data-dash">
-      {/* React 19 hoists <link>/<style> tags rendered anywhere in the tree
-          into <head> automatically, so this is equivalent to the original
-          file's <head> <link> for the same three Google Fonts. */}
-      {/* eslint-disable-next-line @next/next/no-page-custom-font -- App Router
-          component-level font link; this rule targets the Pages Router
-          convention and doesn't apply here. */}
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap"
-      />
+      {/* No Google Fonts <link> needed: Archivo and Inter Tight are already
+          loaded app-wide via next/font in app/layout.tsx (--font-archivo /
+          --font-inter-tight on <html>), the same two fonts the rest of
+          Personal OS uses. */}
       <style>{CSS}</style>
 
       {/* SIDEBAR */}
@@ -867,68 +869,86 @@ export default function SalesDashboard() {
 }
 
 // ── SCOPED CSS (ported from the original file, selectors prefixed with
-// `.data-dash` so the reset/typography/layout rules can't leak into the
-// rest of Personal OS). Colors, fonts, spacing, and proportions are
-// unchanged from the original. Modal-only rules were dropped since the
-// modal itself is gone; `.info-banner` (was `.modal-hint`) is kept and
-// reused for the "no data source" notice. ── */
+// `.data-dash` so the reset/layout rules can't leak into the rest of
+// Personal OS). Restyled 2026-10-01: the --bg/--surface/--border/--text/
+// --accent tokens below now point at the same ink-0/ink-1/ink-2/ink-3/
+// ink-4/brand-blue values app/globals.css defines for the rest of the app
+// (kept as separate --data-dash-scoped vars rather than reading the global
+// --ink-* custom properties directly, since those resolve to different
+// literal values depending on where in the tree they're read and this
+// dashboard's own `--surface2`/`--border2`/tint vars don't have a 1:1
+// global equivalent to alias). Fonts switched from the ported Syne/DM
+// Sans/DM Mono stack to var(--font-archivo) and var(--font-inter-tight),
+// the same next/font variables the rest of the app resolves on <html> --
+// see the removed Google Fonts <link> above. Radius/shadow (10px,
+// 0 2px 18px rgba(0,0,0,.05)) now match .strategy-card/.tbl-card-style
+// panels elsewhere in the app exactly. Modal-only rules were dropped since
+// the modal itself is gone; `.info-banner` (was `.modal-hint`) is kept and
+// reused for the "no data source" notice. Class names used by the
+// renderOverview/renderFunnel/renderCreatives/renderMonthly functions
+// above (`.kpi`, `.metric-tile`, `.badge`, `.b-green` etc.) are untouched
+// so the generated-HTML strings there keep working as-is. ── */
 const CSS = `
 .data-dash, .data-dash *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 .data-dash{
-  --bg:#F4F5F7;--surface:#fff;--surface2:#F0F1F4;
-  --border:#E5E7EB;--border2:#D1D5DB;
-  --text:#111827;--text2:#6B7280;--text3:#9CA3AF;
-  --accent:#2563EB;--accent-light:#EFF6FF;
+  --bg:#F3F1EC;--surface:#FBFAF7;--surface2:rgba(17,17,17,.045);
+  --border:rgba(17,17,17,.12);--border2:rgba(17,17,17,.18);
+  --text:#111111;--text2:rgba(17,17,17,.62);--text3:rgba(17,17,17,.45);
+  --accent:#024ADD;--accent-light:rgba(2,74,221,.08);
   --green:#15803D;--green-bg:#DCFCE7;
-  --red:#B91C1C;--red-bg:#FEE2E2;
-  --amber:#B45309;--amber-bg:#FEF3C7;
-  --purple:#7C3AED;--purple-bg:#EDE9FE;
+  --red:#B3261E;--red-bg:rgba(179,38,30,.12);
+  --amber:#9A7A2E;--amber-bg:rgba(154,122,46,.14);
   --r:10px;
-  --shadow:0 1px 2px rgba(0,0,0,.05),0 2px 8px rgba(0,0,0,.04);
+  --shadow:0 2px 18px rgba(0,0,0,.05);
   --sb:224px;--tab-h:64px;
-  min-height:100vh;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;
+  --font-display:var(--font-archivo),system-ui,sans-serif;
+  --font-body:var(--font-inter-tight),system-ui,sans-serif;
+  --font-mono:ui-monospace,Menlo,monospace;
+  min-height:100vh;font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;
 }
 
 /* LAYOUT */
 .data-dash .sidebar{width:var(--sb);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:var(--app-top-h,0px);bottom:0;left:0;z-index:200;overflow-y:auto}
 .data-dash .main{margin-left:var(--sb);min-height:100vh;display:flex;flex-direction:column;background:var(--bg)}
 .data-dash .sb-logo{padding:22px 20px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
-.data-dash .sb-brand{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--text)}
+.data-dash .sb-brand{font-family:var(--font-display);font-size:15px;font-weight:800;color:var(--text)}
 .data-dash .sb-brand span{color:var(--accent)}
-.data-dash .sb-sub{font-size:10px;color:var(--text3);margin-top:2px;font-family:'DM Mono',monospace;letter-spacing:.04em}
+.data-dash .sb-sub{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--font-mono);letter-spacing:.04em}
 
 .data-dash .offer-toggle{margin:14px 16px 0}
 .data-dash .offer-select-label{display:block;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
-.data-dash .offer-select{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;padding:8px 10px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;color:var(--accent);outline:none;cursor:pointer}
+.data-dash .offer-select{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;padding:8px 10px;font-size:12px;font-weight:700;font-family:var(--font-body);color:var(--accent);outline:none;cursor:pointer}
+.data-dash .offer-select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .data-dash .sb-nav{flex:1;padding:14px 12px}
 .data-dash .sb-sec{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:0 8px;margin:16px 0 6px}
 .data-dash .sb-sec:first-child{margin-top:0}
-.data-dash .nav-item{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border-radius:7px;border:none;background:none;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;text-align:left;transition:all .12s}
+.data-dash .nav-item{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border-radius:7px;border:none;background:none;color:var(--text2);font-family:var(--font-body);font-size:13px;font-weight:500;cursor:pointer;text-align:left;transition:all .12s}
 .data-dash .nav-item svg{width:15px;height:15px;flex-shrink:0}
 .data-dash .nav-item:hover{background:var(--surface2);color:var(--text)}
 .data-dash .nav-item.active{background:var(--accent-light);color:var(--accent);font-weight:600}
+.data-dash .nav-item:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .data-dash .sb-footer{padding:14px 16px;border-top:1px solid var(--border);flex-shrink:0}
-.data-dash .sb-status{font-size:11px;font-family:'DM Mono',monospace;color:var(--text3);display:flex;align-items:center;gap:6px}
+.data-dash .sb-status{font-size:11px;font-family:var(--font-mono);color:var(--text3);display:flex;align-items:center;gap:6px}
 .data-dash .sb-status .dot{width:6px;height:6px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
 .data-dash .sb-status.ok .dot{background:var(--green)}.data-dash .sb-status.ok{color:var(--green)}
 .data-dash .sb-status.err .dot{background:var(--red)}
 
 /* INFO BANNER (was .modal-hint) */
 .data-dash .info-banner{font-size:11px;color:var(--text3);line-height:1.5;background:var(--surface2);border-radius:8px;padding:10px 12px}
-.data-dash .info-banner code{font-family:'DM Mono',monospace;color:var(--text2)}
+.data-dash .info-banner code{font-family:var(--font-mono);color:var(--text2)}
 
 /* TOPBAR */
 .data-dash .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:var(--app-top-h,0px);z-index:100}
-.data-dash .page-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:var(--text);flex:1}
-.data-dash .offer-pill-top{display:none;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--accent-light);color:var(--accent);font-family:'DM Mono',monospace;letter-spacing:.04em}
+.data-dash .page-title{font-family:var(--font-display);font-size:17px;font-weight:800;letter-spacing:-.01em;color:var(--text);flex:1}
+.data-dash .offer-pill-top{display:none;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--accent-light);color:var(--accent);font-family:var(--font-mono);letter-spacing:.04em}
 .data-dash .topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .data-dash .date-pill{display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;overflow:hidden}
 .data-dash .date-seg{display:flex;align-items:center;gap:5px;padding:7px 10px;border-right:1px solid var(--border2)}
 .data-dash .date-seg:last-child{border-right:none}
 .data-dash .date-seg label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase}
-.data-dash .date-seg input[type=date]{background:none;border:none;font-size:12px;font-family:'DM Mono',monospace;color:var(--text);outline:none;cursor:pointer;padding:0;max-width:120px}
-.data-dash .record-count{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+.data-dash .date-seg input[type=date]{background:none;border:none;font-size:12px;font-family:var(--font-mono);color:var(--text);outline:none;cursor:pointer;padding:0;max-width:120px}
+.data-dash .record-count{font-size:11px;color:var(--text3);font-family:var(--font-mono)}
 
 /* CONTENT */
 .data-dash .content{padding:20px 24px 100px;flex:1}
@@ -944,16 +964,16 @@ const CSS = `
 .data-dash .kpi-grid.cols-5{grid-template-columns:repeat(5,1fr)}
 .data-dash .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow)}
 .data-dash .kpi-label{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px}
-.data-dash .kpi-val{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;color:var(--text);letter-spacing:-.02em;line-height:1}
+.data-dash .kpi-val{font-family:var(--font-display);font-size:24px;font-weight:800;color:var(--text);letter-spacing:-.02em;line-height:1}
 .data-dash .kpi-val.green{color:var(--green)}.data-dash .kpi-val.red{color:var(--red)}.data-dash .kpi-val.amber{color:var(--amber)}
 
 /* METRIC TILES */
 .data-dash .metric-grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
 .data-dash .metric-tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow)}
 .data-dash .metric-name{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
-.data-dash .metric-val{font-family:'Syne',sans-serif;font-size:21px;font-weight:700;line-height:1.1;letter-spacing:-.02em}
+.data-dash .metric-val{font-family:var(--font-display);font-size:21px;font-weight:800;line-height:1.1;letter-spacing:-.02em}
 .data-dash .metric-val.green{color:var(--green)}.data-dash .metric-val.red{color:var(--red)}.data-dash .metric-val.amber{color:var(--amber)}.data-dash .metric-val.neutral{color:var(--text)}
-.data-dash .metric-target{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:3px}
+.data-dash .metric-target{font-size:10px;color:var(--text3);font-family:var(--font-mono);margin-top:3px}
 .data-dash .metric-bar-wrap{height:3px;background:var(--surface2);border-radius:2px;margin-top:7px;overflow:hidden}
 .data-dash .metric-bar{height:100%;border-radius:2px}
 
@@ -961,7 +981,7 @@ const CSS = `
 .data-dash .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
 .data-dash .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .data-dash .chart-title{font-size:13px;font-weight:600;color:var(--text)}
-.data-dash .chart-badge{font-size:13px;font-weight:700;font-family:'DM Mono',monospace;color:var(--accent)}
+.data-dash .chart-badge{font-size:13px;font-weight:700;font-family:var(--font-mono);color:var(--accent)}
 .data-dash .chart-inner{position:relative;height:160px}
 
 /* FUNNEL */
@@ -972,25 +992,25 @@ const CSS = `
 .data-dash .f-track{flex:1;height:30px;background:var(--surface2);border-radius:6px;overflow:hidden}
 .data-dash .f-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 10px;font-size:10px;font-weight:700;color:#fff;transition:width .5s cubic-bezier(.4,0,.2,1)}
 .data-dash .f-stats{width:80px;flex-shrink:0;display:flex;align-items:center;gap:6px}
-.data-dash .f-count{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);width:28px}
-.data-dash .f-pct{font-size:10px;font-family:'DM Mono',monospace;color:var(--text3)}
+.data-dash .f-count{font-family:var(--font-display);font-size:15px;font-weight:800;color:var(--text);width:28px}
+.data-dash .f-pct{font-size:10px;font-family:var(--font-mono);color:var(--text3)}
 
 /* TABLES */
 .data-dash .tbl-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
 .data-dash .tbl-toolbar{padding:12px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .data-dash .tbl-title{font-size:13px;font-weight:600;color:var(--text);flex:1}
-.data-dash .tbl-toolbar select{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:12px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;cursor:pointer}
-.data-dash .pill{background:var(--surface2);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text2);font-weight:600;font-family:'DM Mono',monospace}
+.data-dash .tbl-toolbar select{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:12px;font-family:var(--font-body);color:var(--text);outline:none;cursor:pointer}
+.data-dash .pill{background:var(--surface2);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text2);font-weight:600;font-family:var(--font-mono)}
 .data-dash .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .data-dash table{width:100%;border-collapse:collapse;min-width:600px}
 .data-dash thead th{padding:9px 12px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--surface2);border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
 .data-dash tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
 .data-dash tbody tr:last-child{border-bottom:none}
-.data-dash tbody tr:hover{background:#FAFBFF}
+.data-dash tbody tr:hover{background:var(--accent-light)}
 .data-dash tbody td{padding:10px 12px;font-size:12px;color:var(--text)}
 .data-dash td.name-col{font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.data-dash td.mono{font-family:'DM Mono',monospace;font-size:12px}
-.data-dash .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;font-family:'DM Mono',monospace}
+.data-dash td.mono{font-family:var(--font-mono);font-size:12px}
+.data-dash .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--font-mono)}
 .data-dash .b-green{background:var(--green-bg);color:var(--green)}
 .data-dash .b-amber{background:var(--amber-bg);color:var(--amber)}
 .data-dash .b-red{background:var(--red-bg);color:var(--red)}
@@ -1000,9 +1020,10 @@ const CSS = `
 /* MOBILE TAB BAR */
 .data-dash .tab-bar{display:none;position:fixed;bottom:0;left:0;right:0;height:var(--tab-h);background:var(--surface);border-top:1px solid var(--border);z-index:300;padding-bottom:env(safe-area-inset-bottom)}
 .data-dash .tab-bar-inner{display:flex;height:100%;align-items:stretch}
-.data-dash .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:none;cursor:pointer;padding:8px 4px;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500}
+.data-dash .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:none;cursor:pointer;padding:8px 4px;color:var(--text3);font-family:var(--font-body);font-size:10px;font-weight:500}
 .data-dash .tab-item svg{width:20px;height:20px}
 .data-dash .tab-item.active{color:var(--accent)}
+.data-dash .nav-item:focus-visible,.data-dash .tab-item:focus-visible,.data-dash .tbl-toolbar select:focus-visible,.data-dash .date-seg input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 @media(max-width:768px){
   .data-dash .sidebar{display:none}
