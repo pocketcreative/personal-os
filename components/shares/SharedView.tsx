@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { loadStoredImages } from '@/lib/boardImagesClient';
 import { downloadTextFile } from '@/lib/downloadText';
 import MarkdownContent from '@/components/skills/MarkdownContent';
-import { CONTENT_ITEM_TYPES, CONTENT_ITEM_TYPE_LABELS, STAGE_OPTIONS, STATUS_OPTIONS, type ContentItemType } from '@/lib/types';
 import type { SharedCmsItem } from '@/lib/shares';
 
 const ExcalidrawViewer = dynamic(() => import('@/components/boards/ExcalidrawViewer'), {
@@ -142,7 +141,13 @@ export default function SharedView({ token }: { token: string }) {
   }
 
   if (item.type === 'cms') {
-    return <SharedCms items={item.items} token={token} />;
+    // The real entry point for a 'cms' share is /share/[token]/lf (the
+    // server-side redirect in app/share/[token]/page.tsx) -- this only
+    // renders if that redirect didn't happen for some reason, so it does
+    // the same thing client side rather than falling through to the
+    // Excalidraw board view below, which this item shape doesn't have.
+    if (typeof window !== 'undefined') window.location.replace(`/share/${token}/lf`);
+    return <Centered><div style={muted}>Redirecting&hellip;</div></Centered>;
   }
 
   return (
@@ -162,162 +167,6 @@ export default function SharedView({ token }: { token: string }) {
     </div>
   );
 }
-
-// Editable view of the whole CMS: every content item grouped by type, in the
-// same LF/LTS/SF/Ads/VSL groupings as the app's own board tabs, name and
-// stage/status/post date always visible, full content + Stage/Status editing
-// on tap. Whoever has this password-verified link can save real changes
-// (PATCH /api/share/[token]/content-items/[id]) -- there is no per-editor
-// identity behind it, just the shared link+password.
-function SharedCms({ items: initialItems, token }: { items: SharedCmsItem[]; token: string }) {
-  const [items, setItems] = useState(initialItems);
-  const [openId, setOpenId] = useState<string | null>(null);
-  return (
-    <div style={{ width: '96%', maxWidth: 900, margin: '0 auto', padding: 'clamp(24px, 6vw, 56px) 0' }}>
-      <h1 style={{ font: "800 22px 'Archivo', sans-serif", color: '#111', letterSpacing: '-0.02em', margin: '0 0 4px' }}>
-        Content Management System
-      </h1>
-      <div style={{ ...muted, marginBottom: 24 }}>Anyone with this link can view and edit.</div>
-      {CONTENT_ITEM_TYPES.map((type) => {
-        const typeItems = items.filter((i) => i.type === type);
-        if (typeItems.length === 0) return null;
-        return (
-          <div key={type} style={{ marginBottom: 28 }}>
-            <div style={{
-              font: "700 12px 'Inter Tight', sans-serif", letterSpacing: '.04em', textTransform: 'uppercase',
-              color: 'rgba(17,17,17,.45)', marginBottom: 10,
-            }}>
-              {CONTENT_ITEM_TYPE_LABELS[type]}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {typeItems.map((it) => (
-                <SharedCmsCard
-                  key={it.id}
-                  item={it}
-                  open={openId === it.id}
-                  onToggle={() => setOpenId((cur) => (cur === it.id ? null : it.id))}
-                  onSaved={(patch) => setItems((cur) => cur.map((row) => (row.id === it.id ? { ...row, ...patch } : row)))}
-                  token={token}
-                />
-              ))}
-            </div>
-          </div>
-        );
-      })}
-      {items.length === 0 && <div style={muted}>Nothing here yet.</div>}
-    </div>
-  );
-}
-
-function SharedCmsCard({ item, open, onToggle, onSaved, token }: {
-  item: SharedCmsItem;
-  open: boolean;
-  onToggle: () => void;
-  onSaved: (patch: Partial<SharedCmsItem>) => void;
-  token: string;
-}) {
-  const [bodyDraft, setBodyDraft] = useState(item.body_md);
-  const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  useEffect(() => { setBodyDraft(item.body_md); }, [item.body_md]);
-
-  async function save(patch: Partial<Pick<SharedCmsItem, 'body_md' | 'stage' | 'status'>>) {
-    setSaving(true);
-    setSaveMsg(null);
-    try {
-      const res = await fetch(`/api/share/${encodeURIComponent(token)}/content-items/${item.id}`, {
-        method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch),
-      });
-      if (!res.ok) { setSaveMsg('Save failed, try again.'); return; }
-      onSaved(patch);
-      setSaveMsg('Saved.');
-      setTimeout(() => setSaveMsg(null), 1500);
-    } catch {
-      setSaveMsg('Save failed, try again.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={{ background: '#fbfaf7', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10, padding: '12px 16px' }}>
-      <div
-        onClick={onToggle}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer' }}
-      >
-        <div style={{ font: "600 14px 'Inter Tight', sans-serif", color: '#111' }}>{item.name}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <span style={{
-            font: "600 10.5px 'Inter Tight', sans-serif", color: '#024ADD', background: 'rgba(2,74,221,.08)',
-            padding: '2px 9px', borderRadius: 20, whiteSpace: 'nowrap',
-          }}>{item.stage}</span>
-          {item.post_date && (
-            <span style={{ font: "500 11.5px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', whiteSpace: 'nowrap' }}>
-              {new Date(`${item.post_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </span>
-          )}
-        </div>
-      </div>
-      {open && (
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(17,17,17,.08)' }}>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-            <label style={{ flex: '1 1 140px' }}>
-              <span style={fieldLabel}>Stage</span>
-              <select
-                value={item.stage}
-                onChange={(e) => save({ stage: e.target.value })}
-                style={sharedFieldStyle}
-              >
-                {STAGE_OPTIONS[item.type as ContentItemType].map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </label>
-            <label style={{ flex: '1 1 140px' }}>
-              <span style={fieldLabel}>Status</span>
-              <select
-                value={item.status ?? ''}
-                onChange={(e) => save({ status: e.target.value })}
-                style={sharedFieldStyle}
-              >
-                {STATUS_OPTIONS[item.type as ContentItemType].map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </label>
-          </div>
-          <span style={fieldLabel}>Content</span>
-          <textarea
-            value={bodyDraft}
-            onChange={(e) => setBodyDraft(e.target.value)}
-            onBlur={() => { if (bodyDraft !== item.body_md) save({ body_md: bodyDraft }); }}
-            rows={12}
-            style={{ ...sharedFieldStyle, resize: 'vertical', fontFamily: "'Inter Tight', sans-serif", lineHeight: 1.6 }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-            {saving && <span style={muted}>Saving…</span>}
-            {saveMsg && <span style={{ font: "500 12px 'Inter Tight', sans-serif", color: saveMsg === 'Saved.' ? '#3a9d5d' : '#b3261e' }}>{saveMsg}</span>}
-          </div>
-          {!bodyDraft.trim() && (
-            <div style={{ ...muted, marginTop: 8 }}>Preview:</div>
-          )}
-          {bodyDraft.trim() && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px dashed rgba(17,17,17,.1)' }}>
-              <div style={{ ...fieldLabel, marginBottom: 8, display: 'block' }}>Preview</div>
-              <MarkdownContent content={bodyDraft} breaks />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const fieldLabel: React.CSSProperties = {
-  font: "700 10.5px 'Archivo', sans-serif", color: 'rgba(17,17,17,.5)',
-  letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6, display: 'block',
-};
-const sharedFieldStyle: React.CSSProperties = {
-  width: '100%', padding: '9px 12px', border: '1px solid rgba(17,17,17,.1)',
-  borderRadius: 6, background: '#fff', boxSizing: 'border-box',
-  fontFamily: "'Inter Tight', sans-serif", fontSize: 14, color: '#111', outline: 'none',
-};
 
 function Centered({ children }: { children: React.ReactNode }) {
   return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>{children}</div>;

@@ -6,7 +6,7 @@ import {
 } from '@/lib/shares';
 import { findActiveShare } from '@/lib/shareLookup';
 import { checkShareRate, recordShareFailure, tooManyRequests } from '@/lib/shareRateLimit';
-import type { ContentItem } from '@/lib/types';
+import type { ContentIdea, ContentItem } from '@/lib/types';
 
 // PUBLIC route (no login, see middleware.ts). Returns only the one shared
 // item's minimal data. Unknown, revoked, expired and malformed tokens all get
@@ -47,9 +47,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     return NextResponse.json(toSharedSkill(data), { headers: PUBLIC_HEADERS });
   }
   if (share.resource_type === 'cms') {
-    const { data, error } = await db.from('content_items').select('*').eq('user_id', USER_ID);
+    const [{ data, error }, { data: ideas, error: ideasError }] = await Promise.all([
+      db.from('content_items').select('*').eq('user_id', USER_ID),
+      db.from('content_ideas').select('*').eq('user_id', USER_ID),
+    ]);
     if (error) return notFound();
-    return NextResponse.json(toSharedCms((data ?? []) as ContentItem[]), { headers: PUBLIC_HEADERS });
+    return NextResponse.json(
+      toSharedCms((data ?? []) as ContentItem[], ideasError ? [] : (ideas ?? []) as ContentIdea[]),
+      { headers: PUBLIC_HEADERS },
+    );
   }
   const { data } = await db.from('boards').select('title,scene').eq('id', share.resource_id).maybeSingle();
   if (!data) return notFound();

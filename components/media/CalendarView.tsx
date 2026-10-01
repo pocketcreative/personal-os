@@ -6,6 +6,7 @@ import {
 } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { useContentItems } from '@/lib/useContentItems';
+import { useShareContext } from '@/lib/shareContext';
 import {
   CONFLICT_WINDOW_MINUTES, CONTENT_ITEM_TYPE_LABELS, itemScheduledTime, timeToMinutes, type ContentItem,
 } from '@/lib/types';
@@ -37,19 +38,26 @@ function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function DraggableItemPill({ item, conflict }: { item: ContentItem; conflict: boolean }) {
+// Read only on the public /share/[token] CMS view (no drag, no click
+// through) -- see CalendarView's own note on why: rescheduling a post date
+// has no share-scoped route (it's the one field that can trigger a live
+// Zernio reschedule), and editing an item is already fully available from
+// the Board/Table views above, so the calendar stays a plain read-only
+// schedule there rather than growing a second edit surface for the same
+// data.
+function DraggableItemPill({ item, conflict, readOnly }: { item: ContentItem; conflict: boolean; readOnly: boolean }) {
   const router = useRouter();
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: readOnly });
   const time = itemScheduledTime(item);
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
+      {...(readOnly ? {} : listeners)}
+      {...(readOnly ? {} : attributes)}
       title={conflict ? 'Same (or near-same) time as another item this day' : undefined}
-      onClick={() => router.push(`/media/item/${item.id}`)}
+      onClick={readOnly ? undefined : () => router.push(`/media/item/${item.id}`)}
       style={{
-        opacity: isDragging ? 0.3 : 1, cursor: isDragging ? 'grabbing' : 'grab',
+        opacity: isDragging ? 0.3 : 1, cursor: readOnly ? 'default' : isDragging ? 'grabbing' : 'grab',
         padding: '3px 7px', borderRadius: 6,
         background: conflict ? 'rgba(179,38,30,.08)' : 'rgba(2,74,221,.08)',
         border: conflict ? '1px solid rgba(179,38,30,.35)' : '1px solid rgba(2,74,221,.15)',
@@ -96,6 +104,7 @@ function DroppableDay({ date, inMonth, children }: { date: string; inMonth: bool
 
 export default function CalendarView() {
   const { items, loading, updateItem } = useContentItems();
+  const share = useShareContext();
   const [cursor, setCursor] = useState(() => new Date());
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -126,6 +135,7 @@ export default function CalendarView() {
   const undated = items.filter((it) => !it.post_date);
 
   async function handleDragEnd(event: DragEndEvent) {
+    if (share) return;
     const date = event.over?.id as string | undefined;
     if (!date) return;
     const item = items.find((i) => i.id === event.active.id);
@@ -168,7 +178,7 @@ export default function CalendarView() {
                   const flagged = conflictingIds(dayItems);
                   return (
                     <DroppableDay key={key} date={key} inMonth={inMonth}>
-                      {dayItems.map((it) => <DraggableItemPill key={it.id} item={it} conflict={flagged.has(it.id)} />)}
+                      {dayItems.map((it) => <DraggableItemPill key={it.id} item={it} conflict={flagged.has(it.id)} readOnly={!!share} />)}
                     </DroppableDay>
                   );
                 })}
@@ -188,8 +198,8 @@ export default function CalendarView() {
                   const time = itemScheduledTime(it);
                   const conflict = conflictingIds(byDate.get(it.post_date!) ?? []).has(it.id);
                   return (
-                    <div key={it.id} onClick={() => window.location.assign(`/media/item/${it.id}`)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px', borderBottom: '1px solid rgba(17,17,17,.06)', cursor: 'pointer' }}>
+                    <div key={it.id} onClick={share ? undefined : () => window.location.assign(`/media/item/${it.id}`)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px', borderBottom: '1px solid rgba(17,17,17,.06)', cursor: share ? 'default' : 'pointer' }}>
                       <div style={{ width: 52 }}>
                         <div style={{ font: "700 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)' }}>
                           {new Date(`${it.post_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -221,7 +231,7 @@ export default function CalendarView() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {undated.map((it) => (
-                    <div key={it.id} style={{ minWidth: 160 }}><DraggableItemPill item={it} conflict={false} /></div>
+                    <div key={it.id} style={{ minWidth: 160 }}><DraggableItemPill item={it} conflict={false} readOnly={!!share} /></div>
                   ))}
                 </div>
               </div>

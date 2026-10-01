@@ -7,6 +7,7 @@ import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useContentItems } from '@/lib/useContentItems';
+import { useShareContext } from '@/lib/shareContext';
 import { useRouter } from 'next/navigation';
 import CalendarView from './CalendarView';
 import ContentItemCard from './ContentItemCard';
@@ -32,7 +33,10 @@ function useBoardSensors() {
 // sortable within its own column's SortableContext (the new behavior):
 // @dnd-kit/sortable's useSortable wraps useDraggable + useDroppable in one
 // hook, so this replaces the old plain useDraggable card.
-function SortableCard({ item }: { item: ContentItem }) {
+function SortableCard({ item, onUpdate }: {
+  item: ContentItem;
+  onUpdate: (id: string, patch: Partial<ContentItem>) => void;
+}) {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id: item.id });
@@ -45,7 +49,7 @@ function SortableCard({ item }: { item: ContentItem }) {
   };
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
-      <ContentItemCard item={item} />
+      <ContentItemCard item={item} onUpdate={onUpdate} />
     </div>
   );
 }
@@ -70,6 +74,7 @@ type BoardView = 'board' | 'table';
 
 export default function ContentBoard({ type }: { type: ContentItemType }) {
   const { items, loading, addItem, updateItem } = useContentItems(type);
+  const share = useShareContext();
   const sensors = useBoardSensors();
   const [draggingItem, setDraggingItem] = useState<ContentItem | null>(null);
   const [draft, setDraft] = useState('');
@@ -185,27 +190,32 @@ export default function ContentBoard({ type }: { type: ContentItemType }) {
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }}
-              placeholder={`New ${CONTENT_ITEM_TYPE_LABELS[type]} item…`}
-              style={{
-                flex: 1, padding: '10px 14px', border: '1px solid rgba(17,17,17,.12)', borderRadius: 8,
-                background: '#fff', fontFamily: "'Inter Tight', sans-serif", fontSize: 14, outline: 'none',
-              }}
-            />
-            <button
-              onClick={submitAdd}
-              disabled={adding || !draft.trim()}
-              style={{
-                font: "600 13px 'Inter Tight', sans-serif", color: '#fff', background: '#024ADD',
-                border: 'none', borderRadius: 8, padding: '10px 20px', cursor: adding ? 'default' : 'pointer',
-                opacity: adding || !draft.trim() ? 0.5 : 1,
-              }}
-            >Add</button>
-          </div>
+          {/* Adding a new item has no share-scoped route (a public link only
+              edits what's already there) -- hidden rather than shown and
+              silently failing. */}
+          {!share && (
+            <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }}
+                placeholder={`New ${CONTENT_ITEM_TYPE_LABELS[type]} item…`}
+                style={{
+                  flex: 1, padding: '10px 14px', border: '1px solid rgba(17,17,17,.12)', borderRadius: 8,
+                  background: '#fff', fontFamily: "'Inter Tight', sans-serif", fontSize: 14, outline: 'none',
+                }}
+              />
+              <button
+                onClick={submitAdd}
+                disabled={adding || !draft.trim()}
+                style={{
+                  font: "600 13px 'Inter Tight', sans-serif", color: '#fff', background: '#024ADD',
+                  border: 'none', borderRadius: 8, padding: '10px 20px', cursor: adding ? 'default' : 'pointer',
+                  opacity: adding || !draft.trim() ? 0.5 : 1,
+                }}
+              >Add</button>
+            </div>
+          )}
 
           {loading ? (
             <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', padding: '20px 0' }}>Loading…</div>
@@ -213,7 +223,7 @@ export default function ContentBoard({ type }: { type: ContentItemType }) {
             <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', padding: '20px 0' }}>No matches</div>
           ) : view === 'table' ? (
             <div style={{ paddingBottom: 20 }}>
-              <ContentTable items={visibleItems} />
+              <ContentTable items={visibleItems} onUpdate={updateItem} />
             </div>
           ) : (
             <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDraggingItem(null)}>
@@ -236,7 +246,7 @@ export default function ContentBoard({ type }: { type: ContentItemType }) {
                         </div>
                       )}
                       <SortableContext items={stageItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-                        {stageItems.map((item) => <SortableCard key={item.id} item={item} />)}
+                        {stageItems.map((item) => <SortableCard key={item.id} item={item} onUpdate={updateItem} />)}
                       </SortableContext>
                     </DroppableColumn>
                   );
@@ -245,7 +255,7 @@ export default function ContentBoard({ type }: { type: ContentItemType }) {
               <DragOverlay>
                 {draggingItem && (
                   <div style={{ width: COLUMN_MIN_WIDTH - 24, boxShadow: '0 14px 30px rgba(0,0,0,.2)', borderRadius: 10, transform: 'rotate(1.5deg)', cursor: 'grabbing' }}>
-                    <ContentItemCard item={draggingItem} />
+                    <ContentItemCard item={draggingItem} onUpdate={updateItem} />
                   </div>
                 )}
               </DragOverlay>
@@ -262,12 +272,14 @@ export default function ContentBoard({ type }: { type: ContentItemType }) {
           <CalendarView />
         </div>
 
-        <div style={{ padding: '4px clamp(14px, 3vw, 44px) 24px' }}>
-          <a href={NOTION_CMS_URL} target="_blank" rel="noopener noreferrer"
-            style={{ font: "500 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', textDecoration: 'underline' }}>
-            Old Notion CMS (read-only reference during the move) ↗
-          </a>
-        </div>
+        {!share && (
+          <div style={{ padding: '4px clamp(14px, 3vw, 44px) 24px' }}>
+            <a href={NOTION_CMS_URL} target="_blank" rel="noopener noreferrer"
+              style={{ font: "500 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', textDecoration: 'underline' }}>
+              Old Notion CMS (read-only reference during the move) ↗
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

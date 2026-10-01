@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createShare, fetchShares, setShareRevoked } from '@/lib/useShares';
 import type { ShareResource, ShareWithStatus } from '@/lib/shares';
 
@@ -31,12 +31,27 @@ export default function ShareControl({ type, id, align = 'left' }: { type: Share
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  // Panel uses position:fixed with coordinates computed from the real button
+  // position each time it opens, clamped to the viewport. An absolute panel
+  // anchored purely by `[align]: 0` on the button's own relative wrapper ran
+  // off the left edge on mobile, where the button doesn't sit at the true
+  // right edge of the screen the way it does on a wide desktop header.
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
 
   // A missing table comes back from the API as the friendly "one database step" message.
   const fail = (e: unknown) => setError((e as Error).message);
 
   const toggle = async () => {
     const next = !open;
+    if (next && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const panelWidth = Math.min(380, window.innerWidth - 24);
+      const margin = 12;
+      const idealLeft = align === 'right' ? rect.right - panelWidth : rect.left;
+      const left = Math.min(Math.max(idealLeft, margin), window.innerWidth - panelWidth - margin);
+      setPanelPos({ top: rect.bottom + 6, left });
+    }
     setOpen(next);
     if (!next) return;
     setError(null);
@@ -74,10 +89,10 @@ export default function ShareControl({ type, id, align = 'left' }: { type: Share
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button onClick={toggle} className="share-trigger" style={btn}>Share</button>
+      <button ref={btnRef} onClick={toggle} className="share-trigger" style={btn}>Share</button>
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', [align]: 0, zIndex: 60, width: 'min(380px, calc(100vw - 48px))',
+          position: 'fixed', top: panelPos.top, left: panelPos.left, zIndex: 60, width: 'min(380px, calc(100vw - 24px))',
           boxSizing: 'border-box', background: '#fff', border: '1px solid rgba(17,17,17,.15)', borderRadius: 10,
           boxShadow: '0 8px 30px rgba(0,0,0,.12)', padding: 16, textAlign: 'left',
         }}>

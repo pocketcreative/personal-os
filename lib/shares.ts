@@ -4,7 +4,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { filterForAudience } from '@/lib/sopMarkdown';
 import { parseScene } from '@/lib/boardScene';
 import { stripFrontmatter } from '@/lib/skillFile';
-import type { ContentItem } from '@/lib/types';
+import type { ContentIdea, ContentItem } from '@/lib/types';
 
 // 'cms' shares the whole Content Management System (every content_items row
 // across lf/lts/sf/ad/vsl), not one row in one table -- see toSharedCms and
@@ -153,6 +153,10 @@ export function toSharedSkill(skill: { slug: string; version: string; version_da
 // What a link holder gets for a 'cms' share: every content_items row across
 // all 5 types, read-only fields only -- no user_id, no zernio_post_ids (an
 // internal scheduling detail, not something an external viewer needs).
+// post_time and sort_order added so the shared page can reuse the real
+// board/calendar components unmodified (they read these to show a post's
+// time and keep board-column order) -- neither reveals anything Brendan
+// didn't already choose to put on the card itself.
 export interface SharedCmsItem {
   id: string;
   type: ContentItem['type'];
@@ -160,6 +164,8 @@ export interface SharedCmsItem {
   stage: string;
   status: string | null;
   post_date: string | null;
+  post_time: string | null;
+  sort_order: number | null;
   body_md: string;
   platforms: string[];
   caption: string | null;
@@ -169,7 +175,17 @@ export interface SharedCmsItem {
   asset_link: string | null;
 }
 
-export function toSharedCms(items: ContentItem[]) {
+// The 'cms' share's Ideas tab: content_ideas rows, same read/limited-edit
+// treatment as content_items (idea/notes/used are the editable fields --
+// see app/api/share/[token]/content-ideas/[id]/route.ts).
+export interface SharedIdea {
+  id: string;
+  idea: string;
+  notes: string | null;
+  used: boolean;
+}
+
+export function toSharedCms(items: ContentItem[], ideas: ContentIdea[] = []) {
   return {
     type: 'cms' as const,
     title: 'Content Management System',
@@ -180,6 +196,8 @@ export function toSharedCms(items: ContentItem[]) {
       stage: i.stage,
       status: i.status,
       post_date: i.post_date,
+      post_time: i.post_time,
+      sort_order: i.sort_order,
       body_md: i.body_md,
       platforms: i.platforms,
       caption: i.caption,
@@ -188,5 +206,6 @@ export function toSharedCms(items: ContentItem[]) {
       reference_video: i.reference_video,
       asset_link: i.asset_link,
     })),
+    ideas: ideas.map((i): SharedIdea => ({ id: i.id, idea: i.idea, notes: i.notes, used: i.used })),
   };
 }

@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import ShareControl from '@/components/shares/ShareControl';
+import { useShareContext } from '@/lib/shareContext';
 
 // Matches /tasks' header styling exactly (Archivo 800 title, #fbfaf7 panel,
 // same pill-tab treatment as ContentDetailModal's Details/Comments switcher)
@@ -11,16 +12,23 @@ import ShareControl from '@/components/shares/ShareControl';
 // section every board tab renders below its own board, see ContentBoard.tsx.
 export type MediaTab = 'lf' | 'lts' | 'sf' | 'ad' | 'vsl' | 'ideas';
 
-const TABS: { id: MediaTab; label: string; href: string }[] = [
-  { id: 'lf', label: 'LF', href: '/media/lf' },
-  { id: 'lts', label: 'LTS', href: '/media/lts' },
-  { id: 'sf', label: 'SF', href: '/media/sf' },
-  { id: 'ad', label: 'Ads', href: '/media/ad' },
-  { id: 'vsl', label: 'VSL', href: '/media/vsl' },
-  { id: 'ideas', label: 'Ideas', href: '/media/ideas' },
+const TABS: { id: MediaTab; label: string }[] = [
+  { id: 'lf', label: 'LF' },
+  { id: 'lts', label: 'LTS' },
+  { id: 'sf', label: 'SF' },
+  { id: 'ad', label: 'Ads' },
+  { id: 'vsl', label: 'VSL' },
+  { id: 'ideas', label: 'Ideas' },
 ];
 
+// Same bar the internal /media/* pages use, now also reused as-is on the
+// public /share/[token]/* CMS view (see lib/shareContext.tsx) -- a share
+// viewer gets the same LF/LTS/SF/Ads/VSL/Ideas tabs, pointed at
+// /share/[token]/<tab> instead of /media/<tab>, with no Share button (a
+// public link holder must never be able to mint another share link).
 export default function MediaTabBar({ active }: { active: MediaTab }) {
+  const share = useShareContext();
+  const basePath = share ? `/share/${share.token}` : '/media';
   return (
     <div style={{ padding: 'clamp(16px, 4vw, 40px) clamp(14px, 3vw, 44px) 8px' }}>
       <div className="board-header" style={{ marginBottom: 20 }}>
@@ -33,15 +41,16 @@ export default function MediaTabBar({ active }: { active: MediaTab }) {
             {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
           </div>
           {/* Shares the whole CMS (every type, not just this tab) -- there's
-              no single row "the whole CMS" points at, so `id` is omitted. */}
-          <ShareControl type="cms" align="right" />
+              no single row "the whole CMS" points at, so `id` is omitted.
+              Not shown on the shared view itself. */}
+          {!share && <ShareControl type="cms" align="right" />}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
         {TABS.map((t) => (
           <Link
             key={t.id}
-            href={t.href}
+            href={`${basePath}/${t.id}`}
             style={{
               font: "700 12px 'Inter Tight', sans-serif", letterSpacing: '.02em',
               color: active === t.id ? '#fff' : '#111',

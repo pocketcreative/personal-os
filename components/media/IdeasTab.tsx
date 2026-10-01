@@ -1,13 +1,20 @@
 'use client';
 import { useState } from 'react';
 import { useContentIdeas } from '@/lib/useContentIdeas';
+import { useShareContext } from '@/lib/shareContext';
 
 // Mirrors Notion's real "Content Ideas" schema exactly (Idea / Notes / Used --
 // confirmed via live fetch, decision 4) as a simple inline-editable table,
 // simpler than forcing an idea through the 5-type content_items shape, which
 // has no meaningful Stage/Status/Post Date for a loose topic idea.
+//
+// Reused as-is on the public /share/[token] CMS view: editing an idea's text/
+// notes/used still works there (share-scoped PATCH, see
+// app/api/share/[token]/content-ideas/[id]), only adding and deleting are
+// hidden since no share-scoped route creates or removes one.
 export default function IdeasTab() {
   const { ideas, loading, addIdea, updateIdea, deleteIdea } = useContentIdeas();
+  const share = useShareContext();
   const [draft, setDraft] = useState('');
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
@@ -41,19 +48,21 @@ export default function IdeasTab() {
         />
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
-        <input
-          value={draft} onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
-          placeholder="New idea…"
-          style={{ flex: 1, padding: '10px 14px', border: '1px solid rgba(17,17,17,.12)', borderRadius: 8, background: '#fff', fontFamily: "'Inter Tight', sans-serif", fontSize: 14, outline: 'none' }}
-        />
-        <button onClick={submit} disabled={adding || !draft.trim()} style={{
-          font: "600 13px 'Inter Tight', sans-serif", color: '#fff', background: '#024ADD',
-          border: 'none', borderRadius: 8, padding: '10px 20px', cursor: adding ? 'default' : 'pointer',
-          opacity: adding || !draft.trim() ? 0.5 : 1,
-        }}>Add</button>
-      </div>
+      {!share && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+          <input
+            value={draft} onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+            placeholder="New idea…"
+            style={{ flex: 1, padding: '10px 14px', border: '1px solid rgba(17,17,17,.12)', borderRadius: 8, background: '#fff', fontFamily: "'Inter Tight', sans-serif", fontSize: 14, outline: 'none' }}
+          />
+          <button onClick={submit} disabled={adding || !draft.trim()} style={{
+            font: "600 13px 'Inter Tight', sans-serif", color: '#fff', background: '#024ADD',
+            border: 'none', borderRadius: 8, padding: '10px 20px', cursor: adding ? 'default' : 'pointer',
+            opacity: adding || !draft.trim() ? 0.5 : 1,
+          }}>Add</button>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', padding: '20px 0' }}>Loading…</div>
@@ -87,10 +96,12 @@ export default function IdeasTab() {
                   style={{ ...fieldStyle, border: 'none', padding: '2px 0', resize: 'vertical', color: 'rgba(17,17,17,.6)' }}
                 />
               </div>
-              <button
-                onClick={() => { if (confirm(`Delete "${idea.idea}"?`)) deleteIdea(idea.id); }}
-                style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(192,57,43,.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-              >Delete</button>
+              {!share && (
+                <button
+                  onClick={() => { if (confirm(`Delete "${idea.idea}"?`)) deleteIdea(idea.id); }}
+                  style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'rgba(192,57,43,.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                >Delete</button>
+              )}
             </div>
           ))}
         </div>
