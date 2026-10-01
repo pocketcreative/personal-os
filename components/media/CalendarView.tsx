@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   DndContext, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors,
@@ -45,19 +45,24 @@ function isoDate(d: Date): string {
 // the Board/Table views above, so the calendar stays a plain read-only
 // schedule there rather than growing a second edit surface for the same
 // data.
-function DraggableItemPill({ item, conflict, readOnly }: { item: ContentItem; conflict: boolean; readOnly: boolean }) {
+// disableDrag: used on the mobile day-detail panel, where touch drag
+// reordering on a tiny calendar grid is a bad interaction (Brendan hasn't
+// asked for mobile drag) -- but tapping through to the item page should
+// still work there, independent of readOnly (share mode).
+function DraggableItemPill({ item, conflict, readOnly, disableDrag }: { item: ContentItem; conflict: boolean; readOnly: boolean; disableDrag?: boolean }) {
   const router = useRouter();
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: readOnly });
+  const dragDisabled = readOnly || !!disableDrag;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: dragDisabled });
   const time = itemScheduledTime(item);
   return (
     <div
       ref={setNodeRef}
-      {...(readOnly ? {} : listeners)}
-      {...(readOnly ? {} : attributes)}
+      {...(dragDisabled ? {} : listeners)}
+      {...(dragDisabled ? {} : attributes)}
       title={conflict ? 'Same (or near-same) time as another item this day' : undefined}
       onClick={readOnly ? undefined : () => router.push(`/media/item/${item.id}`)}
       style={{
-        opacity: isDragging ? 0.3 : 1, cursor: readOnly ? 'default' : isDragging ? 'grabbing' : 'grab',
+        opacity: isDragging ? 0.3 : 1, cursor: readOnly ? 'default' : isDragging ? 'grabbing' : disableDrag ? 'pointer' : 'grab',
         padding: '3px 7px', borderRadius: 6,
         background: conflict ? 'rgba(179,38,30,.08)' : 'rgba(2,74,221,.08)',
         border: conflict ? '1px solid rgba(179,38,30,.35)' : '1px solid rgba(2,74,221,.15)',
@@ -102,10 +107,67 @@ function DroppableDay({ date, inMonth, children }: { date: string; inMonth: bool
   );
 }
 
+// Compact mobile day cell: day number + up to 3 small dots (red if that
+// item is flagged as a time conflict, blue otherwise) plus a "+N" overflow
+// count -- a full item pill doesn't fit a ~40px cell, a dot/count still
+// shows "something's here" at a glance. Tapping opens the detail panel
+// below the grid instead of cramming content into the cell itself.
+function MobileDayCell({
+  date, inMonth, dayItems, flagged, selected, onSelect,
+}: {
+  date: string; inMonth: boolean; dayItems: ContentItem[]; flagged: Set<string>; selected: boolean; onSelect: () => void;
+}) {
+  const today = isoDate(new Date()) === date;
+  const maxDots = 3;
+  const visible = dayItems.slice(0, maxDots);
+  const extra = dayItems.length - visible.length;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      style={{
+        minHeight: 44, borderRadius: 7, padding: '4px 2px 5px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+        background: selected ? 'rgba(2,74,221,.1)' : inMonth ? '#fff' : 'rgba(17,17,17,.015)',
+        border: selected ? '1.5px solid #024ADD' : today ? '1px solid rgba(2,74,221,.35)' : '1px solid rgba(17,17,17,.06)',
+        cursor: 'pointer', WebkitTapHighlightColor: 'transparent', appearance: 'none', font: 'inherit',
+      }}
+    >
+      <span style={{
+        font: "700 11px 'Inter Tight', sans-serif",
+        color: inMonth ? (today ? '#024ADD' : '#111') : 'rgba(17,17,17,.3)',
+      }}>
+        {Number(date.slice(-2))}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, minHeight: 5 }}>
+        {visible.map((it) => (
+          <span key={it.id} style={{
+            width: 5, height: 5, borderRadius: '50%',
+            background: flagged.has(it.id) ? '#b3261e' : '#024ADD',
+          }} />
+        ))}
+        {extra > 0 && (
+          <span style={{ font: "700 7px 'Inter Tight', sans-serif", color: 'rgba(2,74,221,.7)', lineHeight: 1 }}>+{extra}</span>
+        )}
+      </div>
+    </button>
+  );
+}
+
 export default function CalendarView() {
   const { items, loading, updateItem } = useContentItems();
   const share = useShareContext();
   const [cursor, setCursor] = useState(() => new Date());
+  // Mobile day-detail selection -- defaults to today when today falls in
+  // the month being viewed, otherwise no day is pre-opened. Resets whenever
+  // the viewed month changes (prev/next/Today), so the panel never shows a
+  // day that isn't even in the grid on screen.
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  useEffect(() => {
+    const now = new Date();
+    const todayInView = now.getFullYear() === cursor.getFullYear() && now.getMonth() === cursor.getMonth();
+    setSelectedDate(todayInView ? isoDate(now) : null);
+  }, [cursor]);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
@@ -185,42 +247,58 @@ export default function CalendarView() {
               </div>
             </div>
 
-            {/* Agenda list: mobile only. No drag here (a scrolling list isn't
-                a meaningful drop target) -- change a date from the item page
-                instead, which works everywhere. */}
+            {/* Compact day grid: mobile only (see .calendar-agenda in
+                globals.css -- name kept, content reworked into a real
+                7-column grid so it actually reads as a calendar on a phone,
+                not a flat list). No drag here -- touch drag reordering on
+                tiny cells is a bad interaction; tap a day to see/open what's
+                on it instead, which works everywhere including share. */}
             <div className="calendar-agenda">
-              {items.filter((it) => it.post_date).sort((a, b) => (a.post_date! < b.post_date! ? -1 : 1))
-                .filter((it) => {
-                  const d = new Date(`${it.post_date}T00:00:00`);
-                  return d.getFullYear() === cursor.getFullYear() && d.getMonth() === cursor.getMonth();
-                })
-                .map((it) => {
-                  const time = itemScheduledTime(it);
-                  const conflict = conflictingIds(byDate.get(it.post_date!) ?? []).has(it.id);
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4 }}>
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                  <div key={i} style={{ font: "700 9px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', textTransform: 'uppercase', textAlign: 'center' }}>{d}</div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                {days.map(({ date, inMonth }) => {
+                  const key = isoDate(date);
+                  const dayItems = byDate.get(key) ?? [];
+                  const flagged = conflictingIds(dayItems);
                   return (
-                    <div key={it.id} onClick={share ? undefined : () => window.location.assign(`/media/item/${it.id}`)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px', borderBottom: '1px solid rgba(17,17,17,.06)', cursor: share ? 'default' : 'pointer' }}>
-                      <div style={{ width: 52 }}>
-                        <div style={{ font: "700 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)' }}>
-                          {new Date(`${it.post_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </div>
-                        {time && (
-                          <div style={{ font: "600 9.5px 'Inter Tight', sans-serif", color: conflict ? '#b3261e' : 'rgba(2,74,221,.7)', whiteSpace: 'nowrap' }}>
-                            {conflict ? '⚠️ ' : ''}{time}
-                          </div>
-                        )}
-                      </div>
-                      <span style={{ font: "700 9px 'Inter Tight', sans-serif", color: '#024ADD' }}>{it.type.toUpperCase()}</span>
-                      <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: '#111', flex: 1 }}>{it.name}</div>
-                    </div>
+                    <MobileDayCell
+                      key={key}
+                      date={key}
+                      inMonth={inMonth}
+                      dayItems={dayItems}
+                      flagged={flagged}
+                      selected={selectedDate === key}
+                      onSelect={() => setSelectedDate(selectedDate === key ? null : key)}
+                    />
                   );
                 })}
-              {items.filter((it) => {
-                if (!it.post_date) return false;
-                const d = new Date(`${it.post_date}T00:00:00`);
-                return d.getFullYear() === cursor.getFullYear() && d.getMonth() === cursor.getMonth();
-              }).length === 0 && (
-                <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)', padding: '16px 4px' }}>Nothing scheduled this month.</div>
+              </div>
+
+              {/* Tapped-day detail panel -- this is the "tap a day to see
+                  what's on it" interaction replacing the old flat list. */}
+              {selectedDate ? (
+                <div style={{ marginTop: 12, padding: '10px', borderRadius: 10, background: 'rgba(17,17,17,.02)', border: '1px solid rgba(17,17,17,.07)' }}>
+                  <div style={{ font: "700 11px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.5)', letterSpacing: '.02em', marginBottom: 8 }}>
+                    {new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </div>
+                  {(byDate.get(selectedDate) ?? []).length === 0 ? (
+                    <div style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.4)' }}>Nothing scheduled this day.</div>
+                  ) : (
+                    (() => {
+                      const dayItems = byDate.get(selectedDate) ?? [];
+                      const flagged = conflictingIds(dayItems);
+                      return dayItems.map((it) => (
+                        <DraggableItemPill key={it.id} item={it} conflict={flagged.has(it.id)} readOnly={!!share} disableDrag />
+                      ));
+                    })()
+                  )}
+                </div>
+              ) : (
+                <div style={{ font: "500 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.35)', padding: '12px 2px 0' }}>Tap a day to see what&apos;s scheduled.</div>
               )}
             </div>
 
