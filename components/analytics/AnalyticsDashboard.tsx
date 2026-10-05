@@ -1,6 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { compareByScore, formatScore, isOutlier, roundScore } from '@/lib/outlierScore';
+import {
+  DEFAULT_FILTERS, SCORE_OPTIONS, WINDOW_OPTIONS, buildQuery, filterRows, isFiltered,
+  type Filters, type ScoreFilter, type Tab, type WindowFilter,
+} from '@/lib/outlierFilters';
 
 type RowStatus = 'scored' | 'too_new' | 'not_enough' | 'no_data' | 'unlisted';
 interface Baseline { baseline: number | null; count: number }
@@ -202,7 +206,99 @@ function YoutubeTable({ rows, baseline, scoresOff, sort, setSort, short }: {
   );
 }
 
-export default function AnalyticsDashboard() {
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'youtube', label: 'YouTube' },
+  { id: 'instagram', label: 'Instagram' },
+];
+
+function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+  const refs = useRef<Record<Tab, HTMLButtonElement | null>>({ youtube: null, instagram: null });
+  const onKey = (e: React.KeyboardEvent) => {
+    const i = TABS.findIndex((t) => t.id === tab);
+    let next = -1;
+    if (e.key === 'ArrowRight') next = (i + 1) % TABS.length;
+    else if (e.key === 'ArrowLeft') next = (i - 1 + TABS.length) % TABS.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = TABS.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    setTab(TABS[next].id);
+    refs.current[TABS[next].id]?.focus();
+  };
+  return (
+    <div role="tablist" aria-label="Analytics source" className="an-tabs" onKeyDown={onKey}>
+      {TABS.map((t) => (
+        <button
+          key={t.id} ref={(el) => { refs.current[t.id] = el; }} type="button" role="tab" id={`an-tab-${t.id}`}
+          aria-selected={tab === t.id} aria-controls={`an-panel-${t.id}`} tabIndex={tab === t.id ? 0 : -1}
+          className="an-tab" onClick={() => setTab(t.id)}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function FilterBar({ filters, setFilters, shown, total, noun }: {
+  filters: Filters; setFilters: (f: Filters) => void; shown: number; total: number; noun: 'videos' | 'posts';
+}) {
+  const active = isFiltered(filters);
+  return (
+    <div className="an-filters">
+      <div className="an-filter-row">
+        <div role="group" aria-label="Filter by score" className="an-chips">
+          {SCORE_OPTIONS.map((o) => (
+            <button
+              key={o.value} type="button" className="an-chip" aria-pressed={filters.score === o.value}
+              onClick={() => setFilters({ ...filters, score: o.value as ScoreFilter })}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <label className="an-field">
+          <span className="an-field-label">Time</span>
+          <select className="an-input" value={filters.window} onChange={(e) => setFilters({ ...filters, window: e.target.value as WindowFilter })}>
+            {WINDOW_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+        <label className="an-field an-field-search">
+          <span className="an-field-label">Search</span>
+          <input
+            type="search" className="an-input" value={filters.q} placeholder={noun === 'videos' ? 'Title' : 'Caption'}
+            onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+          />
+        </label>
+      </div>
+      <p className="an-filter-meta">
+        <span aria-live="polite">Showing {shown} of {total}</span>
+        {active && <button type="button" className="an-link" onClick={() => setFilters(DEFAULT_FILTERS)}>Clear filters</button>}
+        {filters.score !== 'all' && <span className="an-filter-hint">Rows without a score (unlisted, too new, n/a) only show under All.</span>}
+      </p>
+    </div>
+  );
+}
+
+function EmptyFilter({ noun }: { noun: 'videos' | 'posts' }) {
+  return <div className="an-empty">No {noun} match these filters</div>;
+}
+
+const ytText = (v: YoutubeVideoRow) => `${v.title ?? ''} ${v.name ?? ''}`;
+
+export default function AnalyticsDashboard({ initialTab = 'youtube', initialFilters = DEFAULT_FILTERS }: { initialTab?: Tab; initialFilters?: Filters }) {
+  const [tab, setTabState] = useState<Tab>(initialTab);
+  // Filters are kept per tab. The URL carries the active tab's filters.
+  const [filtersByTab, setFiltersByTab] = useState<Record<Tab, Filters>>({
+    youtube: initialTab === 'youtube' ? initialFilters : DEFAULT_FILTERS,
+    instagram: initialTab === 'instagram' ? initialFilters : DEFAULT_FILTERS,
+  });
+  const syncUrl = (t: Tab, f: Filters) => {
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${buildQuery(t, f)}`);
+  };
+  const setTab = (t: Tab) => { setTabState(t); syncUrl(t, filtersByTab[t]); };
+  const setFilters = (t: Tab) => (f: Filters) => { setFiltersByTab((prev) => ({ ...prev, [t]: f })); syncUrl(t, f); };
+
   const [ytVideos, setYtVideos] = useState<YoutubeVideoRow[]>([]);
   const [ytError, setYtError] = useState<string | null>(null);
   const [ytLoading, setYtLoading] = useState(true);
@@ -247,8 +343,17 @@ export default function AnalyticsDashboard() {
 
   const followerDelta = igHistory.length >= 2 ? igHistory[igHistory.length - 1].followers - igHistory[0].followers : null;
 
+  // Filters only choose which rows show. Scores and the Normal note come from the full set.
+  const ytF = filtersByTab.youtube;
+  const igF = filtersByTab.instagram;
+  const ytLong = ytVideos.filter((v) => v.format !== 'short');
+  const ytShort = ytVideos.filter((v) => v.format === 'short');
+  const ytLongShown = filterRows(ytLong, ytF, ytText);
+  const ytShortShown = filterRows(ytShort, ytF, ytText);
+  const igShown = filterRows(igPosts, igF, (p) => p.content);
+
   return (
-    <div style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 24px 64px', display: 'flex', flexDirection: 'column', gap: 32 }}>
+    <div style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 24px 64px', display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div>
         <h1 style={{ font: "800 28px 'Archivo', sans-serif", letterSpacing: '-0.01em', color: 'var(--ink-4)' }}>Analytics</h1>
         <p style={{ marginTop: 4, font: "500 14px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>
@@ -256,8 +361,10 @@ export default function AnalyticsDashboard() {
         </p>
       </div>
 
+      <Tabs tab={tab} setTab={setTab} />
+
       {/* YouTube */}
-      <section style={{ ...panel, padding: 20 }}>
+      <section role="tabpanel" id="an-panel-youtube" aria-labelledby="an-tab-youtube" hidden={tab !== 'youtube'} style={{ ...panel, padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <h2 style={sectionTitle}>YouTube long form</h2>
           {ytLoading && <span style={{ font: "600 12px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>Loading…</span>}
@@ -276,21 +383,30 @@ export default function AnalyticsDashboard() {
           <p style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>No videos yet.</p>
         )}
         {ytVideos.length > 0 && (
-          <YoutubeTable rows={ytVideos.filter((v) => v.format !== 'short')} baseline={ytBaselines?.long} scoresOff={!!ytScoresOff} sort={ytSort} setSort={setYtSort} />
+          <FilterBar filters={ytF} setFilters={setFilters('youtube')} shown={ytLongShown.length + ytShortShown.length} total={ytVideos.length} noun="videos" />
         )}
-        {ytVideos.some((v) => v.format === 'short') && (
+        {ytVideos.length > 0 && (ytLongShown.length + ytShortShown.length === 0 ? (
+          <EmptyFilter noun="videos" />
+        ) : (
           <>
-            <h2 style={{ ...sectionTitle, margin: '24px 0 14px' }}>YouTube Shorts</h2>
-            <YoutubeTable rows={ytVideos.filter((v) => v.format === 'short')} baseline={ytBaselines?.short} scoresOff={!!ytScoresOff} sort={ytSort} setSort={setYtSort} short />
+            {ytLongShown.length > 0 && (
+              <YoutubeTable rows={ytLongShown} baseline={ytBaselines?.long} scoresOff={!!ytScoresOff} sort={ytSort} setSort={setYtSort} />
+            )}
+            {ytShortShown.length > 0 && (
+              <>
+                <h2 style={{ ...sectionTitle, margin: '24px 0 14px' }}>YouTube Shorts</h2>
+                <YoutubeTable rows={ytShortShown} baseline={ytBaselines?.short} scoresOff={!!ytScoresOff} sort={ytSort} setSort={setYtSort} short />
+              </>
+            )}
           </>
-        )}
+        ))}
         <p style={{ marginTop: 12, font: "500 11.5px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>
           {AGE_NOTE}{' '}Thumbnail CTR isn&apos;t shown because YouTube&apos;s public Analytics API doesn&apos;t expose impressions or click-through rate for any account, that data only exists in YouTube Studio&apos;s own UI. Views come from the YouTube Data API. Average % viewed is only pulled for your LF videos.
         </p>
       </section>
 
       {/* Instagram */}
-      <section style={{ ...panel, padding: 20 }}>
+      <section role="tabpanel" id="an-panel-instagram" aria-labelledby="an-tab-instagram" hidden={tab !== 'instagram'} style={{ ...panel, padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
           <h2 style={sectionTitle}>Instagram — @brendanangg</h2>
           {igLoading && <span style={{ font: "600 12px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>Loading…</span>}
@@ -310,7 +426,10 @@ export default function AnalyticsDashboard() {
             </div>
             <div>
               <div style={{ font: "800 26px 'Archivo', sans-serif", color: 'var(--ink-4)' }}>{fmtNum(igTotalPosts)}</div>
-              <div style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total Posts</div>
+              <div style={{ font: "600 11px 'Inter Tight', sans-serif", color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Posts in the last 12 months</div>
+              {igTotalPosts !== null && igTotalPosts > igPosts.length && igPosts.length > 0 && (
+                <div style={{ marginTop: 2, font: "500 11px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>The table lists the latest {igPosts.length}.</div>
+              )}
             </div>
           </div>
         )}
@@ -318,8 +437,14 @@ export default function AnalyticsDashboard() {
           <p style={{ font: "500 13px 'Inter Tight', sans-serif", color: 'var(--ink-3)' }}>No posts yet.</p>
         )}
         {igPosts.length > 0 && (
+          <FilterBar filters={igF} setFilters={setFilters('instagram')} shown={igShown.length} total={igPosts.length} noun="posts" />
+        )}
+        {igPosts.length > 0 && igShown.length === 0 && (
+          <EmptyFilter noun="posts" />
+        )}
+        {igPosts.length > 0 && <NormalNote baseline={igBaselines?.REELS} noun="posts" label="Reels" />}
+        {igShown.length > 0 && (
           <>
-            <NormalNote baseline={igBaselines?.REELS} noun="posts" label="Reels" />
             <div className="an-wrap">
               <table className="an-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -333,7 +458,7 @@ export default function AnalyticsDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortRows(igPosts, igSort, (p) => p.impressions).map((p) => (
+                  {sortRows(igShown, igSort, (p) => p.impressions).map((p) => (
                     <tr key={p.id}>
                       <td style={td} className="an-cell-main">
                         <a href={p.platformPostUrl ?? '#'} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit' }}>
