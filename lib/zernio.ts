@@ -155,6 +155,8 @@ export interface ZernioPostAnalytics {
   platformPostUrl: string | null;
   thumbnailUrl: string | null;
   impressions: number;
+  impressionsRaw: number | null; // null when Zernio sent no number; used for scoring so a gap never becomes a fake 0
+  mediaProductType: string | null; // REELS | FEED | ...
   reach: number;
   likes: number;
   comments: number;
@@ -172,11 +174,13 @@ export interface ZernioAccountAnalytics {
 // Real GET /v1/analytics -- confirmed 2026-09-30 via Zernio's own docs
 // (mcp__zernio__docs_search) and a live call: returns per-post analytics
 // plus account follower counts, same shape the connected MCP tools use.
-export async function getInstagramAnalytics(limit = 20): Promise<ZernioAccountAnalytics> {
+// fromDate: Zernio defaults to the last 90 days and caps the range at 366 days,
+// so callers that want more posts pass a date (YYYY-MM-DD).
+export async function getInstagramAnalytics(limit = 20, fromDate?: string): Promise<ZernioAccountAnalytics> {
   const key = apiKey();
   if (!key) throw new Error('ZERNIO_API_KEY not set');
   const body = await zernioFetch(
-    `/analytics?accountId=${INSTAGRAM_ACCOUNT_ID}&limit=${limit}&page=1&sortBy=date&order=desc`,
+    `/analytics?accountId=${INSTAGRAM_ACCOUNT_ID}&limit=${limit}&page=1&sortBy=date&order=desc${fromDate ? `&fromDate=${fromDate}` : ''}`,
     { method: 'GET' },
   );
   const accounts = (body.accounts as Record<string, unknown>[] | undefined) ?? [];
@@ -191,6 +195,8 @@ export async function getInstagramAnalytics(limit = 20): Promise<ZernioAccountAn
       platformPostUrl: (p.platformPostUrl as string) ?? null,
       thumbnailUrl: (p.thumbnailUrl as string) ?? null,
       impressions: (a.impressions as number) ?? 0,
+      impressionsRaw: typeof a.impressions === 'number' ? a.impressions : null,
+      mediaProductType: (p.mediaProductType as string) ?? null,
       reach: (a.reach as number) ?? 0,
       likes: (a.likes as number) ?? 0,
       comments: (a.comments as number) ?? 0,
