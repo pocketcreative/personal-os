@@ -66,3 +66,48 @@ export function codeBlockSmartCharWarning(content: string): string | null {
   if (!hit) return null;
   return 'A curly quote or em dash showed up inside a code block or backticks in this save -- often an iPhone-keyboard autocorrect artifact. Worth checking it did not mangle a command or file path.';
 }
+
+// Version bookkeeping shared by the skill PATCH and rename routes: bumps an
+// "x.y" version's minor number; a hand-typed version of any other shape is
+// left as-is.
+export function bumpVersion(v: string): string {
+  const m = v.match(/^(\d+)\.(\d+)$/);
+  if (!m) return v;
+  return `${m[1]}.${Number(m[2]) + 1}`;
+}
+
+/**
+ * Returns an error message if `s` is not a usable skill folder name, else
+ * null. Lowercase letters, numbers and single dashes, 2 to 64 chars.
+ * 'synced' and 'node_modules' are folders under ~/.claude/skills that are not
+ * skills; a leading dot would hide the folder.
+ */
+export function validateSlug(s: string): string | null {
+  if (s.length < 2 || s.length > 64) return 'Use lowercase letters, numbers and dashes only (2 to 64).';
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(s)) return 'Use lowercase letters, numbers and dashes only (2 to 64).';
+  if (s === 'synced' || s === 'node_modules' || s.startsWith('.')) return 'That name is reserved.';
+  return null;
+}
+
+/**
+ * Rewrites only the `name:` line inside the first `---` frontmatter block.
+ * Keeps quoting style and line endings, inserts a `name:` line if the block
+ * has none, and returns the content unchanged if there is no frontmatter.
+ */
+export function renameFrontmatterName(content: string, newName: string): string {
+  const m = content.match(/^(\uFEFF?)---(\r?\n)([\s\S]*?)(\r?\n)---/);
+  if (!m) return content;
+  // Also swallow indented continuation lines, so a folded `name: >-` value is
+  // replaced whole instead of leaving its old text behind.
+  const nameLine = /^name:[^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*/m;
+  let block: string;
+  if (nameLine.test(m[3])) {
+    block = m[3].replace(nameLine, (line) => {
+      const q = line.match(/^name:\s*(["'])/);
+      return q ? `name: ${q[1]}${newName}${q[1]}` : `name: ${newName}`;
+    });
+  } else {
+    block = `name: ${newName}${m[2]}${m[3]}`;
+  }
+  return `${m[1]}---${m[2]}${block}${m[4]}---${content.slice(m[0].length)}`;
+}

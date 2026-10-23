@@ -86,3 +86,17 @@ export async function deleteSkill(slug: string): Promise<void> {
     throw new Error(text || `Delete failed (${res.status})`);
   }
 }
+
+// True rename (see app/api/skills/[slug]/rename/route.ts). The server's error
+// text is plain JSON { error }, so unwrap it for the caller to show.
+export async function renameSkill(slug: string, newSlug: string, updatedAt: string): Promise<Skill> {
+  const res = await fetch(`/api/skills/${encodeURIComponent(slug)}/rename`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ new_slug: newSlug, updated_at: updatedAt }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(body.error || `Rename failed (${res.status})`);
+  }
+  return res.json();
+}

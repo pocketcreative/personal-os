@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient, USER_ID } from '@/lib/supabase';
-import { codeBlockSmartCharWarning } from '@/lib/skillFile';
+import { bumpVersion, codeBlockSmartCharWarning } from '@/lib/skillFile';
 import { SOP_SYSTEMS } from '@/lib/types';
-
-// Skills are stored verbatim, so the only "smart" edit behaviour is version
-// bookkeeping (Q7): every content save bumps the minor version and sets
-// today's date. A hand-typed version (any non "x.y" shape) is left as-is --
-// Brendan can type his own version string and it sticks.
-function bumpVersion(v: string): string {
-  const m = v.match(/^(\d+)\.(\d+)$/);
-  if (!m) return v;
-  return `${m[1]}.${Number(m[2]) + 1}`;
-}
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -19,7 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   const { data, error } = await db.from('skills').select('*')
     .eq('user_id', USER_ID).eq('slug', slug).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json({ ...data, systems: data.systems ?? [] });
+  return NextResponse.json({ ...data, systems: data.systems ?? [], renamed_from: data.renamed_from ?? null });
 }
 
 // Patchable: content (triggers version bump + audit_log write), status
@@ -27,6 +17,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
 // (any source, including vendor, since it's a tag not content).
 // `slug` is never patchable -- sync-skills.mjs and the import script both
 // key off it, and the local folder name it maps to doesn't rename itself.
+// Renames go through POST /api/skills/[slug]/rename, which also queues the
+// folder move for the next sync.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
@@ -54,6 +46,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
   if (Array.isArray(body.systems)) patch.systems = body.systems;
   if (typeof body.status === 'string') patch.status = body.status;
   if (typeof body.sync_to_local === 'boolean') patch.sync_to_local = body.sync_to_local;
+  // A pending rename needs this skill active and synced, or the sync never
+  // moves its folder and the old name stays live on the Mac.
+  if (current.renamed_from && (patch.status === 'archived' || patch.sync_to_local === false)) {
+    return NextResponse.json({ error: 'This skill was renamed and is waiting for the sync to move its folder. Do that after the sync.' }, { status: 400 });
+  }
 
   let warning: string | null = null;
   const contentChanged = typeof body.content === 'string' && body.content !== current.content;
@@ -86,7 +83,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
 
   const { data, error } = await db.from('skills').update(patch).eq('id', current.id).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ...data, systems: data.systems ?? [], warning });
+  return NextResponse.json({ ...data, systems: data.systems ?? [], renamed_from: data.renamed_from ?? null, warning });
 }
 
 // Soft delete, same convention as the row's own `status` field (skills are
@@ -107,6 +104,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   if (current.source === 'vendor') {
     return NextResponse.json({ error: 'Vendor skills are read-only' }, { status: 403 });
+  }
+
+  if (current.renamed_from) {
+    return NextResponse.json({ error: 'This skill was renamed and is waiting for the sync to move its folder. Archive it after the sync.' }, { status: 400 });
   }
 
   const { error: auditErr } = await db.from('audit_log').insert({

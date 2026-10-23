@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { deleteSkill, fetchSkill, saveSkillContent, SAVE_CONFLICT_MESSAGE } from '@/lib/useSkills';
+import { deleteSkill, fetchSkill, renameSkill, saveSkillContent, SAVE_CONFLICT_MESSAGE } from '@/lib/useSkills';
 import { readTrigger, stripFrontmatter } from '@/lib/skillFile';
 import { SKILL_SOURCE_LABELS, SOP_SYSTEMS, type Skill, type SopSystem } from '@/lib/types';
 import { downloadTextFile } from '@/lib/downloadText';
@@ -38,6 +38,8 @@ export default function SkillDetail({ slug }: { slug: string }) {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState('');
 
   useEffect(() => {
     let live = true;
@@ -130,6 +132,27 @@ export default function SkillDetail({ slug }: { slug: string }) {
     }
   };
 
+  const handleRename = async () => {
+    if (!confirm(`Rename "${skill.slug}" to "${newName}"? Claude Code will use the new name after tonight's sync. Other skills that mention "${skill.slug}" by name will not update by themselves.`)) return;
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const updated = await renameSkill(skill.slug, newName, skill.updated_at);
+      setSaving(false);
+      setRenaming(false);
+      window.dispatchEvent(new Event('skills:refresh'));
+      router.replace(`/skills/${updated.slug}`);
+    } catch (e) {
+      const message = (e as Error).message;
+      setSaveMsg(
+        message === 'name already used' ? 'That name is already used.'
+        : message === 'changed elsewhere, reload' ? 'Changed elsewhere, reload.'
+        : message,
+      );
+      setSaving(false);
+    }
+  };
+
   return (
     <Wrap>
       <div className="board-header" style={{ marginBottom: 4 }}>
@@ -152,6 +175,12 @@ export default function SkillDetail({ slug }: { slug: string }) {
         </span>
       </div>
 
+      {skill.renamed_from && (
+        <div style={{ font: "600 12px 'Inter Tight', sans-serif", color: '#7a5f22', marginBottom: 4 }}>
+          Renamed, waiting for tonight&apos;s 9pm sync (Mac folder is still called {skill.renamed_from})
+        </div>
+      )}
+
       <div style={{ font: "600 12px 'Inter Tight', sans-serif", color: 'rgba(17,17,17,.45)', marginBottom: 4 }}>
         v{skill.version} &middot; {skill.version_date}
         {skill.sync_to_local && (
@@ -173,6 +202,26 @@ export default function SkillDetail({ slug }: { slug: string }) {
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => downloadSkill(skill)} style={btnSecondary}>Download as MD</button>
         <ShareControl type="skill" id={skill.id} />
+        {editable && skill.sync_to_local && !renaming && (
+          <button
+            onClick={() => { setNewName(skill.slug); setSaveMsg(null); setRenaming(true); }}
+            disabled={dirty || saving}
+            style={{ ...btnSecondary, opacity: dirty || saving ? 0.5 : 1 }}
+          >
+            Rename
+          </button>
+        )}
+        {renaming && (
+          <>
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              style={{ font: "500 13px 'Inter Tight', sans-serif", padding: '8px 10px', border: '1px solid rgba(17,17,17,.15)', borderRadius: 8, minWidth: 220 }}
+            />
+            <button onClick={handleRename} disabled={dirty || saving} style={{ ...btnSecondary, opacity: dirty || saving ? 0.5 : 1 }}>Save</button>
+            <button onClick={() => setRenaming(false)} disabled={saving} style={btnSecondary}>Cancel</button>
+          </>
+        )}
         {editable && (
           <button onClick={handleDelete} disabled={deleting} style={{ ...btnDanger, opacity: deleting ? 0.5 : 1 }}>
             {deleting ? 'Deleting…' : 'Delete'}

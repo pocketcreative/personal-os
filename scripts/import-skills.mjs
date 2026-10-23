@@ -110,6 +110,19 @@ async function main() {
     { auth: { persistSession: false } },
   );
 
+  // A rename queued in the app is applied by sync-skills.mjs. Importing before
+  // that would see the old folder as a missing Tier A skill or re-add it.
+  const { data: pendingRenames, error: renameErr } = await db.from('skills').select('slug, renamed_from').not('renamed_from', 'is', null);
+  // A missing column (migration 0040 not applied yet) means there can't be any pending.
+  if (!renameErr && pendingRenames && pendingRenames.length > 0) {
+    const list = pendingRenames.map((r) => `${r.renamed_from} -> ${r.slug}`).join(', ');
+    if (DRY_RUN) console.log(`WARNING: a rename is waiting for the sync (${list}). A real run would refuse until sync-skills.mjs has run.`);
+    else {
+      console.error(`REFUSING: a rename is waiting for the sync (${list}), run sync-skills.mjs first. Nothing was changed.`);
+      process.exit(1);
+    }
+  }
+
   const topLevel = discoverTopLevel();
   const synced = discoverSynced();
 

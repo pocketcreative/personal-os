@@ -12,6 +12,11 @@
 //   node --env-file=.env.local scripts/sync-skills.mjs --apply --force --only <slug>   # overwrite local, record wins
 //   node --env-file=.env.local scripts/sync-skills.mjs --apply --ignore-busy --only <slug>
 //
+// Renames: a skill renamed in the app has renamed_from set (the old slug).
+// The normal run moves ~/.claude/skills/<old>/ to <new>/ (whole folder backed
+// up first), rewrites SKILL.md, and clears renamed_from. Dry run by default;
+// --force and --adopt-local are refused for a skill with a rename pending.
+//
 // Conflict rule (H6): if the local file's hash no longer matches the
 // record's synced_hash (someone hand-edited the SKILL.md on disk since the
 // last sync) AND the record has also changed, this is a real conflict --
@@ -30,7 +35,8 @@
 // in, then sync.
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
@@ -96,6 +102,32 @@ async function isBusy(db, skillId) {
   return busyTask ? busyTask.title : null;
 }
 
+/**
+ * Names of other files under ~/.claude/skills that mention `oldSlug` as a
+ * whole word (report only -- nothing is rewritten). Skips both skill folders
+ * and backup files. grep exits 1 when there are no matches.
+ */
+function findMentions(oldSlug, newSlug) {
+  try {
+    const out = execFileSync('grep', [
+      '-rlw', '--exclude=*.bak*', `--exclude-dir=${oldSlug}`, `--exclude-dir=${newSlug}`, '--exclude-dir=node_modules',
+      '--', oldSlug, SKILLS_ROOT,
+    ], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    return out.split('\n').filter(Boolean).map((f) => path.relative(SKILLS_ROOT, f));
+  } catch (err) {
+    if (err.status === 1) return [];
+    throw err;
+  }
+}
+
+function reportMentions(oldSlug, newSlug) {
+  const mentions = findMentions(oldSlug, newSlug);
+  console.log(`  mentions of "${oldSlug}" in other skill files (not rewritten): ${mentions.length}`);
+  for (const f of mentions.slice(0, 20)) console.log(`    ${f}`);
+  if (mentions.length > 20) console.log(`    ...and ${mentions.length - 20} more`);
+  return mentions;
+}
+
 async function main() {
   const db = createClient(
     requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
@@ -117,6 +149,98 @@ async function main() {
   for (const skill of skills) {
     if (skill.status === 'archived') {
       console.log(`SKIP ${skill.slug}: archived (report only, never synced)`);
+      continue;
+    }
+
+    // A rename queued by the app (skills.renamed_from = the old slug, slug =
+    // the new one): move the Mac folder instead of creating a fresh one.
+    // Checked first, and every failed check touches nothing.
+    if (skill.renamed_from) {
+      const oldSlug = skill.renamed_from;
+      const newSlug = skill.slug;
+      if (FORCE || ADOPT_LOCAL) {
+        console.log(`rename pending for ${newSlug}, run without flags`);
+        continue;
+      }
+      if (!IGNORE_BUSY) {
+        const busyTask = await isBusy(db, skill.id);
+        if (busyTask) {
+          console.log(`REFUSE ${newSlug}: an agent linked to this skill has an in-progress task ("${busyTask}") -- pass --ignore-busy to override.`);
+          continue;
+        }
+      }
+      const oldDir = path.join(SKILLS_ROOT, oldSlug);
+      const newDir = path.join(SKILLS_ROOT, newSlug);
+      const oldExists = existsSync(oldDir);
+      const newExists = existsSync(newDir);
+      const contentHash = sha256(skill.content);
+
+      if (!oldExists && newExists) {
+        // Folder already moved (a re-run after a failed DB update, or moved by hand).
+        const newLocal = readLocal(newSlug);
+        if (newLocal !== null && sha256(newLocal) === contentHash) {
+          console.log(`${APPLY ? 'FINISH' : '[dry-run] would finish'} rename ${oldSlug} -> ${newSlug}: folder already moved and SKILL.md matches the record -- ${APPLY ? 'clearing the flag' : 'would clear the flag'}.`);
+          if (APPLY) {
+            const { error: upErr } = await db.from('skills').update({ synced_hash: contentHash, last_synced_at: new Date().toISOString(), renamed_from: null }).eq('id', skill.id);
+            if (upErr) throw new Error(upErr.message);
+          }
+        } else {
+          console.log(`CONFLICT ${newSlug}: ${oldSlug}/ is gone and ${newSlug}/ exists, but its SKILL.md does not match the record. Not touching anything.`);
+          console.log(`  Resolve by making ${newSlug}/SKILL.md match the record (or deleting ${newSlug}/), then re-run.`);
+        }
+        continue;
+      }
+      if (!oldExists && !newExists) {
+        console.log(`CONFLICT ${newSlug}: nothing on disk -- neither ${oldSlug}/ nor ${newSlug}/ exists under ${SKILLS_ROOT}. Not touching anything.`);
+        console.log(`  Resolve by restoring the folder from ~/.claude/skill-backups, or clear renamed_from on the row so the normal sync recreates ${newSlug}/.`);
+        continue;
+      }
+      if (newExists) {
+        console.log(`CONFLICT ${newSlug}: target folder exists -- both ${oldSlug}/ and ${newSlug}/ are on disk. Not touching anything.`);
+        console.log(`  Resolve by moving ${newSlug}/ out of the way (it is not a skill the app knows about), then re-run.`);
+        continue;
+      }
+      if (lstatSync(oldDir).isSymbolicLink()) {
+        console.log(`REFUSE ${newSlug}: ${oldSlug}/ is a symlink -- not moving it. Resolve by hand, then clear renamed_from.`);
+        continue;
+      }
+      const oldLocal = readLocal(oldSlug);
+      if (oldLocal === null || !skill.synced_hash || sha256(oldLocal) !== skill.synced_hash) {
+        console.log(`CONFLICT ${newSlug}: ${oldSlug}/SKILL.md was edited on the Mac since the last sync (or is missing). Not touching anything.`);
+        console.log(`  Resolve by running the normal sync flow for the old name first, or undoing the local edit, then re-run.`);
+        continue;
+      }
+
+      if (!APPLY) {
+        console.log(`[dry-run] would move ${oldSlug}/ -> ${newSlug}/ (backup first, then write the renamed SKILL.md)`);
+        reportMentions(oldSlug, newSlug);
+        continue;
+      }
+
+      const backupDir = path.join(BACKUP_ROOT, stamp, oldSlug);
+      let newHash;
+      try {
+        cpSync(oldDir, backupDir, { recursive: true }); // whole folder: scripts/references live here too
+        renameSync(oldDir, newDir);
+        newHash = writeLocalAtomic(newSlug, skill.content);
+      } catch (err) {
+        console.log(`FAILED ${newSlug}: disk step failed (${err.message}). The row is unchanged. Backup is at ${backupDir}.`);
+        if (existsSync(newDir) && !existsSync(oldDir)) console.log(`  Recovery: run: mv "${newDir}" "${oldDir}"  then re-run.`);
+        continue;
+      }
+      const { error: upErr } = await db.from('skills').update({ synced_hash: newHash, last_synced_at: new Date().toISOString(), renamed_from: null }).eq('id', skill.id);
+      if (upErr) {
+        console.log(`FAILED ${newSlug}: folder moved but the row update failed (${upErr.message}). renamed_from is still set.`);
+        console.log(`  Recovery: just re-run: node --env-file=.env.local scripts/sync-skills.mjs --apply --only ${newSlug}  (it will finish the rename).`);
+        continue;
+      }
+      console.log(`RENAMED ${oldSlug}/ -> ${newSlug}/ (whole folder backed up to ${backupDir}).`);
+      const mentions = reportMentions(oldSlug, newSlug);
+      const { error: auditErr } = await db.from('audit_log').insert({
+        user_id: USER_ID, action: 'skill_rename_synced', resource_type: 'skills', resource_id: skill.id,
+        metadata: { previous_slug: oldSlug, new_slug: newSlug, mentions_count: mentions.length, mentions_sample: mentions.slice(0, 20) },
+      });
+      if (auditErr) console.log(`  warning: rename done, but the audit_log insert failed (${auditErr.message}).`);
       continue;
     }
 
@@ -203,7 +327,7 @@ async function main() {
     }
   }
 
-  if (FORCE && ONLY && APPLY) {
+  if (FORCE && ONLY && APPLY && !skills.some((s) => s.renamed_from)) {
     // Explicit force-overwrite path, only reached if the caller passed
     // --force alongside --apply --only: re-fetch and hard-overwrite
     // regardless of the conflict check above (H6's second resolution).

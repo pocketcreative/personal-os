@@ -289,6 +289,10 @@ export interface Skill {
   // Migration 0026. Same 8-section tag as Sop.systems. The API always returns
   // an array (defaults to [] if the migration isn't applied yet).
   systems: SopSystem[];
+  // Migration 0040. Old slug while a rename waits for the nightly sync to move
+  // the Mac folder; null otherwise. The API defaults it to null if the column
+  // isn't there yet.
+  renamed_from: string | null;
   // Migration 0033. Who the skill is FOR: Brendan's own tools ('internal')
   // or built for a client/agent to run ('client'). Different axis from source.
   audience: SkillAudience;
