@@ -4,7 +4,9 @@ import { verifySessionToken, requireEnv, SESSION_COOKIE } from '@/lib/auth';
 // '/share/' and '/api/share/' are the view-only share links: they take an
 // unguessable token and return only that one item. The owner's own share
 // management API is '/api/shares' (no trailing slash match), which stays gated.
-const PUBLIC_PREFIXES = ['/login', '/api/auth/', '/api/telegram/webhook', '/api/cron/', '/share/', '/api/share/'];
+// '/manifest.webmanifest' and '/scorecard-icon-' are static PWA assets; iOS fetches
+// the home-screen icon without the session cookie, so they can't sit behind login.
+const PUBLIC_PREFIXES = ['/login', '/api/auth/', '/api/telegram/webhook', '/api/cron/', '/share/', '/api/share/', '/manifest.webmanifest', '/scorecard-icon-'];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

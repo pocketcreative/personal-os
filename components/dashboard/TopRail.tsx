@@ -9,6 +9,7 @@ const TABS = [
   { href: '/skills', label: 'Skills' },
   { href: '/boards', label: 'Boards' },
   { href: '/reflections', label: 'Reflections' },
+  { href: '/scorecard', label: 'Scorecard' },
   { href: '/media', label: 'Media' },
   { href: '/analytics', label: 'Analytics' },
   { href: '/ta-offer', label: 'TA & Offer' },
