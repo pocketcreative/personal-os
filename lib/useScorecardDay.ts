@@ -12,6 +12,7 @@ export interface ScorecardDay {
   date: string;
   today: string;
   note: string | null;
+  submitted: boolean;
   items: ScorecardItem[];
 }
 
@@ -19,7 +20,8 @@ type Edit =
   | { toggle: string; done: boolean }
   | { add: string }
   | { remove: string }
-  | { note: string };
+  | { note: string }
+  | { submit: boolean };
 
 export function useScorecardDay(date: string | null) {
   const [day, setDay] = useState<ScorecardDay | null>(null);
@@ -60,6 +62,8 @@ export function useScorecardDay(date: string | null) {
       setDay((d) => d && { ...d, items: d.items.filter((i) => i.id !== patch.remove) });
     } else if ('note' in patch) {
       setDay((d) => d && { ...d, note: patch.note || null });
+    } else if ('submit' in patch) {
+      setDay((d) => d && { ...d, submitted: patch.submit });
     }
     queue.current = queue.current.then(async () => {
       try {

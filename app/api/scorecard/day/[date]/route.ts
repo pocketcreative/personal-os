@@ -27,6 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ dat
 /**
  * One endpoint for every per-day edit. Body is one of:
  *   { toggle: itemId, done: boolean } | { add: name } | { remove: itemId } | { note: string }
+ *   | { submit: boolean }  (true = submit the day, false = reopen it to edit)
  * Returns the full updated day so the client can reconcile.
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ date: string }> }) {
@@ -59,6 +60,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ da
     } else if (typeof body.note === 'string') {
       const { error } = await db.from('scorecard_days')
         .update({ note: body.note.trim() || null, updated_at: new Date().toISOString() })
+        .eq('user_id', USER_ID).eq('date', date);
+      if (error) throw new Error(error.message);
+    } else if (typeof body.submit === 'boolean') {
+      const { error } = await db.from('scorecard_days')
+        .update({ submitted_at: body.submit ? new Date().toISOString() : null, updated_at: new Date().toISOString() })
         .eq('user_id', USER_ID).eq('date', date);
       if (error) throw new Error(error.message);
     } else {

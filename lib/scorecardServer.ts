@@ -70,9 +70,9 @@ export async function ensureDay(db: SupabaseClient, date: string, today: string)
   }
 
   const { data: day, error: noteErr } = await db.from('scorecard_days')
-    .select('note').eq('user_id', USER_ID).eq('date', date).single();
+    .select('note, submitted_at').eq('user_id', USER_ID).eq('date', date).single();
   if (noteErr) throw new Error(noteErr.message);
-  return { date, today, note: (day?.note as string | null) ?? null, items: await loadItems(db, date) };
+  return { date, today, note: (day?.note as string | null) ?? null, submitted: Boolean(day?.submitted_at), items: await loadItems(db, date) };
 }
 
 /** PostgREST caps a response at 1000 rows by default; page through to get everything. */

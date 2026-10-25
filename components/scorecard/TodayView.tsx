@@ -23,6 +23,7 @@ export default function TodayView({
   const pct = dayScore(items);
   const doneCount = items.filter((i) => i.done).length;
   const isToday = date === today;
+  const locked = day?.submitted ?? false;
 
   const arrow = (label: string, onClick: () => void, disabled = false) => (
     <button
@@ -60,7 +61,7 @@ export default function TodayView({
 
       <Panel
         title="Habits"
-        right={isToday ? (
+        right={isToday && !locked ? (
           <button onClick={() => setEditing((v) => !v)} style={{ fontSize: 12, color: 'var(--ink-3)', textDecoration: 'underline' }}>
             {editing ? 'Done editing' : 'Edit habits'}
           </button>
@@ -70,7 +71,7 @@ export default function TodayView({
           {items.map((i) => (
             <li key={i.id} className="flex items-center gap-2">
               <button
-                onClick={() => !(editing && isToday) && edit({ toggle: i.id, done: !i.done })}
+                onClick={() => !locked && !(editing && isToday) && edit({ toggle: i.id, done: !i.done })}
                 aria-pressed={i.done}
                 className="flex flex-1 items-center gap-3 text-left"
                 style={{
@@ -91,7 +92,7 @@ export default function TodayView({
                   {i.name}
                 </span>
               </button>
-              {editing && isToday && (
+              {editing && isToday && !locked && (
                 <button
                   onClick={() => (i.habit_id ? changeHabit('PATCH', { id: i.habit_id, archive: true }) : edit({ remove: i.id }))}
                   aria-label={`Remove ${i.name}`}
@@ -103,7 +104,7 @@ export default function TodayView({
           {day && items.length === 0 && <li style={{ color: 'var(--ink-3)', fontSize: 14 }}>No habits on this day.</li>}
         </ul>
 
-        {editing && isToday && (
+        {editing && isToday && !locked && (
           <form
             className="mt-3 flex gap-2"
             onSubmit={(e) => { e.preventDefault(); if (newItem.trim()) { void changeHabit('POST', { name: newItem }); setNewItem(''); } }}
@@ -116,6 +117,25 @@ export default function TodayView({
           </form>
         )}
       </Panel>
+
+      {day && (
+        locked ? (
+          <Panel>
+            <div className="flex items-center justify-between gap-3">
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--ok)' }}>✓ Submitted. No more reminders.</span>
+              <button
+                onClick={() => edit({ submit: false })}
+                style={{ minHeight: 44, padding: '0 16px', borderRadius: 10, border: '1px solid var(--ink-2)', background: 'var(--ink-1)', fontWeight: 600 }}
+              >Edit</button>
+            </div>
+          </Panel>
+        ) : (
+          <button
+            onClick={() => { setEditing(false); edit({ submit: true }); }}
+            style={{ minHeight: 52, borderRadius: 12, background: 'var(--ink-4)', color: 'var(--ink-0)', fontWeight: 700, fontSize: 16 }}
+          >Submit {isToday ? 'today' : 'this day'}</button>
+        )
+      )}
 
       {day && (
         <Panel title="One-line note">
