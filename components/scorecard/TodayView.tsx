@@ -70,6 +70,16 @@ export default function TodayView({
         <ul className="flex flex-col gap-2">
           {items.map((i) => (
             <li key={i.id} className="flex items-center gap-2">
+              {editing && isToday && !locked && i.habit_id ? (
+                <textarea
+                  key={i.name} defaultValue={i.name} rows={2} aria-label="Habit name"
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v && v !== i.name) void changeHabit('PATCH', { id: i.habit_id, name: v });
+                  }}
+                  style={{ flex: 1, minWidth: 0, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--ink-2)', background: 'var(--ink-1)', fontSize: 16, lineHeight: 1.3, resize: 'none' }}
+                />
+              ) : (
               <button
                 onClick={() => !locked && !(editing && isToday) && edit({ toggle: i.id, done: !i.done })}
                 aria-pressed={i.done}
@@ -92,6 +102,7 @@ export default function TodayView({
                   {i.name}
                 </span>
               </button>
+              )}
               {editing && isToday && !locked && (
                 <button
                   onClick={() => (i.habit_id ? changeHabit('PATCH', { id: i.habit_id, archive: true }) : edit({ remove: i.id }))}
