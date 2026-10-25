@@ -15,7 +15,7 @@ function prettyDate(key: string): string {
 export default function TodayView({
   today, date, onDateChange,
 }: { today: string; date: string; onDateChange: (d: string) => void }) {
-  const { day, error, edit } = useScorecardDay(date);
+  const { day, error, edit, changeHabit } = useScorecardDay(date);
   const [editing, setEditing] = useState(false);
   const [newItem, setNewItem] = useState('');
 
@@ -60,17 +60,17 @@ export default function TodayView({
 
       <Panel
         title="Habits"
-        right={
+        right={isToday ? (
           <button onClick={() => setEditing((v) => !v)} style={{ fontSize: 12, color: 'var(--ink-3)', textDecoration: 'underline' }}>
-            {editing ? 'Done editing' : isToday ? 'Edit today’s list' : 'Edit this day’s list'}
+            {editing ? 'Done editing' : 'Edit habits'}
           </button>
-        }
+        ) : undefined}
       >
         <ul className="flex flex-col gap-2">
           {items.map((i) => (
             <li key={i.id} className="flex items-center gap-2">
               <button
-                onClick={() => !editing && edit({ toggle: i.id, done: !i.done })}
+                onClick={() => !(editing && isToday) && edit({ toggle: i.id, done: !i.done })}
                 aria-pressed={i.done}
                 className="flex flex-1 items-center gap-3 text-left"
                 style={{
@@ -91,9 +91,10 @@ export default function TodayView({
                   {i.name}
                 </span>
               </button>
-              {editing && (
+              {editing && isToday && (
                 <button
-                  onClick={() => edit({ remove: i.id })} aria-label={`Remove ${i.name} from this day`}
+                  onClick={() => (i.habit_id ? changeHabit('PATCH', { id: i.habit_id, archive: true }) : edit({ remove: i.id }))}
+                  aria-label={`Remove ${i.name}`}
                   style={{ width: 44, height: 44, color: 'var(--danger)', fontSize: 18 }}
                 >×</button>
               )}
@@ -102,13 +103,13 @@ export default function TodayView({
           {day && items.length === 0 && <li style={{ color: 'var(--ink-3)', fontSize: 14 }}>No habits on this day.</li>}
         </ul>
 
-        {editing && (
+        {editing && isToday && (
           <form
             className="mt-3 flex gap-2"
-            onSubmit={(e) => { e.preventDefault(); if (newItem.trim()) { edit({ add: newItem }); setNewItem(''); } }}
+            onSubmit={(e) => { e.preventDefault(); if (newItem.trim()) { void changeHabit('POST', { name: newItem }); setNewItem(''); } }}
           >
             <input
-              value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder="One-off item for this day only"
+              value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder="New habit"
               style={{ flex: 1, minHeight: 44, padding: '0 12px', borderRadius: 10, border: '1px solid var(--ink-2)', background: 'var(--ink-1)', fontSize: 16 }}
             />
             <button type="submit" style={{ minHeight: 44, padding: '0 16px', borderRadius: 10, background: 'var(--ink-4)', color: 'var(--ink-0)', fontWeight: 600 }}>Add</button>
@@ -127,7 +128,7 @@ export default function TodayView({
       )}
 
       <p style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-        A day you skip counts as 0%. Editing the habit list only changes today and later, never past days.
+        A day you skip counts as 0%. Adding or removing a habit is permanent from today on. Past days keep the list they had.
       </p>
     </div>
   );

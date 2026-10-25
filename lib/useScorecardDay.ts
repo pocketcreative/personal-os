@@ -83,5 +83,19 @@ export function useScorecardDay(date: string | null) {
   }, [date, load]);
 
   // A stale day from the previous date reads as loading until the new one lands.
-  return { day: day && day.date === date ? day : null, error, edit };
+  /** Add or archive a habit on the permanent list (today and later, never past days), then reload this day. */
+  const changeHabit = useCallback(async (method: 'POST' | 'PATCH', body: unknown) => {
+    if (!date) return;
+    try {
+      const res = await fetch('/api/scorecard/habits', {
+        method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+      await load(date);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, [date, load]);
+
+  return { changeHabit, day: day && day.date === date ? day : null, error, edit };
 }
